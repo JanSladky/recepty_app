@@ -1,0 +1,35 @@
+# 🔒 Nikdy necommituji env soubory
+.env
+.env.*.local
+
+# 📁 Build a output adresáře
+dist/
+build/
+out/
+
+# 🐞 Logy a debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 📂 Soubory editorů a systémů
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# 🧪 Pokusné databáze nebo soubory
+*.sqlite
+*.sqlite3
+
+# ⬆️ NPM cache nebo locky (dle použitého správce balíčků)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# 🔥 Jest test coverage
+coverage/
+
+# 🖼️ Upload složky (pokud je runtime generovaná)
+uploads/
