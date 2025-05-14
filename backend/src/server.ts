@@ -5,6 +5,7 @@ import path from "path";
 import router from "./routes/recipes";
 
 dotenv.config();
+
 const app = express();
 
 // ✅ Načtení z .env
@@ -21,14 +22,14 @@ app.use(
   })
 );
 
-// ✅ JSON & URL encoded middleware
+// ✅ Middleware pro JSON a URL encoded těla požadavků
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ✅ Statické soubory pro obrázky
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-// ✅ API routes
+// ✅ API router
 app.use("/api/recipes", router);
 
 // ✅ Spuštění serveru

@@ -11,6 +11,7 @@ import {
 
 const router = express.Router();
 
+// Nastavení úložiště pro obrázky
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, path.join(__dirname, "../../uploads"));
@@ -23,7 +24,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Routes
+// API routy
 router.get("/", getRecipes);
 router.get("/:id", getRecipeById);
 router.post("/", upload.single("image"), addFullRecipe);
