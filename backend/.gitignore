@@ -1,4 +1,7 @@
 # 🔒 Nikdy necommituji env soubory
+node_modules
+dist
+.env
 .env
 .env.*.local
 
