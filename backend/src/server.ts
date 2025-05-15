@@ -11,16 +11,23 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ✅ CORS whitelist
-const allowedOrigins = [process.env.FRONTEND_URL || "http://localhost:3000"];
+const allowedOrigins = [
+  "http://localhost:3000",
+  process.env.FRONTEND_URL || "https://recepty-app.vercel.app",
+];
 
-// CORS middleware
+// ✅ CORS middleware
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Povolíme i subdomény *.vercel.app
-      if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
+      if (
+        !origin || // povolit např. Postman / server-side
+        allowedOrigins.includes(origin) || // běžné povolené domény
+        /\.vercel\.app$/.test(origin) // všechny vercel preview deploymenty
+      ) {
         callback(null, true);
       } else {
+        console.warn("❌ Blokováno CORS:", origin);
         callback(new Error("Not allowed by CORS"));
       }
     },
@@ -28,7 +35,7 @@ app.use(
   })
 );
 
-// ✅ Middleware pro JSON a URL encoded těla požadavků
+// ✅ Middleware pro JSON a formulářová data
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
