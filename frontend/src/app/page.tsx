@@ -24,9 +24,10 @@ export default function HomePage() {
   const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
 
   useEffect(() => {
+    console.log("🌍 API URL:", API_URL);
     const fetchRecipes = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/recipes`);
+        const res = await fetch(`${API_URL}/api/recipes`.replace(/([^:]\/)\/+/g, "$1"));
         const data = await res.json();
         console.log("📦 Načtená odpověď:", data);
 
@@ -42,10 +43,7 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    const shouldFilter =
-      query.trim() !== "" ||
-      selectedCategories.length > 0 ||
-      selectedMealTypes.length > 0;
+    const shouldFilter = query.trim() !== "" || selectedCategories.length > 0 || selectedMealTypes.length > 0;
 
     if (!shouldFilter) {
       setFilteredRecipes([]);
@@ -55,13 +53,9 @@ export default function HomePage() {
     const filtered = recipes.filter((recipe) => {
       const matchesQuery = recipe.title.toLowerCase().includes(query.toLowerCase());
 
-      const matchesCategory =
-        selectedCategories.length === 0 ||
-        selectedCategories.some((cat) => recipe.categories.includes(cat));
+      const matchesCategory = selectedCategories.length === 0 || selectedCategories.some((cat) => recipe.categories.includes(cat));
 
-      const matchesMealType =
-        selectedMealTypes.length === 0 ||
-        (recipe.meal_types ?? []).some((type) => selectedMealTypes.includes(type));
+      const matchesMealType = selectedMealTypes.length === 0 || (recipe.meal_types ?? []).some((type) => selectedMealTypes.includes(type));
 
       return matchesQuery && matchesCategory && matchesMealType;
     });
@@ -70,15 +64,11 @@ export default function HomePage() {
   }, [query, selectedCategories, selectedMealTypes, recipes]);
 
   const toggleCategory = (cat: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
-    );
+    setSelectedCategories((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]));
   };
 
   const toggleMealType = (type: string) => {
-    setSelectedMealTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    );
+    setSelectedMealTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
   };
 
   return (
@@ -92,34 +82,22 @@ export default function HomePage() {
       {filteredRecipes.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-6">
           {filteredRecipes.map((recipe) => (
-            <Link
-              key={recipe.id}
-              href={`/recepty/${recipe.id}`}
-              className="border rounded shadow hover:shadow-lg transition overflow-hidden block"
-            >
+            <Link key={recipe.id} href={`/recepty/${recipe.id}`} className="border rounded shadow hover:shadow-lg transition overflow-hidden block">
               <img
                 src={`${API_URL}${recipe.image_url}`}
                 alt={recipe.title}
                 className="w-full h-48 object-cover"
-                onError={(e) =>
-                  ((e.target as HTMLImageElement).src = "/placeholder.jpg")
-                }
+                onError={(e) => ((e.target as HTMLImageElement).src = "/placeholder.jpg")}
               />
               <div className="p-4">
                 <h2 className="text-xl font-semibold">{recipe.title}</h2>
-                {recipe.meal_types && recipe.meal_types.length > 0 && (
-                  <p className="text-sm text-gray-500">
-                    {recipe.meal_types.join(", ")}
-                  </p>
-                )}
+                {recipe.meal_types && recipe.meal_types.length > 0 && <p className="text-sm text-gray-500">{recipe.meal_types.join(", ")}</p>}
               </div>
             </Link>
           ))}
         </div>
       ) : (
-        <p className="mt-6 text-gray-500">
-          Zadej název receptu nebo vyber filtr pro zobrazení výsledků.
-        </p>
+        <p className="mt-6 text-gray-500">Zadej název receptu nebo vyber filtr pro zobrazení výsledků.</p>
       )}
     </main>
   );

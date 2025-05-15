@@ -11,23 +11,17 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ✅ CORS whitelist
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://recepty-app.vercel.app"
-];
+const allowedOrigins = [process.env.FRONTEND_URL || "http://localhost:3000"];
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Povolíme i požadavky z nástrojů bez originu (např. Postman)
+    origin: function (origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
       }
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
     credentials: true,
   })
 );
