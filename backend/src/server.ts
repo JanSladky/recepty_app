@@ -13,10 +13,12 @@ const PORT = process.env.PORT || 5000;
 // ✅ CORS whitelist
 const allowedOrigins = [process.env.FRONTEND_URL || "http://localhost:3000"];
 
+// CORS middleware
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Povolíme i subdomény *.vercel.app
+      if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
