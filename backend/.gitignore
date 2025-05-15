@@ -1,12 +1,12 @@
 # 🔒 Nikdy necommituji env soubory
 node_modules
-dist
+
 .env
 .env
 .env.*.local
 
 # 📁 Build a output adresáře
-dist/
+
 out/
 
 # 🐞 Logy a debug
