@@ -7,7 +7,6 @@ dist
 
 # 📁 Build a output adresáře
 dist/
-build/
 out/
 
 # 🐞 Logy a debug
