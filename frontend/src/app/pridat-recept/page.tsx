@@ -17,7 +17,7 @@ export type RecipeFormProps = {
   submitLabel?: string;
 };
 
-export default function RecipeForm({
+const RecipeForm = ({
   initialTitle = "",
   initialDescription = "",
   initialImageUrl,
@@ -25,7 +25,7 @@ export default function RecipeForm({
   initialMealTypes = [],
   onSubmit,
   submitLabel = "Přidat recept",
-}: RecipeFormProps) {
+}: RecipeFormProps) => {
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -133,4 +133,6 @@ export default function RecipeForm({
       </button>
     </form>
   );
-}
+};
+
+export default RecipeForm;
