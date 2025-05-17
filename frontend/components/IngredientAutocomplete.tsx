@@ -308,10 +308,9 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
     }
   };
 
-  const handleSelect = () => {
-    if (input.trim() === "" || amount <= 0) return;
-
-    setIngredients((prev) => [...prev, { name: input.trim(), amount, unit }]);
+  const handleSelect = (name: string) => {
+    if (name.trim() === "" || amount <= 0) return;
+    setIngredients((prev) => [...prev, { name, amount, unit }]);
     setInput("");
     setAmount(0);
     setUnit("g");
@@ -332,7 +331,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
           <option value="ml">ml</option>
           <option value="ks">ks</option>
         </select>
-        <button onClick={handleSelect} className="bg-blue-600 text-white px-3 py-2 rounded">
+        <button onClick={() => handleSelect(input)} className="bg-blue-600 text-white px-3 py-2 rounded">
           ➕ Přidat
         </button>
       </div>
@@ -344,9 +343,9 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
               key={suggestion}
               className="cursor-pointer px-2 py-1 hover:bg-gray-100"
               onClick={() => {
-                setInput(suggestion); // ✅ doplní text
-                setFiltered([]);
-              }}
+                setInput(suggestion); // zobrazí v inputu
+                setTimeout(() => handleSelect(suggestion), 50); // přidá do seznamu
+              }} // ✅ Oprava tady
             >
               {suggestion}
             </li>
