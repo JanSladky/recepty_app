@@ -3,12 +3,9 @@
 import { useState, useEffect } from "react";
 import SearchBar from "@/components/SearchBar";
 import Link from "next/link";
+import { CUISINE_CATEGORIES, MEALTYPE_CATEGORIES } from "@/components/CategorySelector";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
-const CUISINE_TYPES = ["Italská", "Česká", "Asijská", "Mexická", "Indická", "Japonská", "Americká"];
-
-const INGREDIENT_TYPES = ["Maso", "Ryby", "Mořské plody", "Smažený sýr", "Sendviče", "Těstoviny"];
 
 type Recipe = {
   id: number;
@@ -18,19 +15,22 @@ type Recipe = {
   meal_types?: string[];
 };
 
+// Pomocná funkce pro odstranění diakritiky a převod na lowercase
+const normalizeText = (text: string): string =>
+  text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 export default function HomePage() {
   const [query, setQuery] = useState("");
   const [selectedCuisine, setSelectedCuisine] = useState<string[]>([]);
-  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
+  const [selectedMealTypes, setSelectedMealTypes] = useState<string[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
   const [showCuisine, setShowCuisine] = useState(false);
-  const [showIngredients, setShowIngredients] = useState(false);
+  const [showMealTypes, setShowMealTypes] = useState(false);
 
   useEffect(() => {
     const fetchRecipes = async () => {
       try {
-        console.log("🔍 Volání API:", `${API_URL}/api/recipes`);
         const res = await fetch(`${API_URL}/api/recipes`);
         const data = await res.json();
         setRecipes(Array.isArray(data) ? data : []);
@@ -44,20 +44,27 @@ export default function HomePage() {
 
   useEffect(() => {
     const filtered = recipes.filter((recipe) => {
-      const matchesQuery = recipe.title.toLowerCase().includes(query.toLowerCase());
-      const matchesCuisine = selectedCuisine.length === 0 || selectedCuisine.some((c) => recipe.categories.includes(c));
-      const matchesIngredients = selectedIngredients.length === 0 || selectedIngredients.some((i) => recipe.categories.includes(i));
-      return matchesQuery && matchesCuisine && matchesIngredients;
+      const matchesQuery = normalizeText(recipe.title).includes(normalizeText(query));
+      const matchesCuisine =
+        selectedCuisine.length === 0 || selectedCuisine.some((c) => recipe.categories.includes(c));
+      const matchesMealType =
+        selectedMealTypes.length === 0 ||
+        (recipe.meal_types ?? []).some((t) => selectedMealTypes.includes(t));
+      return matchesQuery && matchesCuisine && matchesMealType;
     });
     setFilteredRecipes(filtered);
-  }, [query, selectedCuisine, selectedIngredients, recipes]);
+  }, [query, selectedCuisine, selectedMealTypes, recipes]);
 
   const toggleCuisine = (type: string) => {
-    setSelectedCuisine((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
+    setSelectedCuisine((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
   };
 
-  const toggleIngredient = (type: string) => {
-    setSelectedIngredients((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
+  const toggleMealType = (type: string) => {
+    setSelectedMealTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
   };
 
   return (
@@ -67,14 +74,22 @@ export default function HomePage() {
 
       <div className="space-y-4">
         <div>
-          <button onClick={() => setShowCuisine(!showCuisine)} className="w-full text-left font-semibold text-gray-700 bg-gray-100 px-4 py-2 rounded-md">
+          <button
+            onClick={() => setShowCuisine(!showCuisine)}
+            className="w-full text-left font-semibold text-gray-700 bg-gray-100 px-4 py-2 rounded-md"
+          >
             Typ kuchyně {showCuisine ? "▲" : "▼"}
           </button>
           {showCuisine && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-              {CUISINE_TYPES.map((type) => (
+              {CUISINE_CATEGORIES.map((type) => (
                 <label key={type} className="inline-flex items-center">
-                  <input type="checkbox" checked={selectedCuisine.includes(type)} onChange={() => toggleCuisine(type)} className="mr-2" />
+                  <input
+                    type="checkbox"
+                    checked={selectedCuisine.includes(type)}
+                    onChange={() => toggleCuisine(type)}
+                    className="mr-2"
+                  />
                   {type}
                 </label>
               ))}
@@ -84,16 +99,21 @@ export default function HomePage() {
 
         <div>
           <button
-            onClick={() => setShowIngredients(!showIngredients)}
+            onClick={() => setShowMealTypes(!showMealTypes)}
             className="w-full text-left font-semibold text-gray-700 bg-gray-100 px-4 py-2 rounded-md"
           >
-            Dle surovin {showIngredients ? "▲" : "▼"}
+            Typ jídla {showMealTypes ? "▲" : "▼"}
           </button>
-          {showIngredients && (
+          {showMealTypes && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-              {INGREDIENT_TYPES.map((type) => (
+              {MEALTYPE_CATEGORIES.map((type) => (
                 <label key={type} className="inline-flex items-center">
-                  <input type="checkbox" checked={selectedIngredients.includes(type)} onChange={() => toggleIngredient(type)} className="mr-2" />
+                  <input
+                    type="checkbox"
+                    checked={selectedMealTypes.includes(type)}
+                    onChange={() => toggleMealType(type)}
+                    className="mr-2"
+                  />
                   {type}
                 </label>
               ))}
@@ -105,7 +125,11 @@ export default function HomePage() {
       {filteredRecipes.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-6">
           {filteredRecipes.map((recipe) => (
-            <Link key={recipe.id} href={`/recepty/${recipe.id}`} className="border rounded shadow hover:shadow-lg transition overflow-hidden block">
+            <Link
+              key={recipe.id}
+              href={`/recepty/${recipe.id}`}
+              className="border rounded shadow hover:shadow-lg transition overflow-hidden block"
+            >
               <img
                 src={`${API_URL}${recipe.image_url}`}
                 alt={recipe.title}
@@ -114,13 +138,17 @@ export default function HomePage() {
               />
               <div className="p-4">
                 <h2 className="text-xl font-semibold">{recipe.title}</h2>
-                {recipe.meal_types && recipe.meal_types.length > 0 && <p className="text-sm text-gray-500">{recipe.meal_types.join(", ")}</p>}
+                {recipe.meal_types && recipe.meal_types.length > 0 && (
+                  <p className="text-sm text-gray-500">{recipe.meal_types.join(", ")}</p>
+                )}
               </div>
             </Link>
           ))}
         </div>
       ) : (
-        <p className="mt-6 text-gray-500">Zadej název receptu nebo vyber filtr pro zobrazení výsledků.</p>
+        <p className="mt-6 text-gray-500">
+          Zadej název receptu nebo vyber filtr pro zobrazení výsledků.
+        </p>
       )}
     </main>
   );

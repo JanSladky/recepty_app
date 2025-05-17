@@ -5,18 +5,30 @@ interface CategorySelectorProps {
   onToggle: (category: string) => void;
 }
 
-const ALL_CATEGORIES = [
-  "Americká", "Asijská", "Bagety", "Bowls", "Burgery", "Česká", "Čínská",
-  "Curry", "Dezerty", "Dorty", "Evropská", "Fast Food", "Indická", "Italská",
-  "Japonská", "Jihoamerická", "Káva", "Kebab", "Mexická", "Nápoje", "Nudle", "Polévka",
-  "Pečivo", "Pizza", "Poke Bowl", "Saláty", "Sendviče", "Smažený sýr", "Steak", "Maso", "Ryby", "Mořské plody",
-  "Sushi", "Světová", "Těstoviny", "Thajská", "Turecká", "Vegetarián", "Východní"
+/**
+ * Kategorie kuchyní pro rozbalovací výběr.
+ */
+export const CUISINE_CATEGORIES = [
+  "Italská", "Česká", "Asijská", "Mexická", "Indická", "Japonská",
+  "Americká", "Evropská", "Thajská", "Turecká", "Čínská"
 ];
 
+/**
+ * Kategorie typu jídla (např. suroviny, forma pokrmu) pro rozbalovací výběr.
+ */
+export const MEALTYPE_CATEGORIES = [
+  "Maso", "Ryby", "Mořské plody", "Sýr", "Sendviče", "Těstoviny",
+  "Pizza", "Polévka", "Pečivo", "Dezerty", "Káva", "Nápoje"
+];
+
+/**
+ * Komponenta pro výběr kategorií pomocí tlačítek.
+ * (volitelně můžeš později použít např. při editaci receptu)
+ */
 const CategorySelector: React.FC<CategorySelectorProps> = ({ selected, onToggle }) => {
   return (
     <div className="flex flex-wrap gap-2">
-      {ALL_CATEGORIES.map((cat) => (
+      {[...CUISINE_CATEGORIES, ...MEALTYPE_CATEGORIES].map((cat) => (
         <button
           key={cat}
           type="button"
