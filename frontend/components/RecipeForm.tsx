@@ -3,9 +3,8 @@
 import { useState, useRef } from "react";
 import CategorySelector from "@/components/CategorySelector";
 import MealTypeSelector from "@/components/MealTypeSelector";
-import IngredientAutocomplete, {
-  IngredientAutocompleteHandle,
-} from "@/components/IngredientAutocomplete";
+import IngredientAutocomplete, { IngredientAutocompleteHandle } from "@/components/IngredientAutocomplete";
+import type { Ingredient } from "@/components/IngredientAutocomplete";
 
 export type RecipeFormProps = {
   initialTitle?: string;
@@ -37,22 +36,17 @@ export default function RecipeForm({
   const ingredientRef = useRef<IngredientAutocompleteHandle>(null);
 
   const toggleCategory = (cat: string) => {
-    setCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
-    );
+    setCategories((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]));
   };
 
   const toggleMealType = (type: string) => {
-    setMealTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    );
+    setMealTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-
-    const ingredients = ingredientRef.current?.getIngredients() || [];
+    const ingredients: Ingredient[] = ingredientRef.current?.getIngredients() || [];
 
     const formData = new FormData();
     formData.append("title", title);
@@ -67,27 +61,10 @@ export default function RecipeForm({
   };
 
   return (
-    <form
-      onSubmit={handleFormSubmit}
-      className="max-w-xl mx-auto p-4 space-y-4"
-      encType="multipart/form-data"
-    >
-      <input
-        type="text"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Název receptu"
-        required
-        className="w-full p-2 border rounded"
-      />
+    <form onSubmit={handleFormSubmit} className="max-w-xl mx-auto p-4 space-y-4" encType="multipart/form-data">
+      <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Název receptu" required className="w-full p-2 border rounded" />
 
-      <textarea
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Popis"
-        required
-        className="w-full p-2 border rounded"
-      />
+      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Popis" required className="w-full p-2 border rounded" />
 
       <input
         type="file"
@@ -106,13 +83,7 @@ export default function RecipeForm({
         className="w-full p-2 border rounded"
       />
 
-      {imagePreview && (
-        <img
-          src={imagePreview}
-          alt="Náhled"
-          className="w-full h-48 object-cover rounded mb-4"
-        />
-      )}
+      {imagePreview && <img src={imagePreview} alt="Náhled" className="w-full h-48 object-cover rounded mb-4" />}
 
       <h3 className="font-semibold">Ingredience</h3>
       <IngredientAutocomplete ref={ingredientRef} />
@@ -123,11 +94,7 @@ export default function RecipeForm({
       <h3 className="font-semibold">Typ jídla</h3>
       <MealTypeSelector selected={mealTypes} onToggle={toggleMealType} />
 
-      <button
-        type="submit"
-        className="bg-green-600 text-white px-4 py-2 rounded"
-        disabled={submitting}
-      >
+      <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded" disabled={submitting}>
         {submitting ? "Ukládám..." : submitLabel}
       </button>
     </form>
