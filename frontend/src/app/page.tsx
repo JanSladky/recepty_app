@@ -2,9 +2,13 @@
 
 import { useState, useEffect } from "react";
 import SearchBar from "@/components/SearchBar";
-import CategorySelector from "@/components/CategorySelector";
-import MealTypeSelector from "@/components/MealTypeSelector";
 import Link from "next/link";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+const CUISINE_TYPES = ["Italská", "Česká", "Asijská", "Mexická", "Indická", "Japonská", "Americká"];
+
+const INGREDIENT_TYPES = ["Maso", "Ryby", "Mořské plody", "Smažený sýr", "Sendviče", "Těstoviny"];
 
 type Recipe = {
   id: number;
@@ -14,70 +18,89 @@ type Recipe = {
   meal_types?: string[];
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 export default function HomePage() {
   const [query, setQuery] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedMealTypes, setSelectedMealTypes] = useState<string[]>([]);
+  const [selectedCuisine, setSelectedCuisine] = useState<string[]>([]);
+  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
+  const [showCuisine, setShowCuisine] = useState(false);
+  const [showIngredients, setShowIngredients] = useState(false);
 
   useEffect(() => {
-    console.log("🌍 API URL:", API_URL);
     const fetchRecipes = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/recipes`.replace(/([^:]\/)\/+/g, "$1"));
+        console.log("🔍 Volání API:", `${API_URL}/api/recipes`);
+        const res = await fetch(`${API_URL}/api/recipes`);
         const data = await res.json();
-        console.log("📦 Načtená odpověď:", data);
-
-        const parsed: Recipe[] = Array.isArray(data) ? data : [];
-        setRecipes(parsed);
+        setRecipes(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("❌ Chyba při načítání receptů:", error);
         setRecipes([]);
       }
     };
-
     fetchRecipes();
   }, []);
 
   useEffect(() => {
-    const shouldFilter = query.trim() !== "" || selectedCategories.length > 0 || selectedMealTypes.length > 0;
-
-    if (!shouldFilter) {
-      setFilteredRecipes([]);
-      return;
-    }
-
     const filtered = recipes.filter((recipe) => {
       const matchesQuery = recipe.title.toLowerCase().includes(query.toLowerCase());
-
-      const matchesCategory = selectedCategories.length === 0 || selectedCategories.some((cat) => recipe.categories.includes(cat));
-
-      const matchesMealType = selectedMealTypes.length === 0 || (recipe.meal_types ?? []).some((type) => selectedMealTypes.includes(type));
-
-      return matchesQuery && matchesCategory && matchesMealType;
+      const matchesCuisine = selectedCuisine.length === 0 || selectedCuisine.some((c) => recipe.categories.includes(c));
+      const matchesIngredients = selectedIngredients.length === 0 || selectedIngredients.some((i) => recipe.categories.includes(i));
+      return matchesQuery && matchesCuisine && matchesIngredients;
     });
-
     setFilteredRecipes(filtered);
-  }, [query, selectedCategories, selectedMealTypes, recipes]);
+  }, [query, selectedCuisine, selectedIngredients, recipes]);
 
-  const toggleCategory = (cat: string) => {
-    setSelectedCategories((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]));
+  const toggleCuisine = (type: string) => {
+    setSelectedCuisine((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
   };
 
-  const toggleMealType = (type: string) => {
-    setSelectedMealTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
+  const toggleIngredient = (type: string) => {
+    setSelectedIngredients((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
   };
 
   return (
     <main className="p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-4">Aplikace na recepty</h1>
-
       <SearchBar query={query} onQueryChange={setQuery} />
-      <CategorySelector selected={selectedCategories} onToggle={toggleCategory} />
-      <MealTypeSelector selected={selectedMealTypes} onToggle={toggleMealType} />
+
+      <div className="space-y-4">
+        <div>
+          <button onClick={() => setShowCuisine(!showCuisine)} className="w-full text-left font-semibold text-gray-700 bg-gray-100 px-4 py-2 rounded-md">
+            Typ kuchyně {showCuisine ? "▲" : "▼"}
+          </button>
+          {showCuisine && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+              {CUISINE_TYPES.map((type) => (
+                <label key={type} className="inline-flex items-center">
+                  <input type="checkbox" checked={selectedCuisine.includes(type)} onChange={() => toggleCuisine(type)} className="mr-2" />
+                  {type}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <button
+            onClick={() => setShowIngredients(!showIngredients)}
+            className="w-full text-left font-semibold text-gray-700 bg-gray-100 px-4 py-2 rounded-md"
+          >
+            Dle surovin {showIngredients ? "▲" : "▼"}
+          </button>
+          {showIngredients && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+              {INGREDIENT_TYPES.map((type) => (
+                <label key={type} className="inline-flex items-center">
+                  <input type="checkbox" checked={selectedIngredients.includes(type)} onChange={() => toggleIngredient(type)} className="mr-2" />
+                  {type}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {filteredRecipes.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-6">

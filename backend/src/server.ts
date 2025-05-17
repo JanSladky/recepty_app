@@ -7,24 +7,29 @@ import router from "./routes/recipes";
 dotenv.config();
 
 const app = express();
-
 const PORT = process.env.PORT || 5000;
 
-// ✅ CORS whitelist
-const allowedOrigins = [
-  "http://localhost:3000",
-  process.env.FRONTEND_URL || "https://recepty-app.vercel.app",
+// ✅ Seznam povolených originů
+const devOrigins = ["http://localhost:3000"];
+const prodOrigins = [
+  "https://recepty-app.vercel.app",
+  "https://receptyapp-production.up.railway.app",
+  process.env.FRONTEND_URL ?? "", // fallback pro jistotu
 ];
 
 // ✅ CORS middleware
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (
-        !origin || // povolit např. Postman / server-side
-        allowedOrigins.includes(origin) || // běžné povolené domény
-        /\.vercel\.app$/.test(origin) // všechny vercel preview deploymenty
-      ) {
+      if (!origin) return callback(null, true); // Povolit např. Postman / server-side
+
+      const isDev = process.env.NODE_ENV !== "production";
+      const isAllowed =
+        (isDev && devOrigins.includes(origin)) ||
+        prodOrigins.includes(origin) ||
+        /\.vercel\.app$/.test(origin); // povolit i preview deploymenty z Vercelu
+
+      if (isAllowed) {
         callback(null, true);
       } else {
         console.warn("❌ Blokováno CORS:", origin);

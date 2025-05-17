@@ -3,9 +3,13 @@ import { Pool } from "pg";
 
 dotenv.config();
 
+const isProduction = process.env.NODE_ENV === "production";
+
+const connectionString = isProduction
+  ? process.env.DATABASE_URL
+  : "postgres://recepty:recepty123@localhost:5432/recepty_dev";
+
 export const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  connectionString,
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
 });

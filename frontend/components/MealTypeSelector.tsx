@@ -18,9 +18,7 @@ const MealTypeSelector: React.FC<MealTypeSelectorProps> = ({ selected, onToggle 
           type="button"
           onClick={() => onToggle(type)}
           className={`px-3 py-1 rounded-full border text-sm transition-all ${
-            selected.includes(type)
-              ? "bg-green-600 text-white"
-              : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
+            selected.includes(type) ? "bg-green-600 text-white" : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
           }`}
         >
           {type}
