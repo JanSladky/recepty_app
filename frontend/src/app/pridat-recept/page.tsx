@@ -4,7 +4,6 @@ import { useState, useRef } from "react";
 import CategorySelector from "@/components/CategorySelector";
 import MealTypeSelector from "@/components/MealTypeSelector";
 import IngredientAutocomplete, {
-  Ingredient,
   IngredientAutocompleteHandle,
 } from "@/components/IngredientAutocomplete";
 
