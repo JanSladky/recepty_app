@@ -42,6 +42,11 @@ app.use(express.urlencoded({ extended: true }));
 // ✅ Statické soubory pro obrázky
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
+// ✅ Root endpoint pro ověření funkčnosti backendu
+app.get("/", (req, res) => {
+  res.send("✅ API pro recepty je v provozu!");
+});
+
 // ✅ API router
 app.use("/api/recipes", router);
 
