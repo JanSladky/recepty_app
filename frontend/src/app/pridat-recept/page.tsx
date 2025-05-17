@@ -18,8 +18,12 @@ export default function AddRecipePage() {
         const error = await res.json();
         alert("❌ Chyba při ukládání: " + error.error);
       }
-    } catch (err: any) {
-      console.error("❌ Neznámá chyba:", err);
+    } catch (err) {
+      if (err instanceof Error) {
+        console.error("❌ Neznámá chyba:", err.message);
+      } else {
+        console.error("❌ Neznámá chyba:", err);
+      }
       alert("❌ Nastala neznámá chyba při ukládání receptu.");
     }
   };
