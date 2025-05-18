@@ -1,5 +1,11 @@
 import { Request, Response } from "express";
-import { getAllRecipes, getRecipeByIdFromDB, createFullRecipe, deleteRecipeFromDB, updateRecipeInDB } from "../models/recipeModel";
+import {
+  getAllRecipes,
+  getRecipeByIdFromDB,
+  createFullRecipe,
+  deleteRecipeFromDB,
+  updateRecipeInDB,
+} from "../models/recipeModel";
 
 export const getRecipes = async (req: Request, res: Response) => {
   try {
@@ -28,9 +34,9 @@ export const getRecipeById = async (req: Request, res: Response) => {
 
 export const addFullRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
-    // ✅ DEBUG výpisy:
     console.log("📦 Request body:", req.body);
     console.log("📷 Request file:", req.file);
+
     const { title, description, ingredients, categories, mealType } = req.body;
 
     if (!title || !description || !ingredients || !categories || !mealType) {
@@ -40,10 +46,17 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
 
     const parsedIngredients = JSON.parse(ingredients);
     const parsedCategories = JSON.parse(categories);
-    const parsedMealTypes = JSON.parse(mealType); // očekáváme pole stringů
-    const imagePath = req.file?.path || "";
+    const parsedMealTypes = JSON.parse(mealType);
+    const imagePath = req.file?.path || ""; // ✅ Cloudinary URL
 
-    const recipeId = await createFullRecipe(title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories);
+    const recipeId = await createFullRecipe(
+      title,
+      description,
+      imagePath,
+      parsedMealTypes,
+      parsedIngredients,
+      parsedCategories
+    );
 
     res.status(201).json({ message: "Recept uložen", id: recipeId });
   } catch (error) {
@@ -64,10 +77,18 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
 
     const parsedIngredients = JSON.parse(ingredients);
     const parsedCategories = JSON.parse(categories);
-    const parsedMealTypes = JSON.parse(mealType); // očekáváme pole stringů
-    const imagePath = req.file ? "/uploads/" + req.file.filename : null;
+    const parsedMealTypes = JSON.parse(mealType);
+    const imagePath = req.file?.path || null; // ✅ Cloudinary URL nebo null (beze změny)
 
-    await updateRecipeInDB(id, title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories);
+    await updateRecipeInDB(
+      id,
+      title,
+      description,
+      imagePath,
+      parsedMealTypes,
+      parsedIngredients,
+      parsedCategories
+    );
 
     res.status(200).json({ message: "Recept upraven" });
   } catch (error) {
