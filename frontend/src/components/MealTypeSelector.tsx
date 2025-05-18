@@ -1,13 +1,13 @@
+// src/components/MealTypeSelector.tsx
 "use client";
 
 import React from "react";
+import { ALL_MEAL_TYPES } from "@/constants/categories";
 
 interface MealTypeSelectorProps {
   selected: string[];
   onToggle: (type: string) => void;
 }
-
-const ALL_MEAL_TYPES = ["Snídaně", "Svačina", "Oběd", "Večeře"];
 
 const MealTypeSelector: React.FC<MealTypeSelectorProps> = ({ selected, onToggle }) => {
   return (
@@ -18,7 +18,9 @@ const MealTypeSelector: React.FC<MealTypeSelectorProps> = ({ selected, onToggle 
           type="button"
           onClick={() => onToggle(type)}
           className={`px-3 py-1 rounded-full border text-sm transition-all ${
-            selected.includes(type) ? "bg-green-600 text-white" : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
+            selected.includes(type)
+              ? "bg-green-600 text-white"
+              : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
           }`}
         >
           {type}

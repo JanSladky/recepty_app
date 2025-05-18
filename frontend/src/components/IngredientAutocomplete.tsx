@@ -31,6 +31,8 @@ export type IngredientAutocompleteHandle = {
 export const INGREDIENT_SUGGESTIONS = [
   // 🥩 Maso a uzeniny
   "Hovězí maso mleté",
+  "Vepřové maso mleté",
+  "Mleté maso mix",
   "Hovězí svíčková",
   "Hovězí žebra",
   "Vepřová panenka",
@@ -364,11 +366,11 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
               key={suggestion}
               className="cursor-pointer px-2 py-1 hover:bg-gray-100"
               onClick={() => {
-                setInput(suggestion); // zobrazí v inputu
+                setInput(suggestion);
                 const defaults = getDefaultForIngredient(suggestion);
                 setAmount(defaults.amount);
                 setUnit(defaults.unit);
-                setTimeout(() => handleSelect(suggestion), 50); // přidá do seznamu
+                // ✅ Už žádné handleSelect!
               }} // ✅ Oprava tady
             >
               {suggestion}

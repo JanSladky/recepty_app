@@ -2,7 +2,7 @@
   "baseUrl": ".",
 
   "compilerOptions": {
-    "baseUrl": ".",
+    "baseUrl": "./src",
 
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
@@ -23,7 +23,7 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

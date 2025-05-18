@@ -1,30 +1,12 @@
+// src/components/CategorySelector.tsx
 import React from "react";
+import { CUISINE_CATEGORIES, MEALTYPE_CATEGORIES } from "@/constants/categories";
 
 interface CategorySelectorProps {
   selected: string[];
   onToggle: (category: string) => void;
 }
 
-/**
- * Kategorie kuchyní pro rozbalovací výběr.
- */
-export const CUISINE_CATEGORIES = [
-  "Italská", "Česká", "Asijská", "Mexická", "Indická", "Japonská",
-  "Americká", "Evropská", "Thajská", "Turecká", "Čínská"
-];
-
-/**
- * Kategorie typu jídla (např. suroviny, forma pokrmu) pro rozbalovací výběr.
- */
-export const MEALTYPE_CATEGORIES = [
-  "Maso", "Ryby", "Mořské plody", "Sýr", "Sendviče", "Těstoviny",
-  "Pizza", "Polévka", "Pečivo", "Dezerty", "Káva", "Nápoje"
-];
-
-/**
- * Komponenta pro výběr kategorií pomocí tlačítek.
- * (volitelně můžeš později použít např. při editaci receptu)
- */
 const CategorySelector: React.FC<CategorySelectorProps> = ({ selected, onToggle }) => {
   return (
     <div className="flex flex-wrap gap-2">
