@@ -38,16 +38,27 @@ export default function EditPage() {
   }, [id]);
 
   const handleSubmit = async (formData: FormData) => {
-    const res = await fetch(`${API_URL}/api/recipes/${id}`, {
-      method: "PUT",
-      body: formData,
-    });
+    try {
+      const res = await fetch(`${API_URL}/api/recipes/${id}`, {
+        method: "PUT",
+        headers: {
+          // důležité: ne nastavuj Content-Type při použití FormData!
+          "x-user-email": localStorage.getItem("userEmail") || "",
+        },
+        body: formData,
+      });
 
-    if (res.ok) {
-      alert("Recept upraven!");
-      router.push(`/recepty/${id}`);
-    } else {
-      alert("Chyba při úpravě.");
+      if (res.ok) {
+        alert("✅ Recept upraven!");
+        router.push(`/recepty/${id}`);
+      } else if (res.status === 401) {
+        alert("❌ Nemáš oprávnění upravit recept.");
+      } else {
+        alert("❌ Chyba při úpravě.");
+      }
+    } catch (err) {
+      console.error("❌ Chyba při odesílání požadavku:", err);
+      alert("❌ Chyba při komunikaci se serverem.");
     }
   };
 
