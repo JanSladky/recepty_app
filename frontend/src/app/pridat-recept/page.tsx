@@ -9,6 +9,10 @@ export default function AddRecipePage() {
     try {
       const res = await fetch(`${API_URL}/api/recipes`, {
         method: "POST",
+        headers: {
+          "x-user-email": localStorage.getItem("userEmail") || "",
+          // ❗️Nepřidávej `Content-Type`, protože FormData si nastaví vlastní
+        },
         body: formData,
       });
 
@@ -16,7 +20,7 @@ export default function AddRecipePage() {
         const data = await res.json();
         alert("✅ Recept přidán!" + (data.image_url ? ` Obrázek: ${data.image_url}` : ""));
       } else {
-        const errorText = await res.text(); // 👈 místo res.json()
+        const errorText = await res.text();
         console.error("❌ Chyba při ukládání:", errorText);
         alert("❌ Chyba při ukládání: " + errorText);
       }
