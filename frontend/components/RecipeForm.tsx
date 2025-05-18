@@ -11,11 +11,11 @@ export type RecipeFormProps = {
   initialDescription?: string;
   initialImageUrl?: string;
   initialIngredients?: Ingredient[];
-  
   initialCategories?: string[];
   initialMealTypes?: string[];
   onSubmit: (formData: FormData) => Promise<void>;
   submitLabel?: string;
+  loading?: boolean; // ✅ NOVÝ prop
 };
 
 export default function RecipeForm({
@@ -27,6 +27,7 @@ export default function RecipeForm({
   initialMealTypes = [],
   onSubmit,
   submitLabel = "Přidat recept",
+  loading = false, // ✅ výchozí hodnota
 }: RecipeFormProps) {
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
@@ -97,7 +98,7 @@ export default function RecipeForm({
       <h3 className="font-semibold">Typ jídla</h3>
       <MealTypeSelector selected={mealTypes} onToggle={toggleMealType} />
 
-      <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded" disabled={submitting}>
+      <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded" disabled={submitting || loading}>
         {submitting ? "Ukládám..." : submitLabel}
       </button>
     </form>

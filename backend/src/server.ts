@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import path from "path";
 import router from "./routes/recipes";
 
 dotenv.config();
@@ -9,26 +8,23 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ✅ Seznam povolených originů
+// ✅ CORS middleware
 const devOrigins = ["http://localhost:3000"];
 const prodOrigins = [
   "https://recepty-app.vercel.app",
   "https://receptyapp-production.up.railway.app",
-  process.env.FRONTEND_URL ?? "", // fallback pro jistotu
+  process.env.FRONTEND_URL ?? "",
 ];
 
-// ✅ CORS middleware
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin) return callback(null, true); // Povolit např. Postman / server-side
-
+      if (!origin) return callback(null, true);
       const isDev = process.env.NODE_ENV !== "production";
       const isAllowed =
         (isDev && devOrigins.includes(origin)) ||
         prodOrigins.includes(origin) ||
-        /\.vercel\.app$/.test(origin); // povolit i preview deploymenty z Vercelu
-
+        /\.vercel\.app$/.test(origin);
       if (isAllowed) {
         callback(null, true);
       } else {
@@ -40,22 +36,19 @@ app.use(
   })
 );
 
-// ✅ Middleware pro JSON a formulářová data
+// ✅ Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ Statické soubory pro obrázky
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
-
-// ✅ Root endpoint pro ověření funkčnosti backendu
+// ✅ Root
 app.get("/", (req, res) => {
   res.send("✅ API pro recepty je v provozu!");
 });
 
-// ✅ API router
+// ✅ API
 app.use("/api/recipes", router);
 
-// ✅ Spuštění serveru
+// ✅ Server
 app.listen(PORT, () => {
   console.log(`✅ Server běží na http://localhost:${PORT}`);
 });

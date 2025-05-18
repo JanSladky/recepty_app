@@ -1,5 +1,5 @@
 "use client";
-
+import { useState } from "react";
 import RecipeForm from "@/components/RecipeForm";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -13,7 +13,8 @@ export default function AddRecipePage() {
       });
 
       if (res.ok) {
-        alert("✅ Recept přidán!");
+        const data = await res.json();
+        alert("✅ Recept přidán!" + (data.image_url ? ` Obrázek: ${data.image_url}` : ""));
       } else {
         const error = await res.json();
         alert("❌ Chyba při ukládání: " + error.error);

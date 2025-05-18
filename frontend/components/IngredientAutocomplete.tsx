@@ -2,6 +2,22 @@
 
 import React, { useState, useImperativeHandle, forwardRef } from "react";
 
+const heuristics = [
+  { keywords: ["jogurt", "mléko", "smetana", "olej", "sirup", "šťáva"], unit: "ml", amount: 100 },
+  { keywords: ["vejce", "párek", "klobása", "šunka", "rajče", "cibule", "kuře"], unit: "ks", amount: 1 },
+  { keywords: ["máslo", "mouka", "cukr", "sýr", "strouhanka", "rýže", "těstoviny"], unit: "g", amount: 100 },
+];
+
+function getDefaultForIngredient(name: string): { unit: string; amount: number } {
+  const lower = name.toLowerCase();
+  for (const rule of heuristics) {
+    if (rule.keywords.some((k) => lower.includes(k))) {
+      return { unit: rule.unit, amount: rule.amount };
+    }
+  }
+  return { unit: "g", amount: 0 };
+}
+
 export type Ingredient = {
   name: string;
   amount: number;
@@ -325,12 +341,17 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
     <div className="space-y-4">
       <div className="flex gap-2 items-center">
         <input type="text" value={input} onChange={handleInputChange} placeholder="Název suroviny" className="flex-1 p-2 border rounded" />
-        <input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} placeholder="Množství" className="w-24 p-2 border rounded" />
         <select value={unit} onChange={(e) => setUnit(e.target.value)} className="w-24 p-2 border rounded">
           <option value="g">g</option>
           <option value="ml">ml</option>
           <option value="ks">ks</option>
+          <option value="ks">lžička</option>
+          <option value="ks">1/4</option>
         </select>
+        {(unit === "g" || unit === "ml") && (
+          <input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} placeholder="Množství" className="w-24 p-2 border rounded" />
+        )}
+
         <button onClick={() => handleSelect(input)} className="bg-blue-600 text-white px-3 py-2 rounded">
           ➕ Přidat
         </button>
@@ -344,6 +365,9 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
               className="cursor-pointer px-2 py-1 hover:bg-gray-100"
               onClick={() => {
                 setInput(suggestion); // zobrazí v inputu
+                const defaults = getDefaultForIngredient(suggestion);
+                setAmount(defaults.amount);
+                setUnit(defaults.unit);
                 setTimeout(() => handleSelect(suggestion), 50); // přidá do seznamu
               }} // ✅ Oprava tady
             >

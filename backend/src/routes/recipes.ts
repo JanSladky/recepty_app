@@ -1,28 +1,13 @@
 import express from "express";
 import multer from "multer";
+import { storage } from "../utils/cloudinary";
 import path from "path";
-import {
-  getRecipes,
-  getRecipeById,
-  addFullRecipe,
-  updateRecipe,
-  deleteRecipe,
-} from "../controllers/recipeController";
+import { getRecipes, getRecipeById, addFullRecipe, updateRecipe, deleteRecipe } from "../controllers/recipeController";
 
 const router = express.Router();
+const upload = multer({ storage }); // ✅ používáme storage z cloudinary
 
-// Nastavení úložiště pro obrázky
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "../../uploads"));
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = Date.now() + "-" + file.originalname;
-    cb(null, uniqueName);
-  },
-});
-
-const upload = multer({ storage });
+// ❌ Duplikovaná deklarace storage byla odstraněna
 
 // API routy
 router.get("/", getRecipes);
