@@ -11,7 +11,7 @@ export default function LoginPage() {
     try {
       console.log("📤 Posílám email:", email); // 👈 Sem to dej
 
-      const res = await fetch(`${API_URL}/api/users/${encodeURIComponent(email)}`);
+      const res = await fetch(`${API_URL}/api/users/email/${encodeURIComponent(email)}`);
       if (!res.ok) {
         alert("❌ Uživatel nenalezen.");
         return;
