@@ -5,7 +5,8 @@ import db from "@utils/db";
 const router = express.Router();
 
 router.get("/:email", async (req, res) => {
-  const email = req.params.email;
+  const email = decodeURIComponent(req.params.email); // ✅ dekóduj e-mail
+
   try {
     const { rows } = await db.query("SELECT * FROM users WHERE email = $1", [email]);
     if (rows.length > 0) {
@@ -14,7 +15,8 @@ router.get("/:email", async (req, res) => {
       res.status(404).json({ error: "Uživatel nenalezen" });
     }
   } catch (error) {
-    res.status(500).json({ error: "Chyba při načítání uživatele" });
+    console.error("❌ Chyba při načítání uživatele:", error);
+    res.status(500).json({ error: "Chyba serveru" });
   }
 });
 
