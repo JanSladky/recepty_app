@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import RecipeForm from "@/components/RecipeForm";
-import { Ingredient } from "@/components/RecipeForm";
+import type { Ingredient } from "@/components/IngredientAutocomplete";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 

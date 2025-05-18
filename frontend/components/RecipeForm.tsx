@@ -10,6 +10,8 @@ export type RecipeFormProps = {
   initialTitle?: string;
   initialDescription?: string;
   initialImageUrl?: string;
+  initialIngredients?: Ingredient[];
+  
   initialCategories?: string[];
   initialMealTypes?: string[];
   onSubmit: (formData: FormData) => Promise<void>;
@@ -19,6 +21,7 @@ export type RecipeFormProps = {
 export default function RecipeForm({
   initialTitle = "",
   initialDescription = "",
+  initialIngredients = [],
   initialImageUrl,
   initialCategories = [],
   initialMealTypes = [],
@@ -86,7 +89,7 @@ export default function RecipeForm({
       {imagePreview && <img src={imagePreview} alt="Náhled" className="w-full h-48 object-cover rounded mb-4" />}
 
       <h3 className="font-semibold">Ingredience</h3>
-      <IngredientAutocomplete ref={ingredientRef} />
+      <IngredientAutocomplete ref={ingredientRef} initialIngredients={initialIngredients} />
 
       <h3 className="font-semibold">Kategorie</h3>
       <CategorySelector selected={categories} onToggle={toggleCategory} />
