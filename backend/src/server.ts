@@ -1,7 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import router from "./routes/recipes";
+import recipeRoutes from "./routes/recipes";
+import userRoutes from "./routes/users"; // ✅ nově přidáno
 
 dotenv.config();
 
@@ -45,10 +46,11 @@ app.get("/", (req, res) => {
   res.send("✅ API pro recepty je v provozu!");
 });
 
-// ✅ API
-app.use("/api/recipes", router);
+// ✅ API routy
+app.use("/api/recipes", recipeRoutes); // 🍲 recepty
+app.use("/api/users", userRoutes);     // 👤 uživatelé
 
-// ✅ Server
+// ✅ Server start
 app.listen(PORT, () => {
   console.log(`✅ Server běží na http://localhost:${PORT}`);
 });

@@ -1,4 +1,4 @@
-import { db } from "../db";
+import db from "../utils/db";
 
 export type IngredientInput = {
   name: string;
@@ -17,8 +17,12 @@ export async function getAllRecipes(): Promise<any[]> {
 
   const recipesWithRelations = await Promise.all(
     recipeRows.map(async (recipe) => {
-      const categoryRes = await db.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [recipe.id]);
-      const mealTypeRes = await db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [recipe.id]);
+      const categoryRes = await db.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [
+        recipe.id,
+      ]);
+      const mealTypeRes = await db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [
+        recipe.id,
+      ]);
 
       const categories = (categoryRes.rows as { name: string }[]).map((c: { name: string }) => c.name);
       const meal_types = (mealTypeRes.rows as { name: string }[]).map((m: { name: string }) => m.name);

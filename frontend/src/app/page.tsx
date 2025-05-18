@@ -5,6 +5,7 @@ import SearchBar from "@/components/SearchBar";
 import Link from "next/link";
 import Image from "next/image";
 import { CUISINE_CATEGORIES, MEALTYPE_CATEGORIES, ALL_MEAL_TYPES } from "@/constants/categories";
+import useAdmin from "@/hooks/useAdmin";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -23,6 +24,8 @@ const normalizeText = (text: string): string =>
     .toLowerCase();
 
 export default function HomePage() {
+  const { isAdmin, loading } = useAdmin(); // přidáno `loading` pro bezpečné načtení
+
   const [query, setQuery] = useState("");
   const [selectedCuisine, setSelectedCuisine] = useState<string[]>([]);
   const [selectedMealTypes, setSelectedMealTypes] = useState<string[]>([]);
@@ -68,8 +71,15 @@ export default function HomePage() {
   return (
     <main className="p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-4">Aplikace na recepty</h1>
+     
+      {!loading && isAdmin && (
+        <Link href="/pridat-recept" className="bg-green-600 text-white px-4 py-2 rounded inline-block mb-6">
+          ➕ Přidat recept
+        </Link>
+      )}
+
       <SearchBar query={query} onQueryChange={setQuery} />
-      {/* Filtrovací tlačítka pro typy jídel */}
+
       <div className="flex flex-wrap gap-2 mb-4">
         {ALL_MEAL_TYPES.map((type) => (
           <button
