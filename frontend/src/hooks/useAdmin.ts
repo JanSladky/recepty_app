@@ -8,23 +8,35 @@ export default function useAdmin() {
 
   useEffect(() => {
     const email = localStorage.getItem("userEmail");
+
     if (!email) {
       setIsAdmin(false);
       setLoading(false);
       return;
     }
 
-    fetch(`${API_URL}/api/users/${encodeURIComponent(email)}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        setIsAdmin(data?.is_admin === true);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("❌ Chyba při načítání admina:", err);
+    const fetchUser = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/users/${encodeURIComponent(email)}`);
+        if (!res.ok) {
+          console.warn("❌ Uživatel nenalezen nebo chyba v odpovědi:", res.status);
+          setIsAdmin(false);
+          return;
+        }
+
+        const user = await res.json();
+        console.log("📦 Načtený uživatel:", user);
+
+        setIsAdmin(user.is_admin === true);
+      } catch (err) {
+        console.error("❌ Chyba při ověřování admina:", err);
         setIsAdmin(false);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchUser();
   }, []);
 
   return { isAdmin, loading };

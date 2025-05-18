@@ -11,21 +11,24 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/users/${email}`);
+      const res = await fetch(`${API_URL}/api/users/${encodeURIComponent(email)}`);
       if (!res.ok) {
-        alert("Uživatel nenalezen.");
+        alert("❌ Uživatel nenalezen.");
         return;
       }
 
       const user = await res.json();
 
+      // ✅ Ulož do localStorage
       localStorage.setItem("userEmail", user.email);
       localStorage.setItem("isAdmin", user.is_admin ? "true" : "false");
 
       alert("✅ Přihlášení úspěšné.");
-      router.push("/");
+
+      // ✅ Vynucené načtení stránky (refresh, aby useAdmin hook fungoval správně)
+      window.location.href = "/";
     } catch (err) {
-      console.error("Chyba při přihlašování:", err);
+      console.error("❌ Chyba při přihlašování:", err);
       alert("Nastala chyba při přihlašování.");
     }
   };
