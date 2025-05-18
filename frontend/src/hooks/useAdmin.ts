@@ -14,13 +14,14 @@ export default function useAdmin() {
       return;
     }
 
-    fetch(`${API_URL}/api/users/${email}`)
-      .then((res) => res.ok ? res.json() : null)
+    fetch(`${API_URL}/api/users/${encodeURIComponent(email)}`)
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         setIsAdmin(data?.is_admin === true);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("❌ Chyba při načítání admina:", err);
         setIsAdmin(false);
         setLoading(false);
       });
