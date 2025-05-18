@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
-  const router = useRouter();
 
   const handleLogin = async () => {
     try {
@@ -19,13 +17,13 @@ export default function LoginPage() {
 
       const user = await res.json();
 
-      // ✅ Ulož do localStorage
+      // ✅ Uložení do localStorage
       localStorage.setItem("userEmail", user.email);
       localStorage.setItem("isAdmin", user.is_admin ? "true" : "false");
 
       alert("✅ Přihlášení úspěšné.");
 
-      // ✅ Vynucené načtení stránky (refresh, aby useAdmin hook fungoval správně)
+      // ✅ Vynucený reload pro správný stav admina
       window.location.href = "/";
     } catch (err) {
       console.error("❌ Chyba při přihlašování:", err);
@@ -42,6 +40,7 @@ export default function LoginPage() {
         onChange={(e) => setEmail(e.target.value)}
         placeholder="Zadej e-mail"
         className="w-full p-2 border rounded mb-4"
+        required
       />
       <button
         onClick={handleLogin}
