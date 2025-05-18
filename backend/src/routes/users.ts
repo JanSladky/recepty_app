@@ -1,9 +1,9 @@
-// routes/users.ts
 import express from "express";
 import db from "@utils/db";
 
 const router = express.Router();
 
+// ✅ NOVÁ správná route
 router.get("/email/:email", async (req, res) => {
   const email = decodeURIComponent(req.params.email);
 
