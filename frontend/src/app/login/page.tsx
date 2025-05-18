@@ -9,7 +9,8 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/users/email/${encodeURIComponent(email)}`);
+      // ✅ OPRAVENÁ cesta – odstraněno `/email/`
+      const res = await fetch(`${API_URL}/api/users/${encodeURIComponent(email)}`);
       if (!res.ok) {
         alert("❌ Uživatel nenalezen.");
         return;

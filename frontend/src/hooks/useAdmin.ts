@@ -17,7 +17,7 @@ export default function useAdmin() {
 
     const fetchUser = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/users/email/${encodeURIComponent(email)}`);
+        const res = await fetch(`${API_URL}/api/users/${encodeURIComponent(email)}`);
         if (!res.ok) {
           console.warn("❌ Uživatel nenalezen nebo chyba v odpovědi:", res.status);
           setIsAdmin(false);

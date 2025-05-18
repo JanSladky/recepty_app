@@ -6,20 +6,22 @@ import useAdmin from "@/hooks/useAdmin";
 import { useEffect, useState } from "react";
 
 export default function Navbar() {
-  const { isAdmin, loading } = useAdmin();
   const router = useRouter();
+  const { isAdmin, loading } = useAdmin();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    setIsLoggedIn(!!localStorage.getItem("userEmail"));
-  }, []);
+    const email = localStorage.getItem("userEmail");
+    setIsLoggedIn(!!email);
+    console.log("🔄 Přihlášen:", !!email, "| Admin:", isAdmin);
+  }, [isAdmin]); // reaguj i na změnu admin statusu
 
   const handleLogout = () => {
     localStorage.removeItem("userEmail");
     localStorage.removeItem("isAdmin");
     alert("Byl jsi odhlášen.");
     router.push("/");
-    router.refresh(); // 👈 pro jistotu aktualizace zobrazení
+    window.location.reload(); // 👉 reload pro jistotu přepočtu hooku
   };
 
   return (

@@ -2,12 +2,12 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import recipeRoutes from "./routes/recipes";
-import userRoutes from "./routes/users"; // ✅ nově přidáno
+import userRoutes from "./routes/users";
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 
 // ✅ CORS middleware
 const devOrigins = ["http://localhost:3000"];
@@ -37,11 +37,11 @@ app.use(
   })
 );
 
-// ✅ Middleware
+// ✅ Parsování request těla
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ Root
+// ✅ Root endpoint
 app.get("/", (req, res) => {
   res.send("✅ API pro recepty je v provozu!");
 });
@@ -50,7 +50,7 @@ app.get("/", (req, res) => {
 app.use("/api/recipes", recipeRoutes); // 🍲 recepty
 app.use("/api/users", userRoutes);     // 👤 uživatelé
 
-// ✅ Server start
+// ✅ Spuštění serveru
 app.listen(PORT, () => {
   console.log(`✅ Server běží na http://localhost:${PORT}`);
 });
