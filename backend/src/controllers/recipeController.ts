@@ -1,11 +1,5 @@
 import { Request, Response } from "express";
-import {
-  getAllRecipes,
-  getRecipeByIdFromDB,
-  createFullRecipe,
-  deleteRecipeFromDB,
-  updateRecipeInDB,
-} from "../models/recipeModel";
+import { getAllRecipes, getRecipeByIdFromDB, createFullRecipe, deleteRecipeFromDB, updateRecipeInDB } from "../models/recipeModel";
 
 export const getRecipes = async (req: Request, res: Response) => {
   try {
@@ -47,16 +41,11 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
     const parsedIngredients = JSON.parse(ingredients);
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
-    const imagePath = req.file?.path || ""; // ✅ Cloudinary URL
 
-    const recipeId = await createFullRecipe(
-      title,
-      description,
-      imagePath,
-      parsedMealTypes,
-      parsedIngredients,
-      parsedCategories
-    );
+    const file = req.file as any; // 👈 přetypování, aby TS nehlásil chybu
+    const imagePath = file?.url || file?.path || "";
+
+    const recipeId = await createFullRecipe(title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories);
 
     res.status(201).json({ message: "Recept uložen", id: recipeId });
   } catch (error) {
@@ -80,15 +69,7 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     const parsedMealTypes = JSON.parse(mealType);
     const imagePath = req.file?.path || null; // ✅ Cloudinary URL nebo null (beze změny)
 
-    await updateRecipeInDB(
-      id,
-      title,
-      description,
-      imagePath,
-      parsedMealTypes,
-      parsedIngredients,
-      parsedCategories
-    );
+    await updateRecipeInDB(id, title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories);
 
     res.status(200).json({ message: "Recept upraven" });
   } catch (error) {
