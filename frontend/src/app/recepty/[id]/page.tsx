@@ -77,15 +77,12 @@ export default function DetailPage() {
 
       <div className="relative w-full h-64 mb-4">
         <Image
-          src={recipe.image_url ? `${API_URL}${recipe.image_url}` : "/placeholder.jpg"}
+          src={
+            recipe.image_url && recipe.image_url.startsWith("http") ? recipe.image_url : recipe.image_url ? `${API_URL}${recipe.image_url}` : "/placeholder.jpg"
+          }
           alt={recipe.title}
           fill
           className="object-cover rounded"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = "/placeholder.jpg";
-          }}
-          priority
         />
       </div>
 

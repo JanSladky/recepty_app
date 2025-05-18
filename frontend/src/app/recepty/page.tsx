@@ -37,18 +37,19 @@ export default function ReceptyPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {recipes.map((recipe) => (
-          <Link
-            key={recipe.id}
-            href={`/recepty/${recipe.id}`}
-            className="border rounded shadow hover:shadow-lg transition overflow-hidden block"
-          >
+          <Link key={recipe.id} href={`/recepty/${recipe.id}`} className="border rounded shadow hover:shadow-lg transition overflow-hidden block">
             <div className="relative w-full h-48">
               <Image
-                src={recipe.image_url ? `${API_URL}${recipe.image_url}` : "/placeholder.jpg"}
+                src={
+                  recipe.image_url && recipe.image_url.startsWith("http")
+                    ? recipe.image_url
+                    : recipe.image_url
+                    ? `${API_URL ?? ""}${recipe.image_url}`
+                    : "/placeholder.jpg"
+                }
                 alt={recipe.title}
                 fill
                 className="object-cover"
-                priority
               />
             </div>
             <div className="p-4">
