@@ -108,14 +108,16 @@ export default function HomePage() {
             <Link key={recipe.id} href={`/recepty/${recipe.id}`} className="border rounded shadow hover:shadow-lg transition overflow-hidden block">
               <div className="relative w-full h-48">
                 <Image
-                  src={`${API_URL}${recipe.image_url}`}
+                  src={
+                    recipe.image_url && recipe.image_url.startsWith("http")
+                      ? recipe.image_url
+                      : recipe.image_url
+                      ? `${API_URL}${recipe.image_url}`
+                      : "/placeholder.jpg"
+                  }
                   alt={recipe.title}
                   fill
                   className="object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "/placeholder.jpg";
-                  }}
                 />
               </div>
               <div className="p-4">

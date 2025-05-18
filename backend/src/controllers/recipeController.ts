@@ -43,7 +43,7 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
     const parsedMealTypes = JSON.parse(mealType);
 
     const file = req.file as any; // 👈 přetypování, aby TS nehlásil chybu
-    const imagePath = file?.url || file?.path || "";
+    const imagePath = (req.file as { path?: string; secure_url?: string })?.secure_url || "";
 
     const recipeId = await createFullRecipe(title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories);
 
