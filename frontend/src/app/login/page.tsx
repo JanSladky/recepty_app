@@ -3,14 +3,30 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const router = useRouter();
 
-  const handleLogin = () => {
-    if (email.trim() !== "") {
-      localStorage.setItem("userEmail", email);
-      router.push("/"); // přesměruj na homepage
+  const handleLogin = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/users/${email}`);
+      if (!res.ok) {
+        alert("Uživatel nenalezen.");
+        return;
+      }
+
+      const user = await res.json();
+
+      localStorage.setItem("userEmail", user.email);
+      localStorage.setItem("isAdmin", user.is_admin ? "true" : "false");
+
+      alert("✅ Přihlášení úspěšné.");
+      router.push("/");
+    } catch (err) {
+      console.error("Chyba při přihlašování:", err);
+      alert("Nastala chyba při přihlašování.");
     }
   };
 
@@ -26,7 +42,7 @@ export default function LoginPage() {
       />
       <button
         onClick={handleLogin}
-        className="w-full bg-green-600 text-white py-2 rounded"
+        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
       >
         Přihlásit se
       </button>

@@ -1,14 +1,29 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import useAdmin from "@/hooks/useAdmin";
+import { useEffect, useState } from "react";
 
 export default function Navbar() {
   const { isAdmin, loading } = useAdmin();
+  const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    setIsLoggedIn(!!localStorage.getItem("userEmail"));
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("isAdmin");
+    alert("Byl jsi odhlášen.");
+    router.push("/");
+    router.refresh(); // 👈 pro jistotu aktualizace zobrazení
+  };
 
   return (
     <nav className="bg-white shadow p-4 flex justify-between items-center">
-      {/* Levá část navigace */}
       <div className="flex gap-6">
         <Link href="/" className="hover:underline">
           Domů
@@ -23,14 +38,16 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Pravá část navigace */}
-      <div>
-        <Link
-          href="/login"
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-        >
-          Přihlásit se
-        </Link>
+      <div className="flex gap-3">
+        {!loading && isLoggedIn ? (
+          <button onClick={handleLogout} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400 transition">
+            Odhlásit se
+          </button>
+        ) : (
+          <Link href="/login" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+            Přihlásit se
+          </Link>
+        )}
       </div>
     </nav>
   );
