@@ -4,11 +4,13 @@ import db from "../utils/db";
 const router = express.Router();
 
 // ✅ NOVÁ správná route
-router.get("/email/:email", async (req, res) => {
+router.get("/:email", async (req, res) => {
   const email = decodeURIComponent(req.params.email);
 
+  console.log("📥 API dotaz na uživatele:", email);
+
   try {
-    const { rows } = await db.query("SELECT * FROM users WHERE email = $1", [email]);
+    const { rows } = await db.query("SELECT * FROM users WHERE LOWER(email) = LOWER($1)", [email]);
     if (rows.length > 0) {
       res.json(rows[0]);
     } else {

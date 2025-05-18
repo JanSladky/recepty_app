@@ -9,6 +9,8 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     try {
+      console.log("📤 Posílám email:", email); // 👈 Sem to dej
+
       const res = await fetch(`${API_URL}/api/users/${encodeURIComponent(email)}`);
       if (!res.ok) {
         alert("❌ Uživatel nenalezen.");
