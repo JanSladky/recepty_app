@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -74,14 +75,19 @@ export default function DetailPage() {
         </div>
       )}
 
-      <img
-        src={recipe.image_url ? `${API_URL}${recipe.image_url}` : "/placeholder.jpg"}
-        alt={recipe.title}
-        onError={(e) => {
-          (e.target as HTMLImageElement).src = "/placeholder.jpg";
-        }}
-        className="w-full h-64 object-cover rounded mb-4"
-      />
+      <div className="relative w-full h-64 mb-4">
+        <Image
+          src={recipe.image_url ? `${API_URL}${recipe.image_url}` : "/placeholder.jpg"}
+          alt={recipe.title}
+          fill
+          className="object-cover rounded"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = "/placeholder.jpg";
+          }}
+          priority
+        />
+      </div>
 
       <p className="mb-4">{recipe.description}</p>
 

@@ -5,6 +5,7 @@ import CategorySelector from "@/components/CategorySelector";
 import MealTypeSelector from "@/components/MealTypeSelector";
 import IngredientAutocomplete, { IngredientAutocompleteHandle } from "@/components/IngredientAutocomplete";
 import type { Ingredient } from "@/components/IngredientAutocomplete";
+import Image from "next/image";
 
 export type RecipeFormProps = {
   initialTitle?: string;
@@ -87,7 +88,11 @@ export default function RecipeForm({
         className="w-full p-2 border rounded"
       />
 
-      {imagePreview && <img src={imagePreview} alt="Náhled" className="w-full h-48 object-cover rounded mb-4" />}
+      {imagePreview && (
+        <div className="relative w-full h-48 mb-4">
+          <Image src={imagePreview} alt="Náhled" fill className="object-cover rounded" />
+        </div>
+      )}
 
       <h3 className="font-semibold">Ingredience</h3>
       <IngredientAutocomplete ref={ingredientRef} initialIngredients={initialIngredients} />

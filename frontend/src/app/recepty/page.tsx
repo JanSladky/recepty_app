@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -41,14 +42,15 @@ export default function ReceptyPage() {
             href={`/recepty/${recipe.id}`}
             className="border rounded shadow hover:shadow-lg transition overflow-hidden block"
           >
-            <img
-              src={`${API_URL}${recipe.image_url}`}
-              alt={recipe.title}
-              className="w-full h-48 object-cover"
-              onError={(e) =>
-                ((e.target as HTMLImageElement).src = "/placeholder.jpg")
-              }
-            />
+            <div className="relative w-full h-48">
+              <Image
+                src={recipe.image_url ? `${API_URL}${recipe.image_url}` : "/placeholder.jpg"}
+                alt={recipe.title}
+                fill
+                className="object-cover"
+                priority
+              />
+            </div>
             <div className="p-4">
               <h2 className="text-xl font-semibold">{recipe.title}</h2>
             </div>
