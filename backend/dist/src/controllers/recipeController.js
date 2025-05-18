@@ -31,6 +31,8 @@ const getRecipeById = async (req, res) => {
 exports.getRecipeById = getRecipeById;
 const addFullRecipe = async (req, res) => {
     try {
+        console.log("📦 Request body:", req.body);
+        console.log("📷 Request file:", req.file);
         const { title, description, ingredients, categories, mealType } = req.body;
         if (!title || !description || !ingredients || !categories || !mealType) {
             res.status(400).json({ error: "Chybí povinná pole." });
@@ -38,8 +40,9 @@ const addFullRecipe = async (req, res) => {
         }
         const parsedIngredients = JSON.parse(ingredients);
         const parsedCategories = JSON.parse(categories);
-        const parsedMealTypes = JSON.parse(mealType); // očekáváme pole stringů
-        const imagePath = req.file ? "/uploads/" + req.file.filename : "";
+        const parsedMealTypes = JSON.parse(mealType);
+        const file = req.file; // 👈 přetypování, aby TS nehlásil chybu
+        const imagePath = file?.url || file?.path || "";
         const recipeId = await (0, recipeModel_1.createFullRecipe)(title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories);
         res.status(201).json({ message: "Recept uložen", id: recipeId });
     }
@@ -59,8 +62,8 @@ const updateRecipe = async (req, res) => {
         }
         const parsedIngredients = JSON.parse(ingredients);
         const parsedCategories = JSON.parse(categories);
-        const parsedMealTypes = JSON.parse(mealType); // očekáváme pole stringů
-        const imagePath = req.file ? "/uploads/" + req.file.filename : null;
+        const parsedMealTypes = JSON.parse(mealType);
+        const imagePath = req.file?.path || null; // ✅ Cloudinary URL nebo null (beze změny)
         await (0, recipeModel_1.updateRecipeInDB)(id, title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories);
         res.status(200).json({ message: "Recept upraven" });
     }
