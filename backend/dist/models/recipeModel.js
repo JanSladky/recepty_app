@@ -1,17 +1,24 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAllRecipes = getAllRecipes;
 exports.getRecipeByIdFromDB = getRecipeByIdFromDB;
 exports.createFullRecipe = createFullRecipe;
 exports.updateRecipeInDB = updateRecipeInDB;
 exports.deleteRecipeFromDB = deleteRecipeFromDB;
-const db_1 = require("../db");
+const db_1 = __importDefault(require("../utils/db"));
 async function getAllRecipes() {
-    const result = await db_1.db.query("SELECT id, title, description, image_url FROM recipes");
+    const result = await db_1.default.query("SELECT id, title, description, image_url FROM recipes");
     const recipeRows = result.rows;
     const recipesWithRelations = await Promise.all(recipeRows.map(async (recipe) => {
-        const categoryRes = await db_1.db.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [recipe.id]);
-        const mealTypeRes = await db_1.db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [recipe.id]);
+        const categoryRes = await db_1.default.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [
+            recipe.id,
+        ]);
+        const mealTypeRes = await db_1.default.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [
+            recipe.id,
+        ]);
         const categories = categoryRes.rows.map((c) => c.name);
         const meal_types = mealTypeRes.rows.map((m) => m.name);
         return {
@@ -23,17 +30,17 @@ async function getAllRecipes() {
     return recipesWithRelations;
 }
 async function getRecipeByIdFromDB(id) {
-    const { rows: recipeRows } = await db_1.db.query("SELECT id, title, description, image_url FROM recipes WHERE id = $1", [id]);
+    const { rows: recipeRows } = await db_1.default.query("SELECT id, title, description, image_url FROM recipes WHERE id = $1", [id]);
     const recipe = recipeRows[0];
     if (!recipe)
         return null;
-    const { rows: ingredients, } = await db_1.db.query("SELECT ri.amount, ri.unit, i.name FROM recipe_ingredients ri JOIN ingredients i ON ri.ingredient_id = i.id WHERE ri.recipe_id = $1", [
+    const { rows: ingredients, } = await db_1.default.query("SELECT ri.amount, ri.unit, i.name FROM recipe_ingredients ri JOIN ingredients i ON ri.ingredient_id = i.id WHERE ri.recipe_id = $1", [
         id,
     ]);
-    const { rows: categories } = await db_1.db.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [
+    const { rows: categories } = await db_1.default.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [
         id,
     ]);
-    const { rows: mealTypes } = await db_1.db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [
+    const { rows: mealTypes } = await db_1.default.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [
         id,
     ]);
     return {
@@ -44,7 +51,7 @@ async function getRecipeByIdFromDB(id) {
     };
 }
 async function createFullRecipe(title, description, imageUrl, mealTypes, ingredients, categories) {
-    const client = await db_1.db.connect();
+    const client = await db_1.default.connect();
     try {
         await client.query("BEGIN");
         const result = await client.query("INSERT INTO recipes (title, description, image_url) VALUES ($1, $2, $3) RETURNING id", [title, description, imageUrl]);
@@ -93,7 +100,7 @@ async function createFullRecipe(title, description, imageUrl, mealTypes, ingredi
     }
 }
 async function updateRecipeInDB(id, title, description, imageUrl, mealTypes, ingredients, categories) {
-    const client = await db_1.db.connect();
+    const client = await db_1.default.connect();
     try {
         await client.query("BEGIN");
         await client.query("UPDATE recipes SET title = $1, description = $2, image_url = $3 WHERE id = $4", [title, description, imageUrl, id]);
@@ -143,7 +150,7 @@ async function updateRecipeInDB(id, title, description, imageUrl, mealTypes, ing
     }
 }
 async function deleteRecipeFromDB(id) {
-    const client = await db_1.db.connect();
+    const client = await db_1.default.connect();
     try {
         await client.query("BEGIN");
         await client.query("DELETE FROM recipe_ingredients WHERE recipe_id = $1", [id]);

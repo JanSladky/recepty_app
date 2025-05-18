@@ -42,7 +42,7 @@ const addFullRecipe = async (req, res) => {
         const parsedCategories = JSON.parse(categories);
         const parsedMealTypes = JSON.parse(mealType);
         const file = req.file; // 👈 přetypování, aby TS nehlásil chybu
-        const imagePath = file?.url || file?.path || "";
+        const imagePath = req.file?.secure_url || "";
         const recipeId = await (0, recipeModel_1.createFullRecipe)(title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories);
         res.status(201).json({ message: "Recept uložen", id: recipeId });
     }

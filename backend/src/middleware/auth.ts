@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import db from "@utils/db";
+import db from "../utils/db";
 
 export const verifyAdmin = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
