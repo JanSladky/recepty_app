@@ -9,7 +9,7 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/users/${encodeURIComponent(email)}`);
+      const res = await fetch(`${API_URL}/api/users/email/${encodeURIComponent(email)}`);
       if (!res.ok) {
         alert("❌ Uživatel nenalezen.");
         return;
@@ -42,10 +42,7 @@ export default function LoginPage() {
         className="w-full p-2 border rounded mb-4"
         required
       />
-      <button
-        onClick={handleLogin}
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
-      >
+      <button onClick={handleLogin} className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
         Přihlásit se
       </button>
     </main>

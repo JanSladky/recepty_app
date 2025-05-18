@@ -4,8 +4,8 @@ import db from "@utils/db";
 
 const router = express.Router();
 
-router.get("/:email", async (req, res) => {
-  const email = decodeURIComponent(req.params.email); // ✅ dekóduj e-mail
+router.get("/email/:email", async (req, res) => {
+  const email = decodeURIComponent(req.params.email);
 
   try {
     const { rows } = await db.query("SELECT * FROM users WHERE email = $1", [email]);
