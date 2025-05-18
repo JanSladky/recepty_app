@@ -8,7 +8,6 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/src/server.js",
-    "init-db": "node dist/initDb.js"
   },
   "keywords": [],
   "author": "",
