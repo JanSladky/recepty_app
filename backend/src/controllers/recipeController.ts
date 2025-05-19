@@ -57,7 +57,7 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
 export const updateRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = Number(req.params.id);
-    const { title, description, ingredients, categories, mealType } = req.body;
+    const { title, description, ingredients, categories, mealType, existingImageUrl } = req.body;
 
     if (!title || !description || !ingredients || !categories || !mealType) {
       res.status(400).json({ error: "Chybí povinná pole." });
@@ -67,9 +67,13 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     const parsedIngredients = JSON.parse(ingredients);
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
-    const imagePath = req.file?.path || null; // ✅ Cloudinary URL nebo null (beze změny)
 
-    await updateRecipeInDB(id, title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories);
+    const uploadedImageUrl = (req.file as { path?: string; secure_url?: string })?.secure_url || null;
+
+    // ✅ Pokud není nový obrázek, použij stávající
+    const finalImageUrl = uploadedImageUrl || existingImageUrl || null;
+
+    await updateRecipeInDB(id, title, description, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories);
 
     res.status(200).json({ message: "Recept upraven" });
   } catch (error) {

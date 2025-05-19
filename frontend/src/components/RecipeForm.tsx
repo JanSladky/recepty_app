@@ -59,7 +59,12 @@ export default function RecipeForm({
     formData.append("ingredients", JSON.stringify(ingredients));
     formData.append("categories", JSON.stringify(categories));
     formData.append("mealType", JSON.stringify(mealTypes));
-    if (imageFile) formData.append("image", imageFile);
+
+    if (imageFile) {
+      formData.append("image", imageFile);
+    } else if (initialImageUrl) {
+      formData.append("existingImageUrl", initialImageUrl); // ✅ přidej původní obrázek
+    }
 
     await onSubmit(formData);
     setSubmitting(false);
