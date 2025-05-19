@@ -1,11 +1,5 @@
 import { Request, Response } from "express";
-import {
-  getAllRecipes,
-  getRecipeByIdFromDB,
-  createFullRecipe,
-  deleteRecipeFromDB,
-  updateRecipeInDB,
-} from "../models/recipeModel";
+import { getAllRecipes, getRecipeByIdFromDB, createFullRecipe, deleteRecipeFromDB, updateRecipeInDB } from "../models/recipeModel";
 
 export const getRecipes = async (req: Request, res: Response) => {
   try {
@@ -22,8 +16,7 @@ export const getRecipeById = async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     const recipe = await getRecipeByIdFromDB(id);
     if (!recipe) {
-      res.status(404).json({ error: "Recept nenalezen" });
-      return;
+      return res.status(404).json({ error: "Recept nenalezen" });
     }
     res.json(recipe);
   } catch (error) {
@@ -32,35 +25,21 @@ export const getRecipeById = async (req: Request, res: Response) => {
   }
 };
 
-export const addFullRecipe = async (req: Request, res: Response): Promise<void> => {
+export const addFullRecipe = async (req: Request, res: Response) => {
   try {
-    console.log("📦 Request body:", req.body);
-    console.log("📷 Request file:", req.file);
-
     const { title, description, ingredients, categories, mealType } = req.body;
 
     if (!title || !description || !ingredients || !categories || !mealType) {
-      res.status(400).json({ error: "Chybí povinná pole." });
-      return;
+      return res.status(400).json({ error: "Chybí povinná pole." });
     }
 
     const parsedIngredients = JSON.parse(ingredients);
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
 
-    const imagePath =
-      (req.file as { path?: string; secure_url?: string })?.secure_url ||
-      req.file?.path ||
-      "";
+    const imagePath = (req.file as { secure_url?: string; path?: string })?.secure_url || req.file?.path || "";
 
-    const recipeId = await createFullRecipe(
-      title,
-      description,
-      imagePath,
-      parsedMealTypes,
-      parsedIngredients,
-      parsedCategories
-    );
+    const recipeId = await createFullRecipe(title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories);
 
     res.status(201).json({ message: "Recept uložen", id: recipeId });
   } catch (error) {
@@ -69,43 +48,25 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-export const updateRecipe = async (req: Request, res: Response): Promise<void> => {
+export const updateRecipe = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    const {
-      title,
-      description,
-      ingredients,
-      categories,
-      mealType,
-      existingImageUrl,
-    } = req.body;
+    const { title, description, ingredients, categories, mealType, existingImageUrl } = req.body;
 
     if (!title || !description || !ingredients || !categories || !mealType) {
-      res.status(400).json({ error: "Chybí povinná pole." });
-      return;
+      return res.status(400).json({ error: "Chybí povinná pole." });
     }
 
     const parsedIngredients = JSON.parse(ingredients);
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
 
-    const uploadedImageUrl =
-      (req.file as { path?: string; secure_url?: string })?.secure_url ||
-      req.file?.path ||
-      null;
+    const uploadedImageUrl = (req.file as { secure_url?: string; path?: string })?.secure_url || req.file?.path || null;
 
-    const finalImageUrl = uploadedImageUrl || existingImageUrl || null;
+    // ✅ Nezapisuj prázdný string, raději použij undefined pro zachování původního
+    const finalImageUrl = uploadedImageUrl !== null && uploadedImageUrl !== "" ? uploadedImageUrl : existingImageUrl || null;
 
-    await updateRecipeInDB(
-      id,
-      title,
-      description,
-      finalImageUrl,
-      parsedMealTypes,
-      parsedIngredients,
-      parsedCategories
-    );
+    await updateRecipeInDB(id, title, description, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories);
 
     res.status(200).json({ message: "Recept upraven" });
   } catch (error) {

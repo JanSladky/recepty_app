@@ -111,7 +111,7 @@ export async function updateRecipeInDB(
   try {
     await client.query("BEGIN");
 
-    if (imageUrl !== null) {
+    if (imageUrl && imageUrl.trim() !== "") {
       await client.query(
         "UPDATE recipes SET title = $1, description = $2, image_url = $3 WHERE id = $4",
         [title, description, imageUrl, id]
@@ -155,7 +155,6 @@ export async function deleteRecipeFromDB(id: number): Promise<void> {
   }
 }
 
-// ✅ Pomocná funkce pro vkládání vztahů
 async function insertRelations(
   client: any,
   recipeId: number,

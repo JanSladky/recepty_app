@@ -9,7 +9,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// ✅ CORS middleware
+// ✅ CORS whitelist
 const devOrigins = ["http://localhost:3000"];
 const prodOrigins = [
   "https://recepty-app.vercel.app",
@@ -26,6 +26,7 @@ app.use(
         (isDev && devOrigins.includes(origin)) ||
         prodOrigins.includes(origin) ||
         /\.vercel\.app$/.test(origin);
+
       if (isAllowed) {
         callback(null, true);
       } else {
@@ -37,20 +38,20 @@ app.use(
   })
 );
 
-// ✅ Parsování request těla
+// ✅ Middleware pro parsování request body
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ Root endpoint
+// ✅ Root route – rychlý test dostupnosti
 app.get("/", (req, res) => {
   res.send("✅ API pro recepty je v provozu!");
 });
 
 // ✅ API routy
-app.use("/api/recipes", recipeRoutes); // 🍲 recepty
-app.use("/api/users", userRoutes);     // 👤 uživatelé
+app.use("/api/recipes", recipeRoutes); // 🍲 Recepty
+app.use("/api/users", userRoutes);     // 👤 Uživatelé
 
-// ✅ Spuštění serveru
+// ✅ Start serveru
 app.listen(PORT, () => {
   console.log(`✅ Server běží na http://localhost:${PORT}`);
 });
