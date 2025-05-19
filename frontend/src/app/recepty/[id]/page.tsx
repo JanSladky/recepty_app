@@ -6,6 +6,7 @@ import Image from "next/image";
 import useAdmin from "@/hooks/useAdmin";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const FALLBACK_IMAGE_URL = "https://via.placeholder.com/600x400?text=Bez+obrázku"; // ✅ veřejný placeholder
 
 type Ingredient = {
   name: string;
@@ -53,7 +54,7 @@ export default function DetailPage() {
       const res = await fetch(`${API_URL}/api/recipes/${recipe?.id}`, {
         method: "DELETE",
         headers: {
-          "x-user-email": localStorage.getItem("userEmail") || "", // opravený klíč
+          "x-user-email": localStorage.getItem("userEmail") || "",
         },
       });
 
@@ -80,6 +81,12 @@ export default function DetailPage() {
 
   const mealTypes = recipe.meal_types ?? [];
 
+  const imageUrl = recipe.image_url?.startsWith("http")
+    ? recipe.image_url
+    : recipe.image_url
+    ? `${API_URL}${recipe.image_url}`
+    : FALLBACK_IMAGE_URL;
+
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-4">{recipe.title}</h1>
@@ -97,7 +104,7 @@ export default function DetailPage() {
 
       <div className="relative w-full h-64 mb-4">
         <Image
-          src={recipe.image_url?.startsWith("http") ? recipe.image_url : recipe.image_url ? `${API_URL}${recipe.image_url}` : "/placeholder.jpg"}
+          src={imageUrl}
           alt={recipe.title}
           fill
           className="object-cover rounded"
