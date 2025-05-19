@@ -47,15 +47,27 @@ export default function DetailPage() {
   }, [id]);
 
   const handleDelete = async () => {
-    if (confirm("Opravdu chceš smazat tento recept?")) {
-      await fetch(`${API_URL}/api/recipes/${recipe?.id}`, {
+    if (!confirm("Opravdu chceš smazat tento recept?")) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/recipes/${recipe?.id}`, {
         method: "DELETE",
         headers: {
-          "x-user-email": localStorage.getItem("email") || "",
+          "x-user-email": localStorage.getItem("userEmail") || "", // opravený klíč
         },
       });
-      alert("Recept smazán");
-      router.push("/recepty");
+
+      if (res.ok) {
+        alert("✅ Recept smazán");
+        router.push("/recepty");
+      } else {
+        const errorText = await res.text();
+        console.error("❌ Chyba při mazání receptu:", errorText);
+        alert("❌ Chyba při mazání receptu: " + errorText);
+      }
+    } catch (err) {
+      console.error("❌ Neznámá chyba při mazání:", err);
+      alert("❌ Chyba při mazání");
     }
   };
 
@@ -85,13 +97,7 @@ export default function DetailPage() {
 
       <div className="relative w-full h-64 mb-4">
         <Image
-          src={
-            recipe.image_url?.startsWith("http")
-              ? recipe.image_url
-              : recipe.image_url
-              ? `${API_URL}${recipe.image_url}`
-              : "/placeholder.jpg"
-          }
+          src={recipe.image_url?.startsWith("http") ? recipe.image_url : recipe.image_url ? `${API_URL}${recipe.image_url}` : "/placeholder.jpg"}
           alt={recipe.title}
           fill
           className="object-cover rounded"
