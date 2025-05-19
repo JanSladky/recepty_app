@@ -7,7 +7,8 @@ import {
   updateRecipeInDB,
 } from "../models/recipeModel";
 
-export const getRecipes = async (req: Request, res: Response) => {
+// ✅ GET /api/recipes
+export const getRecipes = async (req: Request, res: Response): Promise<void> => {
   try {
     const recipes = await getAllRecipes();
     res.json(recipes);
@@ -17,12 +18,14 @@ export const getRecipes = async (req: Request, res: Response) => {
   }
 };
 
-export const getRecipeById = async (req: Request, res: Response) => {
+// ✅ GET /api/recipes/:id
+export const getRecipeById = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = Number(req.params.id);
     const recipe = await getRecipeByIdFromDB(id);
     if (!recipe) {
-      return res.status(404).json({ error: "Recept nenalezen" });
+      res.status(404).json({ error: "Recept nenalezen" });
+      return;
     }
     res.json(recipe);
   } catch (error) {
@@ -31,12 +34,14 @@ export const getRecipeById = async (req: Request, res: Response) => {
   }
 };
 
-export const addFullRecipe = async (req: Request, res: Response) => {
+// ✅ POST /api/recipes
+export const addFullRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
     const { title, description, ingredients, categories, mealType } = req.body;
 
     if (!title || !description || !ingredients || !categories || !mealType) {
-      return res.status(400).json({ error: "Chybí povinná pole." });
+      res.status(400).json({ error: "Chybí povinná pole." });
+      return;
     }
 
     const parsedIngredients = JSON.parse(ingredients);
@@ -64,7 +69,8 @@ export const addFullRecipe = async (req: Request, res: Response) => {
   }
 };
 
-export const updateRecipe = async (req: Request, res: Response) => {
+// ✅ PUT /api/recipes/:id
+export const updateRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = Number(req.params.id);
     const {
@@ -77,12 +83,13 @@ export const updateRecipe = async (req: Request, res: Response) => {
     } = req.body;
 
     if (!title || !description || !ingredients || !categories || !mealType) {
-      return res.status(400).json({ error: "Chybí povinná pole." });
+      res.status(400).json({ error: "Chybí povinná pole." });
+      return;
     }
 
-    // ✅ Debug výpis: co přišlo z frontendu
-    console.log("📝 [UPDATE] req.body:", req.body);
-    console.log("🖼 [UPDATE] req.file:", req.file);
+    // 🔍 Debug info
+    console.log("📝 req.body:", req.body);
+    console.log("📷 req.file:", req.file);
 
     const parsedIngredients = JSON.parse(ingredients);
     const parsedCategories = JSON.parse(categories);
@@ -93,16 +100,14 @@ export const updateRecipe = async (req: Request, res: Response) => {
       req.file?.path ||
       null;
 
-    // ✅ Výběr finálního obrázku
     const finalImageUrl =
       uploadedImageUrl && uploadedImageUrl !== ""
         ? uploadedImageUrl
         : existingImageUrl || null;
 
-    // ✅ Debug výpis: co se uloží jako image_url
     console.log("📦 uploadedImageUrl:", uploadedImageUrl);
     console.log("🧷 existingImageUrl:", existingImageUrl);
-    console.log("✅ Použitý finalImageUrl:", finalImageUrl);
+    console.log("✅ finalImageUrl:", finalImageUrl);
 
     await updateRecipeInDB(
       id,
@@ -121,7 +126,8 @@ export const updateRecipe = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteRecipe = async (req: Request, res: Response) => {
+// ✅ DELETE /api/recipes/:id
+export const deleteRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = Number(req.params.id);
     await deleteRecipeFromDB(id);
