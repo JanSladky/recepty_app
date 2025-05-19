@@ -16,7 +16,7 @@ export type RecipeFormProps = {
   initialMealTypes?: string[];
   onSubmit: (formData: FormData) => Promise<void>;
   submitLabel?: string;
-  loading?: boolean; // ✅ NOVÝ prop
+  loading?: boolean;
 };
 
 export default function RecipeForm({
@@ -28,7 +28,7 @@ export default function RecipeForm({
   initialMealTypes = [],
   onSubmit,
   submitLabel = "Přidat recept",
-  loading = false, // ✅ výchozí hodnota
+  loading = false,
 }: RecipeFormProps) {
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
@@ -51,6 +51,7 @@ export default function RecipeForm({
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+
     const ingredients: Ingredient[] = ingredientRef.current?.getIngredients() || [];
 
     const formData = new FormData();
@@ -63,7 +64,7 @@ export default function RecipeForm({
     if (imageFile) {
       formData.append("image", imageFile);
     } else if (initialImageUrl) {
-      formData.append("existingImageUrl", initialImageUrl); // ✅ přidej původní obrázek
+      formData.append("existingImageUrl", initialImageUrl); // 👈 zachování původního obrázku
     }
 
     await onSubmit(formData);
@@ -72,9 +73,22 @@ export default function RecipeForm({
 
   return (
     <form onSubmit={handleFormSubmit} className="max-w-xl mx-auto p-4 space-y-4" encType="multipart/form-data">
-      <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Název receptu" required className="w-full p-2 border rounded" />
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Název receptu"
+        required
+        className="w-full p-2 border rounded"
+      />
 
-      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Popis" required className="w-full p-2 border rounded" />
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Popis"
+        required
+        className="w-full p-2 border rounded"
+      />
 
       <input
         type="file"
@@ -95,7 +109,7 @@ export default function RecipeForm({
 
       {imagePreview && (
         <div className="relative w-full h-48 mb-4">
-          <Image src={imagePreview} alt="Náhled" fill className="object-cover rounded" />
+          <Image src={imagePreview} alt="Náhled obrázku" fill className="object-cover rounded" />
         </div>
       )}
 
@@ -108,7 +122,11 @@ export default function RecipeForm({
       <h3 className="font-semibold">Typ jídla</h3>
       <MealTypeSelector selected={mealTypes} onToggle={toggleMealType} />
 
-      <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded" disabled={submitting || loading}>
+      <button
+        type="submit"
+        className="bg-green-600 text-white px-4 py-2 rounded"
+        disabled={submitting || loading}
+      >
         {submitting ? "Ukládám..." : submitLabel}
       </button>
     </form>
