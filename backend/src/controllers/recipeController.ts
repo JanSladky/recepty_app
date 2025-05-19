@@ -1,11 +1,5 @@
 import { Request, Response } from "express";
-import {
-  getAllRecipes,
-  getRecipeByIdFromDB,
-  createFullRecipe,
-  deleteRecipeFromDB,
-  updateRecipeInDB,
-} from "../models/recipeModel";
+import { getAllRecipes, getRecipeByIdFromDB, createFullRecipe, deleteRecipeFromDB, updateRecipeInDB } from "../models/recipeModel";
 
 export const getRecipes = async (req: Request, res: Response) => {
   try {
@@ -45,19 +39,9 @@ export const addFullRecipe = async (req: Request, res: Response) => {
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
 
-    const imagePath =
-      (req.file as { secure_url?: string; path?: string })?.secure_url ||
-      req.file?.path ||
-      "";
+    const imagePath = (req.file as { secure_url?: string; path?: string })?.secure_url || req.file?.path || "";
 
-    const recipeId = await createFullRecipe(
-      title,
-      description,
-      imagePath,
-      parsedMealTypes,
-      parsedIngredients,
-      parsedCategories
-    );
+    const recipeId = await createFullRecipe(title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories);
 
     res.status(201).json({ message: "Recept uložen", id: recipeId });
   } catch (error) {
@@ -69,14 +53,10 @@ export const addFullRecipe = async (req: Request, res: Response) => {
 export const updateRecipe = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    const {
-      title,
-      description,
-      ingredients,
-      categories,
-      mealType,
-      existingImageUrl,
-    } = req.body;
+    // ✅ Debug: výpisy, co přichází z FormData
+    console.log("📥 req.body:", req.body);
+    console.log("📷 req.file:", req.file);
+    const { title, description, ingredients, categories, mealType, existingImageUrl } = req.body;
 
     if (!title || !description || !ingredients || !categories || !mealType) {
       res.status(400).json({ error: "Chybí povinná pole." });
@@ -87,25 +67,15 @@ export const updateRecipe = async (req: Request, res: Response) => {
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
 
-    const uploadedImageUrl =
-      (req.file as { secure_url?: string; path?: string })?.secure_url ||
-      req.file?.path ||
-      null;
+    const uploadedImageUrl = (req.file as { secure_url?: string; path?: string })?.secure_url || req.file?.path || null;
+    // ✅ Debug: výpis pro kontrolu, jaká hodnota se použije
+    console.log("🔄 uploadedImageUrl:", uploadedImageUrl);
+    console.log("🧷 existingImageUrl:", existingImageUrl);
 
-    const finalImageUrl =
-      uploadedImageUrl && uploadedImageUrl !== ""
-        ? uploadedImageUrl
-        : existingImageUrl || null;
+    const finalImageUrl = uploadedImageUrl && uploadedImageUrl !== "" ? uploadedImageUrl : existingImageUrl || null;
+    console.log("✅ Použitý finalImageUrl:", finalImageUrl);
 
-    await updateRecipeInDB(
-      id,
-      title,
-      description,
-      finalImageUrl,
-      parsedMealTypes,
-      parsedIngredients,
-      parsedCategories
-    );
+    await updateRecipeInDB(id, title, description, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories);
 
     res.status(200).json({ message: "Recept upraven" });
   } catch (error) {
