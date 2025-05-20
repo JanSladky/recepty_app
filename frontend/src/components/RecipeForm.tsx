@@ -68,12 +68,7 @@ export default function RecipeForm({
     if (imageFile) {
       formData.append("image", imageFile);
       console.log("🖼 Nový obrázek nahrán:", imageFile.name);
-    } else if (
-      initialImageUrl &&
-      typeof initialImageUrl === "string" &&
-      initialImageUrl.trim() !== "" &&
-      initialImageUrl !== "null"
-    ) {
+    } else if (initialImageUrl && initialImageUrl.trim() !== "") {
       formData.append("existingImageUrl", initialImageUrl);
       console.log("🖼 Ponechán původní obrázek:", initialImageUrl);
     }

@@ -111,12 +111,9 @@ export async function updateRecipeInDB(
   try {
     await client.query("BEGIN");
 
-    console.log("🛠 UPDATE RECIPE IN DB:");
-    console.log("• id:", id);
-    console.log("• title:", title);
-    console.log("• imageUrl:", imageUrl);
+    const shouldUpdateImage = imageUrl !== null && imageUrl.trim() !== "" && imageUrl !== "null";
 
-    if (typeof imageUrl === "string" && imageUrl.trim() !== "" && imageUrl !== "null") {
+    if (shouldUpdateImage) {
       await client.query(
         "UPDATE recipes SET title = $1, description = $2, image_url = $3 WHERE id = $4",
         [title, description, imageUrl, id]
@@ -137,7 +134,6 @@ export async function updateRecipeInDB(
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("❌ Chyba při updateRecipeInDB:", error);
     throw error;
   } finally {
     client.release();
@@ -196,10 +192,10 @@ async function insertRelations(
       categoryId = insertRes.rows[0].id;
     }
 
-    await client.query(
-      "INSERT INTO recipe_categories (recipe_id, category_id) VALUES ($1, $2)",
-      [recipeId, categoryId]
-    );
+    await client.query("INSERT INTO recipe_categories (recipe_id, category_id) VALUES ($1, $2)", [
+      recipeId,
+      categoryId,
+    ]);
   }
 
   for (const meal of mealTypes) {
