@@ -111,9 +111,7 @@ export async function updateRecipeInDB(
   try {
     await client.query("BEGIN");
 
-    const shouldUpdateImage = imageUrl !== null && imageUrl.trim() !== "" && imageUrl !== "null";
-
-    if (shouldUpdateImage) {
+    if (imageUrl !== null && typeof imageUrl === "string" && imageUrl.trim() !== "") {
       await client.query(
         "UPDATE recipes SET title = $1, description = $2, image_url = $3 WHERE id = $4",
         [title, description, imageUrl, id]
@@ -134,6 +132,7 @@ export async function updateRecipeInDB(
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
+    console.error("❌ Chyba při updateRecipeInDB:", error);
     throw error;
   } finally {
     client.release();
