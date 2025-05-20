@@ -88,8 +88,10 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     }
 
     // 🔍 Debug info
-    console.log("📝 req.body:", req.body);
-    console.log("📷 req.file:", req.file);
+    console.log("🔄 Aktualizace receptu:");
+    console.log("• title:", title);
+    console.log("• existingImageUrl:", existingImageUrl);
+    console.log("• file:", req.file);
 
     const parsedIngredients = JSON.parse(ingredients);
     const parsedCategories = JSON.parse(categories);
@@ -105,9 +107,7 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
         ? uploadedImageUrl
         : existingImageUrl || null;
 
-    console.log("📦 uploadedImageUrl:", uploadedImageUrl);
-    console.log("🧷 existingImageUrl:", existingImageUrl);
-    console.log("✅ finalImageUrl:", finalImageUrl);
+    console.log("✅ Použito finalImageUrl:", finalImageUrl);
 
     await updateRecipeInDB(
       id,
