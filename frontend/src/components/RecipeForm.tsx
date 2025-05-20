@@ -74,6 +74,8 @@ export default function RecipeForm({
     setSubmitting(false);
   };
 
+  const currentImage = imagePreview || placeholderImg;
+
   return (
     <form onSubmit={handleFormSubmit} className="max-w-xl mx-auto p-4 space-y-4" encType="multipart/form-data">
       <input
@@ -110,12 +112,14 @@ export default function RecipeForm({
         className="w-full p-2 border rounded"
       />
 
-      <div className="relative w-full h-48 mb-4">
+      <div className="relative w-full h-48 mb-4 border rounded overflow-hidden">
         <Image
-          src={imagePreview || placeholderImg}
+          src={currentImage}
           alt="Náhled obrázku"
           fill
-          className="object-cover rounded"
+          unoptimized
+          onError={() => setImagePreview(null)} // fallback při chybě načtení
+          className="object-cover"
         />
       </div>
 

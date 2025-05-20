@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import useAdmin from "@/hooks/useAdmin";
-import placeholderImg from "@/public/placeholder.svg"; // ✅ lokální fallback obrázek
+import placeholderImg from "@/public/placeholder.svg"; // ✅ lokální fallback
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -36,9 +36,10 @@ export default function DetailPage() {
       try {
         const res = await fetch(`${API_URL}/api/recipes/${id}`);
         const data = await res.json();
+        console.log("📦 Načtený recept:", data);
         setRecipe(data);
       } catch (err) {
-        console.error("Chyba při načítání detailu receptu:", err);
+        console.error("❌ Chyba při načítání detailu receptu:", err);
       } finally {
         setLoading(false);
       }
@@ -81,12 +82,14 @@ export default function DetailPage() {
 
   const mealTypes = recipe.meal_types ?? [];
 
-  const imageUrl =
-    recipe.image_url?.startsWith("http") || recipe.image_url?.startsWith("https")
+  // 🔍 Správné vyhodnocení obrázku
+  const imageUrl = recipe.image_url
+    ? recipe.image_url.startsWith("http")
       ? recipe.image_url
-      : recipe.image_url
-      ? `${API_URL}${recipe.image_url}`
-      : placeholderImg;
+      : `${API_URL}${recipe.image_url}`
+    : placeholderImg;
+
+  console.log("🖼 Zobrazený obrázek:", imageUrl);
 
   return (
     <div className="max-w-3xl mx-auto p-6">
@@ -108,6 +111,7 @@ export default function DetailPage() {
           src={imageUrl}
           alt={recipe.title}
           fill
+          unoptimized // ✅ důležité pro obrázky mimo Image CDN
           className="object-cover rounded"
         />
       </div>
