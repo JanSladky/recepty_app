@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import CategorySelector from "@/components/CategorySelector";
 import MealTypeSelector from "@/components/MealTypeSelector";
 import IngredientAutocomplete, { IngredientAutocompleteHandle } from "@/components/IngredientAutocomplete";
 import type { Ingredient } from "@/components/IngredientAutocomplete";
 import Image from "next/image";
-
 
 export type RecipeFormProps = {
   initialTitle?: string;
@@ -41,6 +40,10 @@ export default function RecipeForm({
 
   const ingredientRef = useRef<IngredientAutocompleteHandle>(null);
 
+  useEffect(() => {
+    setImagePreview(initialImageUrl || null);
+  }, [initialImageUrl]);
+
   const toggleCategory = (cat: string) => {
     setCategories((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]));
   };
@@ -65,7 +68,7 @@ export default function RecipeForm({
     if (imageFile) {
       formData.append("image", imageFile);
       console.log("🖼 Nový obrázek nahrán:", imageFile.name);
-    } else if (initialImageUrl) {
+    } else if (initialImageUrl && initialImageUrl.trim() !== "") {
       formData.append("existingImageUrl", initialImageUrl);
       console.log("🖼 Ponechán původní obrázek:", initialImageUrl);
     }
@@ -78,9 +81,22 @@ export default function RecipeForm({
 
   return (
     <form onSubmit={handleFormSubmit} className="max-w-xl mx-auto p-4 space-y-4" encType="multipart/form-data">
-      <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Název receptu" required className="w-full p-2 border rounded" />
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Název receptu"
+        required
+        className="w-full p-2 border rounded"
+      />
 
-      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Popis" required className="w-full p-2 border rounded" />
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Popis"
+        required
+        className="w-full p-2 border rounded"
+      />
 
       <input
         type="file"
@@ -100,7 +116,14 @@ export default function RecipeForm({
       />
 
       <div className="relative w-full h-48 mb-4 border rounded overflow-hidden">
-        <Image src={currentImage} alt="Náhled obrázku" fill unoptimized onError={() => setImagePreview(null)} className="object-cover" />
+        <Image
+          src={currentImage}
+          alt="Náhled obrázku"
+          fill
+          unoptimized
+          onError={() => setImagePreview(null)}
+          className="object-cover"
+        />
       </div>
 
       <h3 className="font-semibold">Ingredience</h3>
@@ -112,7 +135,11 @@ export default function RecipeForm({
       <h3 className="font-semibold">Typ jídla</h3>
       <MealTypeSelector selected={mealTypes} onToggle={toggleMealType} />
 
-      <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded" disabled={submitting || loading}>
+      <button
+        type="submit"
+        className="bg-green-600 text-white px-4 py-2 rounded"
+        disabled={submitting || loading}
+      >
         {submitting ? "Ukládám..." : submitLabel}
       </button>
     </form>

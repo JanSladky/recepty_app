@@ -106,6 +106,8 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
       existingImageUrl.trim() !== ""
     ) {
       finalImageUrl = existingImageUrl;
+    } else {
+      finalImageUrl = null;
     }
 
     console.log("🔄 Aktualizace receptu:");
