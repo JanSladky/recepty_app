@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import useAdmin from "@/hooks/useAdmin";
-import placeholderImg from "@/public/placeholder.svg"; // ✅ lokální fallback
+import placeholderImg from "@/public/placeholder.jpg"; // ✅ lokální fallback
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
