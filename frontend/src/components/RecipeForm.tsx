@@ -23,7 +23,7 @@ export default function RecipeForm({
   initialTitle = "",
   initialDescription = "",
   initialIngredients = [],
-  initialImageUrl,
+  initialImageUrl = "",
   initialCategories = [],
   initialMealTypes = [],
   onSubmit,
@@ -33,7 +33,7 @@ export default function RecipeForm({
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(initialImageUrl || null);
+  const [imagePreview, setImagePreview] = useState<string>(initialImageUrl);
   const [categories, setCategories] = useState<string[]>(initialCategories);
   const [mealTypes, setMealTypes] = useState<string[]>(initialMealTypes);
   const [submitting, setSubmitting] = useState(false);
@@ -41,7 +41,7 @@ export default function RecipeForm({
   const ingredientRef = useRef<IngredientAutocompleteHandle>(null);
 
   useEffect(() => {
-    setImagePreview(initialImageUrl || null);
+    setImagePreview(initialImageUrl || "/placeholder.jpg");
   }, [initialImageUrl]);
 
   const toggleCategory = (cat: string) => {
@@ -109,7 +109,7 @@ export default function RecipeForm({
             reader.onloadend = () => setImagePreview(reader.result as string);
             reader.readAsDataURL(file);
           } else {
-            setImagePreview(initialImageUrl || null);
+            setImagePreview(initialImageUrl || "/placeholder.jpg");
           }
         }}
         className="w-full p-2 border rounded"
@@ -121,7 +121,7 @@ export default function RecipeForm({
           alt="Náhled obrázku"
           fill
           unoptimized
-          onError={() => setImagePreview(null)}
+          onError={() => setImagePreview("/placeholder.jpg")}
           className="object-cover"
         />
       </div>
