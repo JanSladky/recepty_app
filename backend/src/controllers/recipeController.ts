@@ -70,7 +70,7 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
 
     const uploadedImageUrl = (req.file as { secure_url?: string; path?: string })?.secure_url || req.file?.path || null;
 
-    let finalImageUrl: string | null = null;
+    let finalImageUrl: string | null = uploadedImageUrl || existingImageUrl || null;
 
     if (uploadedImageUrl && uploadedImageUrl.trim() !== "") {
       finalImageUrl = uploadedImageUrl;

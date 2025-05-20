@@ -23,7 +23,7 @@ export default function RecipeForm({
   initialTitle = "",
   initialDescription = "",
   initialIngredients = [],
-  initialImageUrl = "",
+  initialImageUrl,
   initialCategories = [],
   initialMealTypes = [],
   onSubmit,
@@ -33,7 +33,7 @@ export default function RecipeForm({
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>(initialImageUrl);
+  const [imagePreview, setImagePreview] = useState<string | null>(initialImageUrl || null);
   const [categories, setCategories] = useState<string[]>(initialCategories);
   const [mealTypes, setMealTypes] = useState<string[]>(initialMealTypes);
   const [submitting, setSubmitting] = useState(false);
@@ -41,7 +41,7 @@ export default function RecipeForm({
   const ingredientRef = useRef<IngredientAutocompleteHandle>(null);
 
   useEffect(() => {
-    setImagePreview(initialImageUrl || "/placeholder.jpg");
+    setImagePreview(initialImageUrl || null);
   }, [initialImageUrl]);
 
   const toggleCategory = (cat: string) => {
@@ -68,8 +68,8 @@ export default function RecipeForm({
     if (imageFile) {
       formData.append("image", imageFile);
       console.log("🖼 Nový obrázek nahrán:", imageFile.name);
-    } else if (initialImageUrl && initialImageUrl.trim() !== "") {
-      formData.append("existingImageUrl", initialImageUrl);
+    } else {
+      formData.append("existingImageUrl", initialImageUrl || "");
       console.log("🖼 Ponechán původní obrázek:", initialImageUrl);
     }
 
@@ -81,22 +81,9 @@ export default function RecipeForm({
 
   return (
     <form onSubmit={handleFormSubmit} className="max-w-xl mx-auto p-4 space-y-4" encType="multipart/form-data">
-      <input
-        type="text"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Název receptu"
-        required
-        className="w-full p-2 border rounded"
-      />
+      <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Název receptu" required className="w-full p-2 border rounded" />
 
-      <textarea
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Popis"
-        required
-        className="w-full p-2 border rounded"
-      />
+      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Popis" required className="w-full p-2 border rounded" />
 
       <input
         type="file"
@@ -109,21 +96,14 @@ export default function RecipeForm({
             reader.onloadend = () => setImagePreview(reader.result as string);
             reader.readAsDataURL(file);
           } else {
-            setImagePreview(initialImageUrl || "/placeholder.jpg");
+            setImagePreview(initialImageUrl || null);
           }
         }}
         className="w-full p-2 border rounded"
       />
 
       <div className="relative w-full h-48 mb-4 border rounded overflow-hidden">
-        <Image
-          src={currentImage}
-          alt="Náhled obrázku"
-          fill
-          unoptimized
-          onError={() => setImagePreview("/placeholder.jpg")}
-          className="object-cover"
-        />
+        <Image src={currentImage} alt="Náhled obrázku" fill unoptimized onError={() => setImagePreview(null)} className="object-cover" />
       </div>
 
       <h3 className="font-semibold">Ingredience</h3>
@@ -135,11 +115,7 @@ export default function RecipeForm({
       <h3 className="font-semibold">Typ jídla</h3>
       <MealTypeSelector selected={mealTypes} onToggle={toggleMealType} />
 
-      <button
-        type="submit"
-        className="bg-green-600 text-white px-4 py-2 rounded"
-        disabled={submitting || loading}
-      >
+      <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded" disabled={submitting || loading}>
         {submitting ? "Ukládám..." : submitLabel}
       </button>
     </form>
