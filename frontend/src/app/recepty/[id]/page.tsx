@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import useAdmin from "@/hooks/useAdmin";
-import placeholderImg from "/placeholder.jpg"; // ✅ lokální fallback
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -83,7 +82,7 @@ export default function DetailPage() {
   const mealTypes = recipe.meal_types ?? [];
 
   // 🔍 Správné vyhodnocení obrázku
-  const imageUrl = recipe.image_url ? (recipe.image_url.startsWith("http") ? recipe.image_url : `${API_URL}${recipe.image_url}`) : "/placeholder.jpg";
+  const imageUrl = recipe.image_url ? (recipe.image_url.startsWith("http") ? recipe.image_url : `${API_URL}${recipe.image_url}`) : "/placeholder.jpg"; // ✅ přímo string, bez importu
 
   console.log("🖼 Zobrazený obrázek:", imageUrl);
 
