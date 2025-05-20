@@ -111,11 +111,6 @@ export async function updateRecipeInDB(
   try {
     await client.query("BEGIN");
 
-    console.log("🔄 UPDATE RECIPE IN DB");
-    console.log("• id:", id);
-    console.log("• title:", title);
-    console.log("• imageUrl:", imageUrl);
-
     const shouldUpdateImage =
       typeof imageUrl === "string" && imageUrl.trim() !== "" && imageUrl !== "null";
 
