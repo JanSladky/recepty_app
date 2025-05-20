@@ -87,7 +87,6 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // 🔍 Debug info
     console.log("🔄 Aktualizace receptu:");
     console.log("• title:", title);
     console.log("• existingImageUrl:", existingImageUrl);

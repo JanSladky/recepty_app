@@ -118,7 +118,7 @@ export default function RecipeForm({
           alt="Náhled obrázku"
           fill
           unoptimized
-          onError={() => setImagePreview(null)} // fallback při chybě načtení
+          onError={() => setImagePreview(null)}
           className="object-cover"
         />
       </div>
