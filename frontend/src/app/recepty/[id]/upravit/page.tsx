@@ -22,18 +22,26 @@ export default function EditPage() {
 
   useEffect(() => {
     const fetchRecipe = async () => {
-      const res = await fetch(`${API_URL}/api/recipes/${id}`);
-      const data = await res.json();
-      setInitialData({
-        title: data.title,
-        description: data.description,
-        image_url: data.image_url,
-        ingredients: data.ingredients,
-        categories: data.categories,
-        meal_types: data.meal_types ?? [],
-      });
-      setLoading(false);
+      try {
+        const res = await fetch(`${API_URL}/api/recipes/${id}`);
+        const data = await res.json();
+
+        setInitialData({
+          title: data.title,
+          description: data.description,
+          image_url: data.image_url,
+          ingredients: data.ingredients,
+          categories: data.categories,
+          meal_types: data.meal_types ?? [],
+        });
+      } catch (err) {
+        console.error("❌ Chyba při načítání receptu:", err);
+        alert("Nepodařilo se načíst recept.");
+      } finally {
+        setLoading(false);
+      }
     };
+
     fetchRecipe();
   }, [id]);
 
@@ -42,7 +50,6 @@ export default function EditPage() {
       const res = await fetch(`${API_URL}/api/recipes/${id}`, {
         method: "PUT",
         headers: {
-          // důležité: ne nastavuj Content-Type při použití FormData!
           "x-user-email": localStorage.getItem("userEmail") || "",
         },
         body: formData,
@@ -54,7 +61,8 @@ export default function EditPage() {
       } else if (res.status === 401) {
         alert("❌ Nemáš oprávnění upravit recept.");
       } else {
-        alert("❌ Chyba při úpravě.");
+        const err = await res.text();
+        alert(`❌ Chyba při úpravě: ${err}`);
       }
     } catch (err) {
       console.error("❌ Chyba při odesílání požadavku:", err);

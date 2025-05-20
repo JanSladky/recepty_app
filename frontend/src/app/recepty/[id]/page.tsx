@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import useAdmin from "@/hooks/useAdmin";
+import placeholderImg from "@/public/placeholder.svg"; // ✅ lokální fallback obrázek
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
-const FALLBACK_IMAGE_URL = "https://via.placeholder.com/600x400?text=Bez+obrázku"; // ✅ veřejný placeholder
 
 type Ingredient = {
   name: string;
@@ -81,11 +81,12 @@ export default function DetailPage() {
 
   const mealTypes = recipe.meal_types ?? [];
 
-  const imageUrl = recipe.image_url?.startsWith("http")
-    ? recipe.image_url
-    : recipe.image_url
-    ? `${API_URL}${recipe.image_url}`
-    : FALLBACK_IMAGE_URL;
+  const imageUrl =
+    recipe.image_url?.startsWith("http") || recipe.image_url?.startsWith("https")
+      ? recipe.image_url
+      : recipe.image_url
+      ? `${API_URL}${recipe.image_url}`
+      : placeholderImg;
 
   return (
     <div className="max-w-3xl mx-auto p-6">
@@ -107,7 +108,6 @@ export default function DetailPage() {
           src={imageUrl}
           alt={recipe.title}
           fill
-          unoptimized
           className="object-cover rounded"
         />
       </div>

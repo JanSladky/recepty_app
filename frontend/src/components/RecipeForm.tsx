@@ -6,6 +6,7 @@ import MealTypeSelector from "@/components/MealTypeSelector";
 import IngredientAutocomplete, { IngredientAutocompleteHandle } from "@/components/IngredientAutocomplete";
 import type { Ingredient } from "@/components/IngredientAutocomplete";
 import Image from "next/image";
+import placeholderImg from "@/public/placeholder.svg";
 
 export type RecipeFormProps = {
   initialTitle?: string;
@@ -102,18 +103,21 @@ export default function RecipeForm({
             const reader = new FileReader();
             reader.onloadend = () => setImagePreview(reader.result as string);
             reader.readAsDataURL(file);
-          } else if (initialImageUrl) {
-            setImagePreview(initialImageUrl);
+          } else {
+            setImagePreview(initialImageUrl || null);
           }
         }}
         className="w-full p-2 border rounded"
       />
 
-      {imagePreview && (
-        <div className="relative w-full h-48 mb-4">
-          <Image src={imagePreview} alt="Náhled obrázku" fill className="object-cover rounded" />
-        </div>
-      )}
+      <div className="relative w-full h-48 mb-4">
+        <Image
+          src={imagePreview || placeholderImg}
+          alt="Náhled obrázku"
+          fill
+          className="object-cover rounded"
+        />
+      </div>
 
       <h3 className="font-semibold">Ingredience</h3>
       <IngredientAutocomplete ref={ingredientRef} initialIngredients={initialIngredients} />
