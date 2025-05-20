@@ -107,6 +107,7 @@ export default function DetailPage() {
           src={imageUrl}
           alt={recipe.title}
           fill
+          unoptimized
           className="object-cover rounded"
         />
       </div>
