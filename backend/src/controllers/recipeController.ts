@@ -1,11 +1,5 @@
 import { Request, Response } from "express";
-import {
-  getAllRecipes,
-  getRecipeByIdFromDB,
-  createFullRecipe,
-  deleteRecipeFromDB,
-  updateRecipeInDB,
-} from "../models/recipeModel";
+import { getAllRecipes, getRecipeByIdFromDB, createFullRecipe, deleteRecipeFromDB, updateRecipeInDB } from "../models/recipeModel";
 
 // ✅ GET /api/recipes
 export const getRecipes = async (req: Request, res: Response): Promise<void> => {
@@ -48,19 +42,9 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
 
-    const imagePath =
-      (req.file as { secure_url?: string; path?: string })?.secure_url ||
-      req.file?.path ||
-      "";
+    const imagePath = (req.file as { secure_url?: string; path?: string })?.secure_url || req.file?.path || "";
 
-    const recipeId = await createFullRecipe(
-      title,
-      description,
-      imagePath,
-      parsedMealTypes,
-      parsedIngredients,
-      parsedCategories
-    );
+    const recipeId = await createFullRecipe(title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories);
 
     res.status(201).json({ message: "Recept uložen", id: recipeId });
   } catch (error) {
@@ -73,14 +57,7 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
 export const updateRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = Number(req.params.id);
-    const {
-      title,
-      description,
-      ingredients,
-      categories,
-      mealType,
-      existingImageUrl,
-    } = req.body;
+    const { title, description, ingredients, categories, mealType, existingImageUrl } = req.body;
 
     if (!title || !description || !ingredients || !categories || !mealType) {
       res.status(400).json({ error: "Chybí povinná pole." });
@@ -91,24 +68,14 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
 
-    const uploadedImageUrl =
-      (req.file as { secure_url?: string; path?: string })?.secure_url ||
-      req.file?.path ||
-      null;
+    const uploadedImageUrl = (req.file as { secure_url?: string; path?: string })?.secure_url || req.file?.path || null;
 
     let finalImageUrl: string | null = null;
 
     if (uploadedImageUrl && uploadedImageUrl.trim() !== "") {
       finalImageUrl = uploadedImageUrl;
-    } else if (
-      existingImageUrl &&
-      typeof existingImageUrl === "string" &&
-      existingImageUrl.trim() !== "" &&
-      existingImageUrl !== "null"
-    ) {
+    } else if (typeof existingImageUrl === "string" && existingImageUrl.trim() !== "" && existingImageUrl !== "null") {
       finalImageUrl = existingImageUrl;
-    } else {
-      finalImageUrl = null;
     }
 
     console.log("🔄 Aktualizace receptu:");
@@ -117,15 +84,7 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     console.log("• existingImageUrl:", existingImageUrl);
     console.log("✅ Použito finalImageUrl:", finalImageUrl);
 
-    await updateRecipeInDB(
-      id,
-      title,
-      description,
-      finalImageUrl,
-      parsedMealTypes,
-      parsedIngredients,
-      parsedCategories
-    );
+    await updateRecipeInDB(id, title, description, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories);
 
     res.status(200).json({ message: "Recept upraven" });
   } catch (error) {

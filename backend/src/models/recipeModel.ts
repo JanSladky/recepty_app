@@ -111,7 +111,10 @@ export async function updateRecipeInDB(
   try {
     await client.query("BEGIN");
 
-    if (imageUrl !== null && typeof imageUrl === "string" && imageUrl.trim() !== "") {
+    const shouldUpdateImage =
+      typeof imageUrl === "string" && imageUrl.trim() !== "" && imageUrl !== "null";
+
+    if (shouldUpdateImage) {
       await client.query(
         "UPDATE recipes SET title = $1, description = $2, image_url = $3 WHERE id = $4",
         [title, description, imageUrl, id]
