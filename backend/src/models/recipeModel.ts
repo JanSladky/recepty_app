@@ -112,7 +112,9 @@ export async function updateRecipeInDB(
     await client.query("BEGIN");
 
     const shouldUpdateImage =
-      typeof imageUrl === "string" && imageUrl.trim() !== "" && imageUrl !== "null";
+      typeof imageUrl === "string" &&
+      imageUrl.trim() !== "" &&
+      imageUrl !== "null";
 
     if (shouldUpdateImage) {
       await client.query(

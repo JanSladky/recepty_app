@@ -96,18 +96,22 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
       req.file?.path ||
       null;
 
+    // ✅ Ošetření, aby nebyla uložena hodnota "null" nebo ""
     let finalImageUrl: string | null = null;
 
-    if (uploadedImageUrl && uploadedImageUrl.trim() !== "") {
+    if (
+      uploadedImageUrl &&
+      uploadedImageUrl.trim() !== "" &&
+      uploadedImageUrl.trim() !== "null"
+    ) {
       finalImageUrl = uploadedImageUrl;
     } else if (
       existingImageUrl &&
       typeof existingImageUrl === "string" &&
-      existingImageUrl.trim() !== ""
+      existingImageUrl.trim() !== "" &&
+      existingImageUrl.trim() !== "null"
     ) {
       finalImageUrl = existingImageUrl;
-    } else {
-      finalImageUrl = null;
     }
 
     console.log("🔄 Aktualizace receptu:");
