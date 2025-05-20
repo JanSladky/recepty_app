@@ -74,7 +74,7 @@ export default function RecipeForm({
     setSubmitting(false);
   };
 
-  const currentImage = imagePreview || placeholderImg;
+  const currentImage = imagePreview || "/placeholder.jpg";
 
   return (
     <form onSubmit={handleFormSubmit} className="max-w-xl mx-auto p-4 space-y-4" encType="multipart/form-data">

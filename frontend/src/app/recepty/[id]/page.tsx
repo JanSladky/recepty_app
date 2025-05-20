@@ -83,11 +83,7 @@ export default function DetailPage() {
   const mealTypes = recipe.meal_types ?? [];
 
   // 🔍 Správné vyhodnocení obrázku
-  const imageUrl = recipe.image_url
-    ? recipe.image_url.startsWith("http")
-      ? recipe.image_url
-      : `${API_URL}${recipe.image_url}`
-    : placeholderImg;
+  const imageUrl = recipe.image_url ? (recipe.image_url.startsWith("http") ? recipe.image_url : `${API_URL}${recipe.image_url}`) : "/placeholder.jpg";
 
   console.log("🖼 Zobrazený obrázek:", imageUrl);
 
