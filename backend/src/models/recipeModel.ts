@@ -116,26 +116,25 @@ export async function updateRecipeInDB(
     console.log("• title:", title);
     console.log("• imageUrl:", imageUrl);
 
-    if (imageUrl !== null) {
-      // ✅ použijeme buď nový obrázek nebo existingImageUrl
+    const shouldUpdateImage =
+      typeof imageUrl === "string" && imageUrl.trim() !== "" && imageUrl !== "null";
+
+    if (shouldUpdateImage) {
       await client.query(
         "UPDATE recipes SET title = $1, description = $2, image_url = $3 WHERE id = $4",
         [title, description, imageUrl, id]
       );
     } else {
-      // ✅ zachováme původní obrázek beze změny
       await client.query(
         "UPDATE recipes SET title = $1, description = $2 WHERE id = $3",
         [title, description, id]
       );
     }
 
-    // ❌ staré relace pryč
     await client.query("DELETE FROM recipe_ingredients WHERE recipe_id = $1", [id]);
     await client.query("DELETE FROM recipe_categories WHERE recipe_id = $1", [id]);
     await client.query("DELETE FROM recipe_meal_types WHERE recipe_id = $1", [id]);
 
-    // ✅ nové relace
     await insertRelations(client, id, mealTypes, ingredients, categories);
 
     await client.query("COMMIT");
