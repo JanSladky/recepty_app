@@ -31,6 +31,8 @@ export default function DetailPage() {
   const [loading, setLoading] = useState(true);
   const { isAdmin, loading: adminLoading } = useAdmin();
 
+  console.log("🌍 API_URL z .env:", API_URL);
+
   useEffect(() => {
     const fetchRecipe = async () => {
       try {

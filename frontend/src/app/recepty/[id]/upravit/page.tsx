@@ -20,7 +20,7 @@ export default function EditPage() {
     meal_types: string[];
     steps: string[];
   } | null>(null);
-
+  console.log("🌍 API_URL z .env:", API_URL);
   useEffect(() => {
     const fetchRecipe = async () => {
       try {
