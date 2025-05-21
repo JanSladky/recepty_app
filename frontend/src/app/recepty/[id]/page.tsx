@@ -114,16 +114,16 @@ export default function DetailPage() {
       {recipe.steps && recipe.steps.length > 0 && (
         <div className="mb-6">
           <h3 className="font-semibold mt-4 mb-2">Postup</h3>
-          <ol className="list-decimal list-inside space-y-2">
+          <div className="space-y-6">
             {recipe.steps.map((step, i) => (
-              <ol key={i} className="relative bg-white border-l-4 border-green-500 pl-6 pr-4 py-4 mb-6 shadow-xl rounded-md">
+              <div key={i} className="relative bg-white border-l-4 border-green-500 pl-6 pr-4 py-4 shadow-xl rounded-md">
                 <div className="absolute -left-4 top-4 w-8 h-8 bg-green-500 text-white font-bold rounded-full flex items-center justify-center shadow">
                   {i + 1}
                 </div>
                 <p className="text-gray-800 leading-relaxed">{step}</p>
-              </ol>
+              </div>
             ))}
-          </ol>
+          </div>
         </div>
       )}
       <p className="mb-4">{recipe.notes}</p>
