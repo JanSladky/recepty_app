@@ -17,6 +17,7 @@ export const getRecipeById = async (req: Request, res: Response): Promise<void> 
   try {
     const id = Number(req.params.id);
     const recipe = await getRecipeByIdFromDB(id);
+    console.log("📦 Odpověď z DB:", recipe);
     if (!recipe) {
       res.status(404).json({ error: "Recept nenalezen" });
       return;
