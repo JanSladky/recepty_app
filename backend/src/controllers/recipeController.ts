@@ -41,7 +41,7 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
     const parsedIngredients = JSON.parse(ingredients);
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
-    const parsedSteps = steps ? JSON.parse(steps) : [];
+    const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
 
     const imagePath = (req.file as { secure_url?: string; path?: string })?.secure_url || req.file?.path || "";
 
@@ -68,7 +68,7 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     const parsedIngredients = JSON.parse(ingredients);
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
-    const parsedSteps = steps ? JSON.parse(steps) : [];
+    const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
 
     const uploadedImageUrl = (req.file as { secure_url?: string; path?: string })?.secure_url || req.file?.path || null;
 

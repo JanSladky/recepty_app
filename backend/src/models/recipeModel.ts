@@ -113,7 +113,7 @@ export async function updateRecipeInDB(
   try {
     await client.query("BEGIN");
 
-    const stepsJson = JSON.stringify(steps); // ← DŮLEŽITÉ
+    const stepsJson = JSON.stringify(steps);
 
     const shouldUpdateImage = typeof imageUrl === "string" && imageUrl.trim() !== "" && imageUrl !== "null";
 
