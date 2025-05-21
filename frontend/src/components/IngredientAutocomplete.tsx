@@ -39,6 +39,7 @@ export const INGREDIENT_SUGGESTIONS = [
   "Vepřová plec",
   "Vepřový bok",
   "Kuřecí prsa",
+  "Kuřecí maso",
   "Kuřecí stehna",
   "Kuřecí křídla",
   "Krůtí maso",
