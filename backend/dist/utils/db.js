@@ -6,11 +6,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
 const pg_1 = require("pg");
 dotenv_1.default.config();
-const isProduction = process.env.NODE_ENV === "production";
-const connectionString = isProduction ? process.env.DATABASE_URL : "postgres://recepty:recepty123@localhost:5432/recepty_dev";
+const connectionString = process.env.DATABASE_URL || "postgres://recepty:recepty123@localhost:5432/recepty_dev";
 const pool = new pg_1.Pool({
     connectionString,
-    ssl: isProduction ? { rejectUnauthorized: false } : false,
+    ssl: connectionString.includes("railway") ? { rejectUnauthorized: false } : undefined,
 });
 const db = {
     query: (text, params) => pool.query(text, params),

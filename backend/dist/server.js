@@ -11,7 +11,7 @@ const users_1 = __importDefault(require("./routes/users"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 8080;
-// ✅ CORS middleware
+// ✅ CORS whitelist
 const devOrigins = ["http://localhost:3000"];
 const prodOrigins = [
     "https://recepty-app.vercel.app",
@@ -36,17 +36,17 @@ app.use((0, cors_1.default)({
     },
     credentials: true,
 }));
-// ✅ Parsování request těla
+// ✅ Middleware pro parsování request body
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
-// ✅ Root endpoint
+// ✅ Root route – rychlý test dostupnosti
 app.get("/", (req, res) => {
     res.send("✅ API pro recepty je v provozu!");
 });
 // ✅ API routy
-app.use("/api/recipes", recipes_1.default); // 🍲 recepty
-app.use("/api/users", users_1.default); // 👤 uživatelé
-// ✅ Spuštění serveru
+app.use("/api/recipes", recipes_1.default); // 🍲 Recepty
+app.use("/api/users", users_1.default); // 👤 Uživatelé
+// ✅ Start serveru
 app.listen(PORT, () => {
     console.log(`✅ Server běží na http://localhost:${PORT}`);
 });
