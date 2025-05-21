@@ -31,14 +31,12 @@ export default function DetailPage() {
   const [loading, setLoading] = useState(true);
   const { isAdmin, loading: adminLoading } = useAdmin();
 
-  console.log("🌍 API_URL z .env:", API_URL);
-
   useEffect(() => {
     const fetchRecipe = async () => {
       try {
         const res = await fetch(`${API_URL}/api/recipes/${id}`);
         const data = await res.json();
-        console.log("📦 Načtený recept:", data);
+
         setRecipe(data);
       } catch (err) {
         console.error("❌ Chyba při načítání detailu receptu:", err);
@@ -142,9 +140,7 @@ export default function DetailPage() {
       <h3 className="font-semibold mt-4 mb-2">Ingredience</h3>
       <ul className="list-disc list-inside mb-6">
         {recipe.ingredients.map((ing, i) => (
-          <li key={i}>
-            {ing.amount} {ing.unit} {ing.name}
-          </li>
+          <li key={i}>{["hrst", "špetka"].includes(ing.unit) ? `${ing.unit} - ${ing.name}` : `${ing.amount} ${ing.unit} -  ${ing.name}`}</li>
         ))}
       </ul>
 

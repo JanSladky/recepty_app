@@ -174,6 +174,7 @@ export const INGREDIENT_SUGGESTIONS = [
 
   // 🍎 Ovoce
   "Jablko",
+  "Lesní ovoce",
   "Hruška",
   "Banán",
   "Pomeranč",
@@ -327,7 +328,12 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
   };
 
   const handleSelect = (name: string) => {
-    if (name.trim() === "" || amount <= 0) return;
+    if (name.trim() === "") return;
+    // Pokud je jednotka g/ml, množství musí být větší než 0
+    if ((unit === "g" || unit === "ml") && amount <= 0) return;
+    // Pokud už ingredience se stejným názvem a jednotkou existuje, nepřidávej
+    const alreadyExists = ingredients.some((i) => i.name === name && i.unit === unit);
+    if (alreadyExists) return;
     setIngredients((prev) => [...prev, { name, amount, unit }]);
     setInput("");
     setAmount(0);
@@ -347,14 +353,16 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
           <option value="g">g</option>
           <option value="ml">ml</option>
           <option value="ks">ks</option>
-          <option value="ks">lžička</option>
-          <option value="ks">1/4</option>
+          <option value="hrst">hrst</option>
+          <option value="špetka">špetka</option>
+          <option value="lžička">lžička</option>
+          <option value="lžíce">lžíce</option>
         </select>
         {(unit === "g" || unit === "ml") && (
           <input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} placeholder="Množství" className="w-24 p-2 border rounded" />
         )}
 
-        <button onClick={() => handleSelect(input)} className="bg-blue-600 text-white px-3 py-2 rounded">
+        <button type="button" onClick={() => handleSelect(input)} className="bg-blue-600 text-white px-3 py-2 rounded">
           ➕ Přidat
         </button>
       </div>
@@ -366,12 +374,12 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
               key={suggestion}
               className="cursor-pointer px-2 py-1 hover:bg-gray-100"
               onClick={() => {
-                setInput(suggestion);
                 const defaults = getDefaultForIngredient(suggestion);
+                setInput(suggestion);
                 setAmount(defaults.amount);
                 setUnit(defaults.unit);
-                // ✅ Už žádné handleSelect!
-              }} // ✅ Oprava tady
+                setFiltered([]);
+              }}
             >
               {suggestion}
             </li>
@@ -385,9 +393,9 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
           {ingredients.map((ing, i) => (
             <li key={i} className="flex justify-between items-center">
               <span>
-                {ing.name} – {ing.amount} {ing.unit}
+                {ing.name} – {["hrst", "špetka"].includes(ing.unit) ? ing.unit : `${ing.amount} ${ing.unit}`}
               </span>
-              <button onClick={() => removeIngredient(i)} className="text-red-600 text-xs hover:underline">
+              <button type="button" onClick={() => removeIngredient(i)} className="text-red-600 text-xs hover:underline">
                 Odebrat
               </button>
             </li>
