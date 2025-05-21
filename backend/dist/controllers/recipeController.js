@@ -35,8 +35,8 @@ exports.getRecipeById = getRecipeById;
 // ✅ POST /api/recipes
 const addFullRecipe = async (req, res) => {
     try {
-        const { title, description, ingredients, categories, mealType, steps } = req.body;
-        if (!title || !description || !ingredients || !categories || !mealType || !steps) {
+        const { title, notes, ingredients, categories, mealType, steps } = req.body;
+        if (!title || !ingredients || !categories || !mealType || !steps) {
             res.status(400).json({ error: "Chybí povinná pole." });
             return;
         }
@@ -45,7 +45,7 @@ const addFullRecipe = async (req, res) => {
         const parsedMealTypes = JSON.parse(mealType);
         const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
         const imagePath = req.file?.secure_url || req.file?.path || "";
-        const recipeId = await (0, recipeModel_1.createFullRecipe)(title, description, imagePath, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
+        const recipeId = await (0, recipeModel_1.createFullRecipe)(title, notes, imagePath, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
         res.status(201).json({ message: "Recept uložen", id: recipeId });
     }
     catch (error) {
@@ -58,8 +58,8 @@ exports.addFullRecipe = addFullRecipe;
 const updateRecipe = async (req, res) => {
     try {
         const id = Number(req.params.id);
-        const { title, description, ingredients, categories, mealType, existingImageUrl, steps } = req.body;
-        if (!title || !description || !ingredients || !categories || !mealType) {
+        const { title, notes, ingredients, categories, mealType, existingImageUrl, steps } = req.body;
+        if (!title || !ingredients || !categories || !mealType) {
             res.status(400).json({ error: "Chybí povinná pole." });
             return;
         }
@@ -80,7 +80,7 @@ const updateRecipe = async (req, res) => {
         console.log("• uploadedImageUrl:", uploadedImageUrl);
         console.log("• existingImageUrl:", existingImageUrl);
         console.log("✅ Použito finalImageUrl:", finalImageUrl);
-        await (0, recipeModel_1.updateRecipeInDB)(id, title, description, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
+        await (0, recipeModel_1.updateRecipeInDB)(id, title, notes, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
         res.status(200).json({ message: "Recept upraven" });
     }
     catch (error) {

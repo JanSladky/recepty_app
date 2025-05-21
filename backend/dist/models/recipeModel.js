@@ -10,7 +10,7 @@ exports.updateRecipeInDB = updateRecipeInDB;
 exports.deleteRecipeFromDB = deleteRecipeFromDB;
 const db_1 = __importDefault(require("../utils/db"));
 async function getAllRecipes() {
-    const result = await db_1.default.query("SELECT id, title, description, image_url FROM recipes");
+    const result = await db_1.default.query("SELECT id, title, notes, image_url FROM recipes");
     const recipeRows = result.rows;
     const recipesWithRelations = await Promise.all(recipeRows.map(async (recipe) => {
         const categoryRes = await db_1.default.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [
@@ -28,7 +28,7 @@ async function getAllRecipes() {
     return recipesWithRelations;
 }
 async function getRecipeByIdFromDB(id) {
-    const { rows: recipeRows } = await db_1.default.query("SELECT id, title, description, image_url, steps FROM recipes WHERE id = $1", [id]);
+    const { rows: recipeRows } = await db_1.default.query("SELECT id, title, notes, image_url, steps FROM recipes WHERE id = $1", [id]);
     const recipe = recipeRows[0];
     if (!recipe)
         return null;
@@ -49,14 +49,14 @@ async function getRecipeByIdFromDB(id) {
         meal_types: mealTypes.map((m) => m.name),
     };
 }
-async function createFullRecipe(title, description, imageUrl, mealTypes, ingredients, categories, steps) {
+async function createFullRecipe(title, notes, imageUrl, mealTypes, ingredients, categories, steps) {
     const client = await db_1.default.connect();
     try {
         await client.query("BEGIN");
         const stepsJson = JSON.stringify(steps); // ← DŮLEŽITÉ
-        const result = await client.query("INSERT INTO recipes (title, description, image_url, steps) VALUES ($1, $2, $3, $4::jsonb) RETURNING id", [
+        const result = await client.query("INSERT INTO recipes (title, notes, image_url, steps) VALUES ($1, $2, $3, $4::jsonb) RETURNING id", [
             title,
-            description,
+            notes,
             imageUrl,
             stepsJson,
         ]);
@@ -73,23 +73,23 @@ async function createFullRecipe(title, description, imageUrl, mealTypes, ingredi
         client.release();
     }
 }
-async function updateRecipeInDB(id, title, description, imageUrl, mealTypes, ingredients, categories, steps) {
+async function updateRecipeInDB(id, title, notes, imageUrl, mealTypes, ingredients, categories, steps) {
     const client = await db_1.default.connect();
     try {
         await client.query("BEGIN");
         const stepsJson = JSON.stringify(steps);
         const shouldUpdateImage = typeof imageUrl === "string" && imageUrl.trim() !== "" && imageUrl !== "null";
         if (shouldUpdateImage) {
-            await client.query("UPDATE recipes SET title = $1, description = $2, image_url = $3, steps = $4::jsonb WHERE id = $5", [
+            await client.query("UPDATE recipes SET title = $1, notes = $2, image_url = $3, steps = $4::jsonb WHERE id = $5", [
                 title,
-                description,
+                notes,
                 imageUrl,
                 stepsJson,
                 id,
             ]);
         }
         else {
-            await client.query("UPDATE recipes SET title = $1, description = $2, steps = $3::jsonb WHERE id = $4", [title, description, stepsJson, id]);
+            await client.query("UPDATE recipes SET title = $1, notes = $2, steps = $3::jsonb WHERE id = $4", [title, notes, stepsJson, id]);
         }
         await client.query("DELETE FROM recipe_ingredients WHERE recipe_id = $1", [id]);
         await client.query("DELETE FROM recipe_categories WHERE recipe_id = $1", [id]);
