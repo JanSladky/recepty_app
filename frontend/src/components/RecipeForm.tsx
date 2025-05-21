@@ -7,6 +7,7 @@ import IngredientAutocomplete, { IngredientAutocompleteHandle } from "@/componen
 import type { Ingredient } from "@/components/IngredientAutocomplete";
 import Image from "next/image";
 
+// ✅ Přidáno initialCalories do prop typu
 export type RecipeFormProps = {
   initialTitle?: string;
   initialNotes?: string;
@@ -15,6 +16,7 @@ export type RecipeFormProps = {
   initialCategories?: string[];
   initialMealTypes?: string[];
   initialSteps?: string[];
+  initialCalories?: number;
   onSubmit: (formData: FormData) => Promise<void>;
   submitLabel?: string;
   loading?: boolean;
@@ -28,10 +30,13 @@ export default function RecipeForm({
   initialCategories = [],
   initialMealTypes = [],
   initialSteps = [],
+  initialCalories = undefined,
+
   onSubmit,
   submitLabel = "Přidat recept",
   loading = false,
 }: RecipeFormProps) {
+  const [calories, setCalories] = useState<number | "">(initialCalories ?? "");
   const [title, setTitle] = useState(initialTitle);
   const [notes, setNotes] = useState(initialNotes);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -40,7 +45,6 @@ export default function RecipeForm({
   const [mealTypes, setMealTypes] = useState<string[]>(initialMealTypes);
   const [steps, setSteps] = useState<string[]>(initialSteps && initialSteps.length > 0 ? initialSteps : [""]);
   const [submitting, setSubmitting] = useState(false);
-  const [calories, setCalories] = useState<number | "">("");
 
   const ingredientRef = useRef<IngredientAutocompleteHandle>(null);
 
@@ -69,16 +73,16 @@ export default function RecipeForm({
     formData.append("categories", JSON.stringify(categories));
     formData.append("mealType", JSON.stringify(mealTypes));
     formData.append("steps", JSON.stringify(steps));
+
+    // ✅ přidáno kontrolované uložení kalorií
     if (calories !== "") {
       formData.append("calories", calories.toString());
     }
 
     if (imageFile) {
       formData.append("image", imageFile);
-      console.log("🖼 Nový obrázek nahrán:", imageFile.name);
     } else {
       formData.append("existingImageUrl", initialImageUrl || "");
-      console.log("🖼 Ponechán původní obrázek:", initialImageUrl);
     }
 
     await onSubmit(formData);
@@ -106,11 +110,10 @@ export default function RecipeForm({
           className="md:col-span-3 p-2 border rounded w-full"
         />
       </div>
-      {/* Zvolení typu jídla */}
+
       <h3 className="font-semibold">Typ jídla</h3>
       <MealTypeSelector selected={mealTypes} onToggle={toggleMealType} />
 
-      {/* Vložení kroku receptu */}
       <div>
         <h3 className="font-semibold mb-2">Postup krok za krokem</h3>
         {steps.map((step, index) => (
@@ -127,19 +130,11 @@ export default function RecipeForm({
               required
               className="w-full p-2 border rounded"
             />
-            <button
-              type="button"
-              onClick={() => {
-                const newSteps = steps.filter((_, i) => i !== index);
-                setSteps(newSteps);
-              }}
-              className="ml-2 text-red-500"
-            >
+            <button type="button" onClick={() => setSteps(steps.filter((_, i) => i !== index))} className="ml-2 text-red-500">
               🗑
             </button>
           </div>
         ))}
-
         <button type="button" onClick={() => setSteps([...steps, ""])} className="bg-blue-600 text-white px-3 py-1 rounded">
           ➕ Přidat krok
         </button>

@@ -19,6 +19,7 @@ export default function EditPage() {
     categories: string[];
     meal_types: string[];
     steps: string[];
+    calories?: number;
   } | null>(null);
   console.log("🌍 API_URL z .env:", API_URL);
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function EditPage() {
           categories: data.categories,
           meal_types: data.meal_types ?? [],
           steps: data.steps ?? [],
+          calories: data.calories,
         });
       } catch (err) {
         console.error("❌ Chyba při načítání receptu:", err);
@@ -85,6 +87,7 @@ export default function EditPage() {
         initialCategories={initialData.categories}
         initialMealTypes={initialData.meal_types}
         initialSteps={initialData.steps}
+        initialCalories={initialData.calories}
         onSubmit={handleSubmit}
         submitLabel="Uložit změny"
       />
