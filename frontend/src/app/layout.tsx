@@ -25,6 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="cs" className="light">
+      {/* Koment */}
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-100 text-gray-900`}>
         <Navbar />
         <main className="p-4">{children}</main>
