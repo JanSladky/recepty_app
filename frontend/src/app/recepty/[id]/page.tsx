@@ -16,7 +16,7 @@ type Ingredient = {
 type Recipe = {
   id: number;
   title: string;
-  description: string;
+  notes: string;
   image_url: string;
   categories: string[];
   ingredients: Ingredient[];
@@ -125,7 +125,7 @@ export default function DetailPage() {
           </ol>
         </div>
       )}
-      <p className="mb-4">{recipe.description}</p>
+      <p className="mb-4">{recipe.notes}</p>
 
       <h3 className="font-semibold mt-4">Kategorie</h3>
       <div className="flex gap-2 mb-4 flex-wrap text-sm">
