@@ -7,11 +7,11 @@ export type IngredientInput = {
 };
 
 export async function getAllRecipes(): Promise<any[]> {
-  const result = await db.query("SELECT id, title, description, image_url FROM recipes");
+  const result = await db.query("SELECT id, title, notes, image_url FROM recipes");
   const recipeRows = result.rows as {
     id: number;
     title: string;
-    description: string;
+    notes: string;
     image_url: string;
   }[];
 
@@ -36,7 +36,7 @@ export async function getAllRecipes(): Promise<any[]> {
 }
 
 export async function getRecipeByIdFromDB(id: number) {
-  const { rows: recipeRows } = await db.query("SELECT id, title, description, image_url, steps FROM recipes WHERE id = $1", [id]);
+  const { rows: recipeRows } = await db.query("SELECT id, title, notes, image_url, steps FROM recipes WHERE id = $1", [id]);
   const recipe = recipeRows[0];
   if (!recipe) return null;
 
@@ -65,7 +65,7 @@ export async function getRecipeByIdFromDB(id: number) {
 
 export async function createFullRecipe(
   title: string,
-  description: string,
+  notes: string,
   imageUrl: string,
   mealTypes: string[],
   ingredients: IngredientInput[],
@@ -78,9 +78,9 @@ export async function createFullRecipe(
 
     const stepsJson = JSON.stringify(steps); // ← DŮLEŽITÉ
 
-    const result = await client.query("INSERT INTO recipes (title, description, image_url, steps) VALUES ($1, $2, $3, $4::jsonb) RETURNING id", [
+    const result = await client.query("INSERT INTO recipes (title, notes, image_url, steps) VALUES ($1, $2, $3, $4::jsonb) RETURNING id", [
       title,
-      description,
+      notes,
       imageUrl,
       stepsJson,
     ]);
@@ -102,7 +102,7 @@ export async function createFullRecipe(
 export async function updateRecipeInDB(
   id: number,
   title: string,
-  description: string,
+  notes: string,
   imageUrl: string | null,
   mealTypes: string[],
   ingredients: IngredientInput[],
@@ -118,15 +118,15 @@ export async function updateRecipeInDB(
     const shouldUpdateImage = typeof imageUrl === "string" && imageUrl.trim() !== "" && imageUrl !== "null";
 
     if (shouldUpdateImage) {
-      await client.query("UPDATE recipes SET title = $1, description = $2, image_url = $3, steps = $4::jsonb WHERE id = $5", [
+      await client.query("UPDATE recipes SET title = $1, notes = $2, image_url = $3, steps = $4::jsonb WHERE id = $5", [
         title,
-        description,
+        notes,
         imageUrl,
         stepsJson,
         id,
       ]);
     } else {
-      await client.query("UPDATE recipes SET title = $1, description = $2, steps = $3::jsonb WHERE id = $4", [title, description, stepsJson, id]);
+      await client.query("UPDATE recipes SET title = $1, notes = $2, steps = $3::jsonb WHERE id = $4", [title, notes, stepsJson, id]);
     }
 
     await client.query("DELETE FROM recipe_ingredients WHERE recipe_id = $1", [id]);

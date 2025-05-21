@@ -9,7 +9,7 @@ import Image from "next/image";
 
 export type RecipeFormProps = {
   initialTitle?: string;
-  initialDescription?: string;
+  initialNotes?: string;
   initialImageUrl?: string;
   initialIngredients?: Ingredient[];
   initialCategories?: string[];
@@ -22,7 +22,7 @@ export type RecipeFormProps = {
 
 export default function RecipeForm({
   initialTitle = "",
-  initialDescription = "",
+  initialNotes = "",
   initialIngredients = [],
   initialImageUrl,
   initialCategories = [],
@@ -33,7 +33,7 @@ export default function RecipeForm({
   loading = false,
 }: RecipeFormProps) {
   const [title, setTitle] = useState(initialTitle);
-  const [description, setDescription] = useState(initialDescription);
+  const [notes, setnotes] = useState(initialNotes);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(initialImageUrl || null);
   const [categories, setCategories] = useState<string[]>(initialCategories);
@@ -63,7 +63,7 @@ export default function RecipeForm({
 
     const formData = new FormData();
     formData.append("title", title);
-    formData.append("description", description);
+    formData.append("notes", notes);
     formData.append("ingredients", JSON.stringify(ingredients));
     formData.append("categories", JSON.stringify(categories));
     formData.append("mealType", JSON.stringify(mealTypes));
@@ -125,7 +125,7 @@ export default function RecipeForm({
         </button>
       </div>
 
-      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Popis" required className="w-full p-2 border rounded" />
+      <textarea value={notes} onChange={(e) => setnotes(e.target.value)} placeholder="Další poznámky" className="w-full p-2 border rounded" />
 
       <input
         type="file"

@@ -13,7 +13,7 @@ export default function EditPage() {
   const [loading, setLoading] = useState(true);
   const [initialData, setInitialData] = useState<{
     title: string;
-    description: string;
+    notes: string;
     image_url: string;
     ingredients: Ingredient[];
     categories: string[];
@@ -29,7 +29,7 @@ export default function EditPage() {
 
         setInitialData({
           title: data.title,
-          description: data.description,
+          notes: data.notes,
           image_url: data.image_url,
           ingredients: data.ingredients,
           categories: data.categories,
@@ -79,7 +79,7 @@ export default function EditPage() {
       <h1 className="text-3xl font-bold mb-4">Upravit recept</h1>
       <RecipeForm
         initialTitle={initialData.title}
-        initialDescription={initialData.description}
+        initialNotes={initialData.notes}
         initialImageUrl={initialData.image_url}
         initialIngredients={initialData.ingredients}
         initialCategories={initialData.categories}

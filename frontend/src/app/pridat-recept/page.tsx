@@ -40,7 +40,7 @@ export default function AddRecipePage() {
       <RecipeForm
         onSubmit={handleSubmit}
         initialTitle=""
-        initialDescription=""
+        initialNotes=""
         initialImageUrl={undefined}
         initialCategories={[]}
         initialMealTypes={[]}
