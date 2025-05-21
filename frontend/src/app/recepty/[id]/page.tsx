@@ -118,9 +118,12 @@ export default function DetailPage() {
           <h3 className="font-semibold mt-4 mb-2">Postup</h3>
           <ol className="list-decimal list-inside space-y-2">
             {recipe.steps.map((step, i) => (
-              <li key={i} className="bg-gray-50 p-2 rounded shadow-sm">
-                {step}
-              </li>
+              <ol key={i} className="relative bg-white border-l-4 border-green-500 pl-6 pr-4 py-4 mb-6 shadow-xl rounded-md">
+                <div className="absolute -left-4 top-4 w-8 h-8 bg-green-500 text-white font-bold rounded-full flex items-center justify-center shadow">
+                  {i + 1}
+                </div>
+                <p className="text-gray-800 leading-relaxed">{step}</p>
+              </ol>
             ))}
           </ol>
         </div>
