@@ -6,7 +6,6 @@ import MealTypeSelector from "@/components/MealTypeSelector";
 import IngredientAutocomplete, { IngredientAutocompleteHandle } from "@/components/IngredientAutocomplete";
 import type { Ingredient } from "@/components/IngredientAutocomplete";
 import Image from "next/image";
-import { log } from "console";
 
 export type RecipeFormProps = {
   initialTitle?: string;
