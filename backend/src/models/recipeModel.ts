@@ -39,7 +39,7 @@ export async function getAllRecipes(): Promise<any[]> {
 
 export async function getRecipeByIdFromDB(id: number) {
   const { rows: recipeRows } = await db.query(
-    "SELECT id, title, description, image_url FROM recipes WHERE id = $1",
+    "SELECT id, title, description, image_url, steps FROM recipes WHERE id = $1",
     [id]
   );
   const recipe = recipeRows[0];
@@ -62,9 +62,11 @@ export async function getRecipeByIdFromDB(id: number) {
 
   return {
     ...recipe,
+    steps: recipe.steps ?? [],
     ingredients,
     categories: categories.map((c) => c.name),
     meal_types: mealTypes.map((m) => m.name),
+    
   };
 }
 
@@ -74,15 +76,16 @@ export async function createFullRecipe(
   imageUrl: string,
   mealTypes: string[],
   ingredients: IngredientInput[],
-  categories: string[]
+  categories: string[],
+  steps: string[]
 ): Promise<number> {
   const client = await db.connect();
   try {
     await client.query("BEGIN");
 
     const result = await client.query(
-      "INSERT INTO recipes (title, description, image_url) VALUES ($1, $2, $3) RETURNING id",
-      [title, description, imageUrl]
+      "INSERT INTO recipes (title, description, image_url, steps) VALUES ($1, $2, $3, $4) RETURNING id",
+      [title, description, imageUrl, steps]
     );
     const recipeId = result.rows[0].id;
 
@@ -105,7 +108,8 @@ export async function updateRecipeInDB(
   imageUrl: string | null,
   mealTypes: string[],
   ingredients: IngredientInput[],
-  categories: string[]
+  categories: string[],
+  steps: string[]
 ): Promise<void> {
   const client = await db.connect();
   try {
@@ -116,13 +120,13 @@ export async function updateRecipeInDB(
 
     if (shouldUpdateImage) {
       await client.query(
-        "UPDATE recipes SET title = $1, description = $2, image_url = $3 WHERE id = $4",
-        [title, description, imageUrl, id]
+        "UPDATE recipes SET title = $1, description = $2, image_url = $3, steps = $4 WHERE id = $5",
+        [title, description, imageUrl, steps, id]
       );
     } else {
       await client.query(
-        "UPDATE recipes SET title = $1, description = $2 WHERE id = $3",
-        [title, description, id]
+        "UPDATE recipes SET title = $1, description = $2, image_url = $3, steps = $4 WHERE id = $5",
+        [title, description, imageUrl, steps, id]
       );
     }
 

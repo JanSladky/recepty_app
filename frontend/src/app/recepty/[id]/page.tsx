@@ -21,6 +21,7 @@ type Recipe = {
   categories: string[];
   ingredients: Ingredient[];
   meal_types?: string[];
+  steps?: string[];
 };
 
 export default function DetailPage() {
@@ -110,7 +111,18 @@ export default function DetailPage() {
           className="object-cover rounded"
         />
       </div>
-
+      {recipe.steps && recipe.steps.length > 0 && (
+        <div className="mb-6">
+          <h3 className="font-semibold mt-4 mb-2">Postup</h3>
+          <ol className="list-decimal list-inside space-y-2">
+            {recipe.steps.map((step, i) => (
+              <li key={i} className="bg-gray-50 p-2 rounded shadow-sm">
+                {step}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
       <p className="mb-4">{recipe.description}</p>
 
       <h3 className="font-semibold mt-4">Kategorie</h3>

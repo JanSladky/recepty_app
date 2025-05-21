@@ -6,6 +6,7 @@ import MealTypeSelector from "@/components/MealTypeSelector";
 import IngredientAutocomplete, { IngredientAutocompleteHandle } from "@/components/IngredientAutocomplete";
 import type { Ingredient } from "@/components/IngredientAutocomplete";
 import Image from "next/image";
+import { log } from "console";
 
 export type RecipeFormProps = {
   initialTitle?: string;
@@ -14,6 +15,7 @@ export type RecipeFormProps = {
   initialIngredients?: Ingredient[];
   initialCategories?: string[];
   initialMealTypes?: string[];
+  initialSteps?: string[];
   onSubmit: (formData: FormData) => Promise<void>;
   submitLabel?: string;
   loading?: boolean;
@@ -26,6 +28,7 @@ export default function RecipeForm({
   initialImageUrl,
   initialCategories = [],
   initialMealTypes = [],
+  initialSteps = [],
   onSubmit,
   submitLabel = "Přidat recept",
   loading = false,
@@ -36,6 +39,7 @@ export default function RecipeForm({
   const [imagePreview, setImagePreview] = useState<string | null>(initialImageUrl || null);
   const [categories, setCategories] = useState<string[]>(initialCategories);
   const [mealTypes, setMealTypes] = useState<string[]>(initialMealTypes);
+  const [steps, setSteps] = useState<string[]>(initialSteps && initialSteps.length > 0 ? initialSteps : [""]);
   const [submitting, setSubmitting] = useState(false);
 
   const ingredientRef = useRef<IngredientAutocompleteHandle>(null);
@@ -64,6 +68,7 @@ export default function RecipeForm({
     formData.append("ingredients", JSON.stringify(ingredients));
     formData.append("categories", JSON.stringify(categories));
     formData.append("mealType", JSON.stringify(mealTypes));
+    formData.append("steps", JSON.stringify(steps));
 
     if (imageFile) {
       formData.append("image", imageFile);
@@ -82,6 +87,44 @@ export default function RecipeForm({
   return (
     <form onSubmit={handleFormSubmit} className="max-w-xl mx-auto p-4 space-y-4" encType="multipart/form-data">
       <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Název receptu" required className="w-full p-2 border rounded" />
+      {/* Zvolení typu jídla */}
+      <h3 className="font-semibold">Typ jídla</h3>
+      <MealTypeSelector selected={mealTypes} onToggle={toggleMealType} />
+
+      {/* Vložení kroku receptu */}
+      <div>
+        <h3 className="font-semibold mb-2">Postup krok za krokem</h3>
+        {steps.map((step, index) => (
+          <div key={index} className="flex items-start gap-2 mb-3">
+            <div className="min-w-[2rem] h-[2rem] bg-green-600 text-white flex items-center justify-center rounded-full font-bold">{index + 1}</div>
+            <textarea
+              value={step}
+              onChange={(e) => {
+                const newSteps = [...steps];
+                newSteps[index] = e.target.value;
+                setSteps(newSteps);
+              }}
+              placeholder={`Krok ${index + 1}`}
+              required
+              className="w-full p-2 border rounded"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const newSteps = steps.filter((_, i) => i !== index);
+                setSteps(newSteps);
+              }}
+              className="ml-2 text-red-500"
+            >
+              🗑
+            </button>
+          </div>
+        ))}
+
+        <button type="button" onClick={() => setSteps([...steps, ""])} className="bg-blue-600 text-white px-3 py-1 rounded">
+          ➕ Přidat krok
+        </button>
+      </div>
 
       <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Popis" required className="w-full p-2 border rounded" />
 
@@ -111,9 +154,6 @@ export default function RecipeForm({
 
       <h3 className="font-semibold">Kategorie</h3>
       <CategorySelector selected={categories} onToggle={toggleCategory} />
-
-      <h3 className="font-semibold">Typ jídla</h3>
-      <MealTypeSelector selected={mealTypes} onToggle={toggleMealType} />
 
       <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded" disabled={submitting || loading}>
         {submitting ? "Ukládám..." : submitLabel}
