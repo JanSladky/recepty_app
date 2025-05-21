@@ -33,7 +33,7 @@ export default function RecipeForm({
   loading = false,
 }: RecipeFormProps) {
   const [title, setTitle] = useState(initialTitle);
-  const [notes, setnotes] = useState(initialNotes);
+  const [notes, setNotes] = useState(initialNotes);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(initialImageUrl || null);
   const [categories, setCategories] = useState<string[]>(initialCategories);
@@ -125,7 +125,7 @@ export default function RecipeForm({
         </button>
       </div>
 
-      <textarea value={notes} onChange={(e) => setnotes(e.target.value)} placeholder="Další poznámky" className="w-full p-2 border rounded" />
+      <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Další poznámky" className="w-full p-2 border rounded" />
 
       <input
         type="file"
