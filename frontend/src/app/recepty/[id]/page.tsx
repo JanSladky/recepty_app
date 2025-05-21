@@ -22,6 +22,7 @@ type Recipe = {
   ingredients: Ingredient[];
   meal_types?: string[];
   steps?: string[];
+  calories: number;
 };
 
 export default function DetailPage() {
@@ -89,7 +90,10 @@ export default function DetailPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-4">{recipe.title}</h1>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
+        <h1 className="text-3xl font-bold">{recipe.title}</h1>
+        {recipe.calories !== null && recipe.calories !== undefined && <span className="text-sm text-gray-700 md:text-base">{recipe.calories} kcal</span>}
+      </div>
 
       {mealTypes.length > 0 && (
         <div className="mb-4 text-sm">

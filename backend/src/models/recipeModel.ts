@@ -7,22 +7,25 @@ export type IngredientInput = {
 };
 
 export async function getAllRecipes(): Promise<any[]> {
-  const result = await db.query("SELECT id, title, notes, image_url FROM recipes");
+  const result = await db.query("SELECT id, title, notes, image_url, calories FROM recipes");
   const recipeRows = result.rows as {
     id: number;
     title: string;
     notes: string;
     image_url: string;
+    calories: number | null;
   }[];
 
   const recipesWithRelations = await Promise.all(
     recipeRows.map(async (recipe) => {
-      const categoryRes = await db.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [
-        recipe.id,
-      ]);
-      const mealTypeRes = await db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [
-        recipe.id,
-      ]);
+      const categoryRes = await db.query(
+        "SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1",
+        [recipe.id]
+      );
+      const mealTypeRes = await db.query(
+        "SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1",
+        [recipe.id]
+      );
 
       return {
         ...recipe,
@@ -36,23 +39,27 @@ export async function getAllRecipes(): Promise<any[]> {
 }
 
 export async function getRecipeByIdFromDB(id: number) {
-  const { rows: recipeRows } = await db.query("SELECT id, title, notes, image_url, steps FROM recipes WHERE id = $1", [id]);
+  const { rows: recipeRows } = await db.query(
+    "SELECT id, title, notes, image_url, steps, calories FROM recipes WHERE id = $1",
+    [id]
+  );
   const recipe = recipeRows[0];
   if (!recipe) return null;
 
-  const {
-    rows: ingredients,
-  } = await db.query("SELECT ri.amount, ri.unit, i.name FROM recipe_ingredients ri JOIN ingredients i ON ri.ingredient_id = i.id WHERE ri.recipe_id = $1", [
-    id,
-  ]);
+  const { rows: ingredients } = await db.query(
+    "SELECT ri.amount, ri.unit, i.name FROM recipe_ingredients ri JOIN ingredients i ON ri.ingredient_id = i.id WHERE ri.recipe_id = $1",
+    [id]
+  );
 
-  const { rows: categories } = await db.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [
-    id,
-  ]);
+  const { rows: categories } = await db.query(
+    "SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1",
+    [id]
+  );
 
-  const { rows: mealTypes } = await db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [
-    id,
-  ]);
+  const { rows: mealTypes } = await db.query(
+    "SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1",
+    [id]
+  );
 
   return {
     ...recipe,
@@ -70,20 +77,19 @@ export async function createFullRecipe(
   mealTypes: string[],
   ingredients: IngredientInput[],
   categories: string[],
-  steps: string[]
+  steps: string[],
+  calories: number | null
 ): Promise<number> {
   const client = await db.connect();
   try {
     await client.query("BEGIN");
 
-    const stepsJson = JSON.stringify(steps); // ← DŮLEŽITÉ
+    const stepsJson = JSON.stringify(steps);
 
-    const result = await client.query("INSERT INTO recipes (title, notes, image_url, steps) VALUES ($1, $2, $3, $4::jsonb) RETURNING id", [
-      title,
-      notes,
-      imageUrl,
-      stepsJson,
-    ]);
+    const result = await client.query(
+      "INSERT INTO recipes (title, notes, image_url, steps, calories) VALUES ($1, $2, $3, $4::jsonb, $5) RETURNING id",
+      [title, notes, imageUrl, stepsJson, calories]
+    );
 
     const recipeId = result.rows[0].id;
 
@@ -107,26 +113,26 @@ export async function updateRecipeInDB(
   mealTypes: string[],
   ingredients: IngredientInput[],
   categories: string[],
-  steps: string[]
+  steps: string[],
+  calories: number | null
 ): Promise<void> {
   const client = await db.connect();
   try {
     await client.query("BEGIN");
 
     const stepsJson = JSON.stringify(steps);
-
     const shouldUpdateImage = typeof imageUrl === "string" && imageUrl.trim() !== "" && imageUrl !== "null";
 
     if (shouldUpdateImage) {
-      await client.query("UPDATE recipes SET title = $1, notes = $2, image_url = $3, steps = $4::jsonb WHERE id = $5", [
-        title,
-        notes,
-        imageUrl,
-        stepsJson,
-        id,
-      ]);
+      await client.query(
+        "UPDATE recipes SET title = $1, notes = $2, image_url = $3, steps = $4::jsonb, calories = $5 WHERE id = $6",
+        [title, notes, imageUrl, stepsJson, calories, id]
+      );
     } else {
-      await client.query("UPDATE recipes SET title = $1, notes = $2, steps = $3::jsonb WHERE id = $4", [title, notes, stepsJson, id]);
+      await client.query(
+        "UPDATE recipes SET title = $1, notes = $2, steps = $3::jsonb, calories = $4 WHERE id = $5",
+        [title, notes, stepsJson, calories, id]
+      );
     }
 
     await client.query("DELETE FROM recipe_ingredients WHERE recipe_id = $1", [id]);
@@ -162,7 +168,13 @@ export async function deleteRecipeFromDB(id: number): Promise<void> {
   }
 }
 
-async function insertRelations(client: any, recipeId: number, mealTypes: string[], ingredients: IngredientInput[], categories: string[]) {
+async function insertRelations(
+  client: any,
+  recipeId: number,
+  mealTypes: string[],
+  ingredients: IngredientInput[],
+  categories: string[]
+) {
   for (const ing of ingredients) {
     const res = await client.query("SELECT id FROM ingredients WHERE name = $1", [ing.name]);
     let ingredientId = res.rows[0]?.id;
@@ -171,12 +183,10 @@ async function insertRelations(client: any, recipeId: number, mealTypes: string[
       ingredientId = insertRes.rows[0].id;
     }
 
-    await client.query("INSERT INTO recipe_ingredients (recipe_id, ingredient_id, amount, unit) VALUES ($1, $2, $3, $4)", [
-      recipeId,
-      ingredientId,
-      ing.amount,
-      ing.unit,
-    ]);
+    await client.query(
+      "INSERT INTO recipe_ingredients (recipe_id, ingredient_id, amount, unit) VALUES ($1, $2, $3, $4)",
+      [recipeId, ingredientId, ing.amount, ing.unit]
+    );
   }
 
   for (const cat of categories) {

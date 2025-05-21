@@ -32,7 +32,7 @@ export const getRecipeById = async (req: Request, res: Response): Promise<void> 
 // ✅ POST /api/recipes
 export const addFullRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, notes, ingredients, categories, mealType, steps } = req.body;
+    const { title, notes, ingredients, categories, mealType, steps, calories } = req.body;
 
     if (!title || !ingredients || !categories || !mealType || !steps) {
       res.status(400).json({ error: "Chybí povinná pole." });
@@ -43,10 +43,11 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
+    const parsedCalories = calories ? Number(calories) : null;
 
     const imagePath = (req.file as { secure_url?: string; path?: string })?.secure_url || req.file?.path || "";
 
-    const recipeId = await createFullRecipe(title, notes, imagePath, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
+    const recipeId = await createFullRecipe(title, notes, imagePath, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps, parsedCalories);
 
     res.status(201).json({ message: "Recept uložen", id: recipeId });
   } catch (error) {
@@ -59,7 +60,7 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
 export const updateRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = Number(req.params.id);
-    const { title, notes, ingredients, categories, mealType, existingImageUrl, steps } = req.body;
+    const { title, notes, ingredients, categories, mealType, existingImageUrl, steps, calories } = req.body;
 
     if (!title || !ingredients || !categories || !mealType) {
       res.status(400).json({ error: "Chybí povinná pole." });
@@ -70,6 +71,7 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
+    const parsedCalories = calories ? Number(calories) : null
 
     const uploadedImageUrl = (req.file as { secure_url?: string; path?: string })?.secure_url || req.file?.path || null;
 
@@ -87,7 +89,7 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     console.log("• existingImageUrl:", existingImageUrl);
     console.log("✅ Použito finalImageUrl:", finalImageUrl);
 
-    await updateRecipeInDB(id, title, notes, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
+    await updateRecipeInDB(id, title, notes, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps, parsedCalories);
 
     res.status(200).json({ message: "Recept upraven" });
   } catch (error) {

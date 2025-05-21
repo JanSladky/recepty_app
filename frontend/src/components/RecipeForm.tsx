@@ -40,6 +40,7 @@ export default function RecipeForm({
   const [mealTypes, setMealTypes] = useState<string[]>(initialMealTypes);
   const [steps, setSteps] = useState<string[]>(initialSteps && initialSteps.length > 0 ? initialSteps : [""]);
   const [submitting, setSubmitting] = useState(false);
+  const [calories, setCalories] = useState<number | "">("");
 
   const ingredientRef = useRef<IngredientAutocompleteHandle>(null);
 
@@ -68,6 +69,9 @@ export default function RecipeForm({
     formData.append("categories", JSON.stringify(categories));
     formData.append("mealType", JSON.stringify(mealTypes));
     formData.append("steps", JSON.stringify(steps));
+    if (calories !== "") {
+      formData.append("calories", calories.toString());
+    }
 
     if (imageFile) {
       formData.append("image", imageFile);
@@ -85,7 +89,23 @@ export default function RecipeForm({
 
   return (
     <form onSubmit={handleFormSubmit} className="max-w-xl mx-auto p-4 space-y-4" encType="multipart/form-data">
-      <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Název receptu" required className="w-full p-2 border rounded" />
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Název receptu"
+          required
+          className="md:col-span-9 p-2 border rounded w-full"
+        />
+        <input
+          type="number"
+          value={calories}
+          onChange={(e) => setCalories(e.target.value === "" ? "" : Number(e.target.value))}
+          placeholder="Kalorie"
+          className="md:col-span-3 p-2 border rounded w-full"
+        />
+      </div>
       {/* Zvolení typu jídla */}
       <h3 className="font-semibold">Typ jídla</h3>
       <MealTypeSelector selected={mealTypes} onToggle={toggleMealType} />
