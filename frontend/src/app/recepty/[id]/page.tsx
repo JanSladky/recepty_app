@@ -91,9 +91,9 @@ export default function DetailPage() {
   return (
     <div className="max-w-3xl mx-auto p-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-4">
-          <h1 className="text-3xl font-bold">{recipe.title}</h1>
-          {recipe.calories != null && <div className="text-sm text-gray-700 bg-yellow-100 px-3 py-1 rounded">{recipe.calories} kcal</div>}
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+          <h1 className="text-3xl font-bold flex-1">{recipe.title}</h1>
+          {recipe.calories != null && <div className="text-sm text-gray-700 bg-yellow-100 px-3 py-1 rounded whitespace-nowrap">{recipe.calories} kcal</div>}
         </div>
       </div>
 
