@@ -1,35 +1,49 @@
+// ✅ Umístění: backend/src/controllers/recipeController.ts
 import { Request, Response } from "express";
-import { getAllRecipes, getRecipeByIdFromDB, createFullRecipe, deleteRecipeFromDB, updateRecipeInDB } from "../models/recipeModel";
+import { getAllRecipes, getRecipeByIdFromDB, createFullRecipe, updateRecipeInDB, deleteRecipeFromDB, getAllIngredientsFromDB } from "../models/recipeModel";
 
-// ✅ GET /api/recipes
 export const getRecipes = async (req: Request, res: Response): Promise<void> => {
   try {
     const recipes = await getAllRecipes();
-    res.json(recipes);
+    res.status(200).json(recipes);
   } catch (error) {
     console.error("❌ Chyba při načítání receptů:", error);
     res.status(500).json({ error: "Chyba při načítání receptů" });
   }
 };
 
-// ✅ GET /api/recipes/:id
 export const getRecipeById = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = Number(req.params.id);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Neplatné ID" });
+      return;
+    }
+
     const recipe = await getRecipeByIdFromDB(id);
-    console.log("📦 Odpověď z DB:", recipe);
     if (!recipe) {
       res.status(404).json({ error: "Recept nenalezen" });
       return;
     }
-    res.json(recipe);
+
+    res.status(200).json(recipe);
   } catch (error) {
     console.error("❌ Chyba při načítání detailu receptu:", error);
     res.status(500).json({ error: "Chyba serveru" });
   }
 };
+export const getAllIngredients = async (req: Request, res: Response) => {
+  try {
+    console.log("📥 GET /api/ingredients zavolán");
+    const ingredients = await getAllIngredientsFromDB();
+    console.log("📦 Načtené suroviny:", ingredients);
+    res.json(ingredients);
+  } catch (error) {
+    console.error("❌ Chyba při načítání surovin:", error);
+    res.status(500).json({ error: "Chyba serveru při načítání surovin" });
+  }
+};
 
-// ✅ POST /api/recipes
 export const addFullRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
     const { title, notes, ingredients, categories, mealType, steps, calories } = req.body;
@@ -56,10 +70,14 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// ✅ PUT /api/recipes/:id
 export const updateRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = Number(req.params.id);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Neplatné ID" });
+      return;
+    }
+
     const { title, notes, ingredients, categories, mealType, existingImageUrl, steps, calories } = req.body;
 
     if (!title || !ingredients || !categories || !mealType) {
@@ -71,23 +89,14 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
-    const parsedCalories = calories ? Number(calories) : null
+    const parsedCalories = calories ? Number(calories) : null;
 
     const uploadedImageUrl = (req.file as { secure_url?: string; path?: string })?.secure_url || req.file?.path || null;
-
     let finalImageUrl: string | null = uploadedImageUrl || existingImageUrl || null;
 
-    if (uploadedImageUrl && uploadedImageUrl.trim() !== "") {
-      finalImageUrl = uploadedImageUrl;
-    } else if (typeof existingImageUrl === "string" && existingImageUrl.trim() !== "" && existingImageUrl !== "null") {
-      finalImageUrl = existingImageUrl;
+    if (typeof finalImageUrl === "string" && (finalImageUrl.trim() === "" || finalImageUrl === "null")) {
+      finalImageUrl = null;
     }
-
-    console.log("🔄 Aktualizace receptu:");
-    console.log("• title:", title);
-    console.log("• uploadedImageUrl:", uploadedImageUrl);
-    console.log("• existingImageUrl:", existingImageUrl);
-    console.log("✅ Použito finalImageUrl:", finalImageUrl);
 
     await updateRecipeInDB(id, title, notes, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps, parsedCalories);
 
@@ -98,10 +107,14 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-// ✅ DELETE /api/recipes/:id
 export const deleteRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = Number(req.params.id);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Neplatné ID" });
+      return;
+    }
+
     await deleteRecipeFromDB(id);
     res.status(200).json({ message: "Recept smazán." });
   } catch (error) {

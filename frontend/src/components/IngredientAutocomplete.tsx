@@ -1,6 +1,22 @@
 "use client";
 
-import React, { useState, useImperativeHandle, forwardRef } from "react";
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
+
+export type Ingredient = {
+  name: string;
+  amount: number;
+  unit: string;
+};
+
+export type IngredientAutocompleteHandle = {
+  getIngredients: () => Ingredient[];
+};
+
+type Props = {
+  initialIngredients?: Ingredient[];
+};
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const heuristics = [
   { keywords: ["jogurt", "mléko", "smetana", "olej", "sirup", "šťáva"], unit: "ml", amount: 100 },
@@ -18,288 +34,9 @@ function getDefaultForIngredient(name: string): { unit: string; amount: number }
   return { unit: "g", amount: 0 };
 }
 
-export type Ingredient = {
-  name: string;
-  amount: number;
-  unit: string;
-};
-
-export type IngredientAutocompleteHandle = {
-  getIngredients: () => Ingredient[];
-};
-
-export const INGREDIENT_SUGGESTIONS = [
-  // 🥩 Maso a uzeniny
-  "Hovězí maso mleté",
-  "Vepřové maso mleté",
-  "Mleté maso mix",
-  "Hovězí svíčková",
-  "Hovězí žebra",
-  "Vepřová panenka",
-  "Vepřová plec",
-  "Vepřový bok",
-  "Kuřecí prsa",
-  "Kuřecí maso",
-  "Kuřecí stehna",
-  "Kuřecí křídla",
-  "Krůtí maso",
-  "Kachna",
-  "Husí maso",
-  "Klobása",
-  "Šunka",
-  "Slanina",
-  "Salám",
-  "Uzené maso",
-  "Zvěřina",
-  "Jehněčí maso",
-  "Tlačenka",
-  "Párky",
-
-  // 🐟 Ryby a mořské plody
-  "Losos",
-  "Tuňák",
-  "Treska",
-  "Makrela",
-  "Sardinky",
-  "Sledi",
-  "Pstruh",
-  "Kapří maso",
-  "Krevety",
-  "Kalmáry",
-  "Mušle",
-  "Ančovičky",
-
-  // 🥚 Mléčné výrobky a vejce
-  "Vejce",
-  "Máslo",
-  "Margarín",
-  "Mléko",
-  "Kondenzované mléko",
-  "Smetana ke šlehání",
-  "Smetana na vaření",
-  "Zakysaná smetana",
-  "Jogurt bílý",
-  "Jogurt ovocný",
-  "Tvaroh měkký",
-  "Tvaroh tvrdý",
-  "Sýr Eidam",
-  "Sýr čedar",
-  "Sýr niva",
-  "Mozzarella",
-  "Parmezán",
-  "Ricotta",
-  "Cottage",
-  "Mascarpone",
-  "Termizovaný sýr",
-  "Sýr Lučina",
-  "Kefír",
-  "Podmáslí",
-
-  // 🥖 Pečivo a obiloviny
-  "Chléb",
-  "Rohlík",
-  "Houska",
-  "Bageta",
-  "Celozrnný chléb",
-  "Toastový chléb",
-  "Croissant",
-  "Lavaš",
-  "Tortilla",
-  "Piškoty",
-  "Sušenky",
-  "Strouhanka",
-  "Těstoviny",
-  "Špagety",
-  "Penne",
-  "Fusilli",
-  "Lasagne",
-  "Rýže",
-  "Jasmínová rýže",
-  "Basmati rýže",
-  "Kuskus",
-  "Bulgur",
-  "Quinoa",
-  "Jáhly",
-  "Pohanka",
-  "Polenta",
-  "Cizrna",
-  "Čočka červená",
-  "Čočka zelená",
-  "Fazole červené",
-  "Fazole bílé",
-  "Hrách",
-  "Ovesné vločky",
-  "Müsli",
-  "Mouka hladká",
-  "Mouka polohrubá",
-  "Mouka celozrnná",
-  "Kukuřičná mouka",
-  "Rýžová mouka",
-  "Pšeničná krupice",
-
-  // 🥦 Zelenina
-  "Cibule",
-  "Česnek",
-  "Jarní cibulka",
-  "Pórek",
-  "Mrkev",
-  "Petržel",
-  "Celer",
-  "Řapíkatý celer",
-  "Brambory",
-  "Batáty",
-  "Paprika červená",
-  "Paprika zelená",
-  "Rajče",
-  "Cherry rajčata",
-  "Okurka",
-  "Salát",
-  "Kukuřice",
-  "Hrášek",
-  "Špenát",
-  "Zelí bílé",
-  "Zelí červené",
-  "Kapusta",
-  "Kedlubna",
-  "Avokádo",
-  "Ředkvička",
-  "Řepa",
-  "Brokolice",
-  "Květák",
-  "Dýně",
-  "Lilek",
-  "Cuketa",
-  "Houby",
-  "Žampiony",
-  "Hlíva ústřičná",
-
-  // 🍎 Ovoce
-  "Jablko",
-  "Lesní ovoce",
-  "Hruška",
-  "Banán",
-  "Pomeranč",
-  "Mandarinka",
-  "Citron",
-  "Limetka",
-  "Grep",
-  "Jahody",
-  "Maliny",
-  "Borůvky",
-  "Třešně",
-  "Višně",
-  "Meruňky",
-  "Švestky",
-  "Mango",
-  "Ananas",
-  "Meloun",
-  "Hroznové víno",
-  "Granátové jablko",
-  "Kiwi",
-  "Fíky",
-  "Datle",
-  "Rozinky",
-  "Kokos",
-  "Ličí",
-  "Marakuja",
-
-  // 🧂 Koření a dochucovadla
-  "Sůl",
-  "Pepř",
-  "Oregano",
-  "Bazalka",
-  "Tymián",
-  "Rozmarýn",
-  "Koriandr",
-  "Kmín",
-  "Majoránka",
-  "Paprika sladká",
-  "Paprika pálivá",
-  "Chilli",
-  "Kari",
-  "Muškátový oříšek",
-  "Bobkový list",
-  "Skořice",
-  "Hřebíček",
-  "Zázvor",
-  "Vanilka",
-  "Sojová omáčka",
-  "Worcester",
-  "Kečup",
-  "Hořčice",
-  "Majonéza",
-  "Tatarka",
-  "Česnekový dresink",
-  "Med",
-  "Cukr",
-  "Třtinový cukr",
-  "Javorový sirup",
-  "Vanilkový cukr",
-  "Kakaový prášek",
-  "Prášek do pečiva",
-  "Jedlá soda",
-  "Droždí",
-
-  // 🧁 Dezerty a sladkosti
-  "Čokoláda",
-  "Bílá čokoláda",
-  "Tmavá čokoláda",
-  "Zmrzlina",
-  "Marmeláda",
-  "Nutella",
-  "Pudink vanilkový",
-  "Pudink čokoládový",
-  "Dortový korpus",
-  "Marcipán",
-  "Piškoty",
-  "Dětské piškoty",
-  "Zdobení na dort",
-  "Poleva",
-  "Želatina",
-
-  // 🥜 Ořechy a semínka
-  "Vlašské ořechy",
-  "Lískové ořechy",
-  "Mandle",
-  "Kešu",
-  "Pistácie",
-  "Arašídy",
-  "Slunečnicová semínka",
-  "Dýňová semínka",
-  "Chia semínka",
-  "Lněné semínko",
-  "Sezam",
-
-  // 🥤 Nápoje
-  "Voda",
-  "Minerálka",
-  "Soda",
-  "Pomerančový džus",
-  "Jablečný džus",
-  "Káva",
-  "Čaj černý",
-  "Čaj zelený",
-  "Kakao",
-  "Cola",
-  "Tonik",
-  "Energetický nápoj",
-
-  // 🧊 Mražené potraviny
-  "Mražená zelenina",
-  "Mražené ovoce",
-  "Mražená pizza",
-  "Mražené hranolky",
-  "Mražené kuřecí řízky",
-  "Mražený špenát",
-  "Zmrzlé krevety",
-];
-
-type Props = {
-  initialIngredients?: Ingredient[];
-};
-
 const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(({ initialIngredients = [] }, ref) => {
   const [ingredients, setIngredients] = useState<Ingredient[]>(initialIngredients);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [filtered, setFiltered] = useState<string[]>([]);
   const [amount, setAmount] = useState<number>(0);
@@ -308,6 +45,21 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
   useImperativeHandle(ref, () => ({
     getIngredients: () => ingredients,
   }));
+
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/ingredients`);
+        const data = await res.json();
+        const names = data.map((i: { name: string }) => i.name);
+        setSuggestions(names);
+      } catch (err) {
+        console.error("❌ Chyba při načítání autocomplete surovin:", err);
+      }
+    };
+
+    fetchSuggestions();
+  }, []);
 
   const normalize = (str: string) =>
     str
@@ -321,7 +73,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
 
     if (value.length > 0) {
       const normalized = normalize(value);
-      const matches = INGREDIENT_SUGGESTIONS.filter((s) => normalize(s).includes(normalized));
+      const matches = suggestions.filter((s) => normalize(s).includes(normalized));
       setFiltered(matches.slice(0, 10));
     } else {
       setFiltered([]);
@@ -330,11 +82,10 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
 
   const handleSelect = (name: string) => {
     if (name.trim() === "") return;
-    // Pokud je jednotka g/ml, množství musí být větší než 0
     if ((unit === "g" || unit === "ml") && amount <= 0) return;
-    // Pokud už ingredience se stejným názvem a jednotkou existuje, nepřidávej
     const alreadyExists = ingredients.some((i) => i.name === name && i.unit === unit);
     if (alreadyExists) return;
+
     setIngredients((prev) => [...prev, { name, amount, unit }]);
     setInput("");
     setAmount(0);
@@ -362,7 +113,6 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
         {(unit === "g" || unit === "ml") && (
           <input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} placeholder="Množství" className="w-24 p-2 border rounded" />
         )}
-
         <button type="button" onClick={() => handleSelect(input)} className="bg-blue-600 text-white px-3 py-2 rounded">
           ➕ Přidat
         </button>
