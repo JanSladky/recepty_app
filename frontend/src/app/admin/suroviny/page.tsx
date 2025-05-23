@@ -29,16 +29,15 @@ export default function IngredientAdminPage() {
     category_id: "",
   });
 
+  const [newCategory, setNewCategory] = useState("");
+  const [editedCategories, setEditedCategories] = useState<Record<number, string>>({});
+
   useEffect(() => {
     const fetchIngredients = async () => {
       try {
         const res = await fetch(`${API_URL}/api/ingredients`);
         const data = await res.json();
-        if (Array.isArray(data)) {
-          setIngredients(data);
-        } else {
-          console.error("❌ Neočekávaný formát dat:", data);
-        }
+        setIngredients(data);
       } catch (err) {
         console.error("❌ Chyba při načítání surovin:", err);
       }
@@ -155,6 +154,55 @@ export default function IngredientAdminPage() {
     }
   };
 
+  const handleAddCategory = async () => {
+    if (!newCategory.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/api/ingredients/categories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCategory }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setCategories((prev) => [...prev, created]);
+        setNewCategory("");
+      }
+    } catch (err) {
+      console.error("❌ Chyba při přidávání kategorie:", err);
+    }
+  };
+
+  const handleUpdateCategory = async (id: number) => {
+    const newName = editedCategories[id];
+    if (!newName?.trim()) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName }),
+      });
+      if (res.ok) {
+        setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name: newName } : c)));
+      }
+    } catch (err) {
+      console.error("❌ Chyba při úpravě kategorie:", err);
+    }
+  };
+
+  const handleDeleteCategory = async (id: number) => {
+    if (!confirm("Opravdu chceš smazat tuto kategorii?")) return;
+    try {
+      const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, {
+        method: "DELETE" });
+      if (res.ok) {
+        setCategories((prev) => prev.filter((c) => c.id !== id));
+      }
+    } catch (err) {
+      console.error("❌ Chyba při mazání kategorie:", err);
+    }
+  };
+
   if (loading) return <p>Načítání...</p>;
   if (!isAdmin) return <p>Přístup zamítnut.</p>;
 
@@ -194,9 +242,7 @@ export default function IngredientAdminPage() {
         >
           <option value="">Vyber kategorii</option>
           {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
           ))}
         </select>
         <button onClick={handleCreate} className="bg-blue-600 text-white rounded px-3 py-2 col-span-1">
@@ -242,9 +288,7 @@ export default function IngredientAdminPage() {
                   >
                     <option value="">Vyber kategorii</option>
                     {categories.map((cat) => (
-                      <option key={cat.id} value={cat.name}>
-                        {cat.name}
-                      </option>
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
                     ))}
                   </select>
                 </td>
@@ -261,6 +305,50 @@ export default function IngredientAdminPage() {
           })}
         </tbody>
       </table>
+
+      {/* Sekce správy kategorií */}
+      <section className="mt-8">
+        <h2 className="text-xl font-semibold mb-2">Správa kategorií</h2>
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <input
+            type="text"
+            placeholder="Nová kategorie"
+            value={newCategory}
+            onChange={(e) => setNewCategory(e.target.value)}
+            className="border p-2 rounded col-span-2"
+          />
+          <button
+            onClick={handleAddCategory}
+            className="bg-blue-500 text-white rounded px-3 py-2 col-span-1"
+          >
+            ➕ Přidat kategorii
+          </button>
+        </div>
+        <ul className="space-y-2">
+          {categories.map((cat) => (
+            <li key={cat.id} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={editedCategories[cat.id] ?? cat.name}
+                onChange={(e) => setEditedCategories((prev) => ({ ...prev, [cat.id]: e.target.value }))}
+                className="border rounded p-1 flex-1"
+              />
+              <button
+                onClick={() => handleUpdateCategory(cat.id)}
+                className="bg-green-500 text-white px-2 py-1 rounded"
+              >
+                💾 Uložit
+              </button>
+              <button
+                onClick={() => handleDeleteCategory(cat.id)}
+                className="bg-red-500 text-white px-2 py-1 rounded"
+              >
+                🗑️ Smazat
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
     </main>
   );
 }
