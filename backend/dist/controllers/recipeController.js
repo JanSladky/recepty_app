@@ -1,12 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteRecipe = exports.updateRecipe = exports.addFullRecipe = exports.getRecipeById = exports.getRecipes = void 0;
+exports.deleteRecipe = exports.updateRecipe = exports.addFullRecipe = exports.getAllIngredients = exports.getRecipeById = exports.getRecipes = void 0;
 const recipeModel_1 = require("../models/recipeModel");
-// ✅ GET /api/recipes
-const getRecipes = async (req, res) => {
+// GET /api/recipes
+const getRecipes = async (_req, res) => {
     try {
         const recipes = await (0, recipeModel_1.getAllRecipes)();
-        res.json(recipes);
+        res.status(200).json(recipes);
     }
     catch (error) {
         console.error("❌ Chyba při načítání receptů:", error);
@@ -14,17 +14,20 @@ const getRecipes = async (req, res) => {
     }
 };
 exports.getRecipes = getRecipes;
-// ✅ GET /api/recipes/:id
+// GET /api/recipes/:id
 const getRecipeById = async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+        res.status(400).json({ error: "Neplatné ID" });
+        return;
+    }
     try {
-        const id = Number(req.params.id);
         const recipe = await (0, recipeModel_1.getRecipeByIdFromDB)(id);
-        console.log("📦 Odpověď z DB:", recipe);
         if (!recipe) {
             res.status(404).json({ error: "Recept nenalezen" });
             return;
         }
-        res.json(recipe);
+        res.status(200).json(recipe);
     }
     catch (error) {
         console.error("❌ Chyba při načítání detailu receptu:", error);
@@ -32,10 +35,22 @@ const getRecipeById = async (req, res) => {
     }
 };
 exports.getRecipeById = getRecipeById;
-// ✅ POST /api/recipes
+// GET /api/ingredients
+const getAllIngredients = async (_req, res) => {
+    try {
+        const ingredients = await (0, recipeModel_1.getAllIngredientsFromDB)();
+        res.status(200).json(ingredients);
+    }
+    catch (error) {
+        console.error("❌ Chyba při načítání surovin:", error);
+        res.status(500).json({ error: "Chyba serveru při načítání surovin" });
+    }
+};
+exports.getAllIngredients = getAllIngredients;
+// POST /api/recipes
 const addFullRecipe = async (req, res) => {
     try {
-        const { title, notes, ingredients, categories, mealType, steps } = req.body;
+        const { title, notes, ingredients, categories, mealType, steps, calories, } = req.body;
         if (!title || !ingredients || !categories || !mealType || !steps) {
             res.status(400).json({ error: "Chybí povinná pole." });
             return;
@@ -44,8 +59,11 @@ const addFullRecipe = async (req, res) => {
         const parsedCategories = JSON.parse(categories);
         const parsedMealTypes = JSON.parse(mealType);
         const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
-        const imagePath = req.file?.secure_url || req.file?.path || "";
-        const recipeId = await (0, recipeModel_1.createFullRecipe)(title, notes, imagePath, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
+        const parsedCalories = calories ? Number(calories) : null;
+        const imagePath = req.file?.secure_url ||
+            req.file?.path ||
+            "";
+        const recipeId = await (0, recipeModel_1.createFullRecipe)(title, notes, imagePath, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps, parsedCalories);
         res.status(201).json({ message: "Recept uložen", id: recipeId });
     }
     catch (error) {
@@ -54,12 +72,16 @@ const addFullRecipe = async (req, res) => {
     }
 };
 exports.addFullRecipe = addFullRecipe;
-// ✅ PUT /api/recipes/:id
+// PUT /api/recipes/:id
 const updateRecipe = async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+        res.status(400).json({ error: "Neplatné ID" });
+        return;
+    }
     try {
-        const id = Number(req.params.id);
-        const { title, notes, ingredients, categories, mealType, existingImageUrl, steps } = req.body;
-        if (!title || !ingredients || !categories || !mealType) {
+        const { title, notes, ingredients, categories, mealType, steps, calories, existingImageUrl, } = req.body;
+        if (!title || !ingredients || !categories || !mealType || !steps) {
             res.status(400).json({ error: "Chybí povinná pole." });
             return;
         }
@@ -67,20 +89,15 @@ const updateRecipe = async (req, res) => {
         const parsedCategories = JSON.parse(categories);
         const parsedMealTypes = JSON.parse(mealType);
         const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
-        const uploadedImageUrl = req.file?.secure_url || req.file?.path || null;
+        const parsedCalories = calories ? Number(calories) : null;
+        const uploadedImageUrl = req.file?.secure_url ||
+            req.file?.path ||
+            null;
         let finalImageUrl = uploadedImageUrl || existingImageUrl || null;
-        if (uploadedImageUrl && uploadedImageUrl.trim() !== "") {
-            finalImageUrl = uploadedImageUrl;
+        if (typeof finalImageUrl === "string" && (finalImageUrl.trim() === "" || finalImageUrl === "null")) {
+            finalImageUrl = null;
         }
-        else if (typeof existingImageUrl === "string" && existingImageUrl.trim() !== "" && existingImageUrl !== "null") {
-            finalImageUrl = existingImageUrl;
-        }
-        console.log("🔄 Aktualizace receptu:");
-        console.log("• title:", title);
-        console.log("• uploadedImageUrl:", uploadedImageUrl);
-        console.log("• existingImageUrl:", existingImageUrl);
-        console.log("✅ Použito finalImageUrl:", finalImageUrl);
-        await (0, recipeModel_1.updateRecipeInDB)(id, title, notes, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
+        await (0, recipeModel_1.updateRecipeInDB)(id, title, notes, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps, parsedCalories);
         res.status(200).json({ message: "Recept upraven" });
     }
     catch (error) {
@@ -89,10 +106,14 @@ const updateRecipe = async (req, res) => {
     }
 };
 exports.updateRecipe = updateRecipe;
-// ✅ DELETE /api/recipes/:id
+// DELETE /api/recipes/:id
 const deleteRecipe = async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+        res.status(400).json({ error: "Neplatné ID" });
+        return;
+    }
     try {
-        const id = Number(req.params.id);
         await (0, recipeModel_1.deleteRecipeFromDB)(id);
         res.status(200).json({ message: "Recept smazán." });
     }

@@ -6,18 +6,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
+// 📦 Import rout
 const recipes_1 = __importDefault(require("./routes/recipes"));
 const users_1 = __importDefault(require("./routes/users"));
-dotenv_1.default.config();
+const ingredients_1 = __importDefault(require("./routes/ingredients")); // ✅ Suroviny + kategorie
+dotenv_1.default.config(); // 🔑 Načti .env proměnné
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 8080;
-// ✅ CORS whitelist
+// 🌍 Povolené CORS původy
 const devOrigins = ["http://localhost:3000"];
 const prodOrigins = [
     "https://recepty-app.vercel.app",
     "https://receptyapp-production.up.railway.app",
     process.env.FRONTEND_URL ?? "",
 ];
+// 🔐 CORS nastavení
 app.use((0, cors_1.default)({
     origin: function (origin, callback) {
         if (!origin)
@@ -36,17 +39,18 @@ app.use((0, cors_1.default)({
     },
     credentials: true,
 }));
-// ✅ Middleware pro parsování request body
+// 🧠 Middleware pro JSON a form data
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
-// ✅ Root route – rychlý test dostupnosti
-app.get("/", (req, res) => {
+// 🧪 Testovací endpoint
+app.get("/", (_req, res) => {
     res.send("✅ API pro recepty je v provozu!");
 });
-// ✅ API routy
-app.use("/api/recipes", recipes_1.default); // 🍲 Recepty
-app.use("/api/users", users_1.default); // 👤 Uživatelé
-// ✅ Start serveru
+// 📚 Různé routy
+app.use("/api/recipes", recipes_1.default);
+app.use("/api/users", users_1.default);
+app.use("/api/ingredients", ingredients_1.default); // ✅ Připojeno správně
+// 🚀 Spuštění serveru
 app.listen(PORT, () => {
     console.log(`✅ Server běží na http://localhost:${PORT}`);
 });
