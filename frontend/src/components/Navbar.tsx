@@ -35,10 +35,10 @@ export default function Navbar() {
         </Link>
         {!loading && isAdmin && (
           <>
-            <Link href="/pridat-recept" className="hover:underline text-green-700 font-semibold">
+            <Link href="/pridat-recept" className="hover:underline">
               Přidat recept
             </Link>
-            <Link href="/admin/suroviny" className="text-sm px-3 py-2 hover:underline">
+            <Link href="/admin/suroviny" className="hover:underline">
               Suroviny
             </Link>
           </>

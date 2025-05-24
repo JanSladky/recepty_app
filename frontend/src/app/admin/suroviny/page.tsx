@@ -9,7 +9,7 @@ export type Ingredient = {
   id: number;
   name: string;
   calories_per_gram: number;
-  category: string;
+  category_id: number;
 };
 
 export type Category = {
@@ -62,7 +62,7 @@ export default function IngredientAdminPage() {
       ...prev,
       [id]: {
         ...prev[id],
-        [field]: field === "calories_per_gram" ? Number(value) : value,
+        [field]: field === "calories_per_gram" || field === "category_id" ? Number(value) : value,
       },
     }));
   };
@@ -71,14 +71,17 @@ export default function IngredientAdminPage() {
     const current = ingredients.find((i) => i.id === id);
     if (!current) return;
 
-    const updatedCategory = edited[id]?.category ?? current.category;
-    const updatedCalories = edited[id]?.calories_per_gram ?? current.calories_per_gram;
-
     const updated = {
       name: edited[id]?.name ?? current.name,
-      calories_per_gram: Number(updatedCalories),
-      category: updatedCategory,
+      calories_per_gram: Number(edited[id]?.calories_per_gram ?? current.calories_per_gram),
+      category_id: Number(edited[id]?.category_id ?? current.category_id),
     };
+
+    // 🛡️ Nová validace
+    if (!updated.name || isNaN(updated.calories_per_gram) || isNaN(updated.category_id)) {
+      alert("❌ Vyplň správně všechna pole včetně kategorie.");
+      return;
+    }
 
     try {
       const res = await fetch(`${API_URL}/api/ingredients/${id}`, {
@@ -94,8 +97,7 @@ export default function IngredientAdminPage() {
         setEdited(copy);
       } else {
         const error = await res.json();
-        console.error("❌ Backend error:", error);
-        alert("❌ Nepodařilo se uložit změny.");
+        alert(`❌ ${error?.error || "Chyba při ukládání."}`);
       }
     } catch (err) {
       console.error("❌ Chyba při ukládání:", err);
@@ -123,21 +125,24 @@ export default function IngredientAdminPage() {
 
   const handleCreate = async () => {
     const { name, calories_per_gram, category_id } = newIngredient;
-    if (!name || !calories_per_gram || !category_id) return;
+
+    if (!name || !calories_per_gram || !category_id) {
+      alert("❌ Vyplň všechny údaje včetně kategorie.");
+      return;
+    }
+
+    if (isNaN(Number(category_id))) {
+      alert("❌ Vyber platnou kategorii.");
+      return;
+    }
 
     try {
-      const selectedCategoryName = categories.find((c) => String(c.id) === category_id)?.name;
-      if (!selectedCategoryName) {
-        alert("❌ Neplatná kategorie.");
-        return;
-      }
-
       const res = await fetch(`${API_URL}/api/ingredients`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          category: selectedCategoryName,
+          category_id: Number(category_id),
           calories_per_gram: Number(calories_per_gram),
         }),
       });
@@ -147,7 +152,8 @@ export default function IngredientAdminPage() {
         setIngredients((prev) => [...prev, created]);
         setNewIngredient({ name: "", calories_per_gram: "", category_id: "" });
       } else {
-        alert("❌ Nepodařilo se přidat surovinu.");
+        const error = await res.json();
+        alert(`❌ ${error?.error || "Chyba při přidání."}`);
       }
     } catch (err) {
       console.error("❌ Chyba při vytváření:", err);
@@ -166,6 +172,10 @@ export default function IngredientAdminPage() {
         const created = await res.json();
         setCategories((prev) => [...prev, created]);
         setNewCategory("");
+      } else if (res.status === 409) {
+        alert("Kategorie s tímto názvem již existuje.");
+      } else {
+        alert("Nepodařilo se přidat kategorii.");
       }
     } catch (err) {
       console.error("❌ Chyba při přidávání kategorie:", err);
@@ -250,6 +260,7 @@ export default function IngredientAdminPage() {
         </button>
       </div>
 
+      {/* Výpis surovin */}
       <table className="w-full border text-sm">
         <thead>
           <tr className="bg-gray-100">
@@ -282,13 +293,13 @@ export default function IngredientAdminPage() {
                 </td>
                 <td className="p-2 border">
                   <select
-                    value={editedItem.category ?? ingredient.category ?? ""}
-                    onChange={(e) => handleInputChange(ingredient.id, "category", e.target.value)}
+                    value={editedItem.category_id ?? ingredient.category_id ?? ""}
+                    onChange={(e) => handleInputChange(ingredient.id, "category_id", e.target.value)}
                     className="w-full border rounded p-1"
                   >
                     <option value="">Vyber kategorii</option>
                     {categories.map((cat) => (
-                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </select>
                 </td>
@@ -317,10 +328,7 @@ export default function IngredientAdminPage() {
             onChange={(e) => setNewCategory(e.target.value)}
             className="border p-2 rounded col-span-2"
           />
-          <button
-            onClick={handleAddCategory}
-            className="bg-blue-500 text-white rounded px-3 py-2 col-span-1"
-          >
+          <button onClick={handleAddCategory} className="bg-blue-500 text-white rounded px-3 py-2 col-span-1">
             ➕ Přidat kategorii
           </button>
         </div>
@@ -333,16 +341,10 @@ export default function IngredientAdminPage() {
                 onChange={(e) => setEditedCategories((prev) => ({ ...prev, [cat.id]: e.target.value }))}
                 className="border rounded p-1 flex-1"
               />
-              <button
-                onClick={() => handleUpdateCategory(cat.id)}
-                className="bg-green-500 text-white px-2 py-1 rounded"
-              >
+              <button onClick={() => handleUpdateCategory(cat.id)} className="bg-green-500 text-white px-2 py-1 rounded">
                 💾 Uložit
               </button>
-              <button
-                onClick={() => handleDeleteCategory(cat.id)}
-                className="bg-red-500 text-white px-2 py-1 rounded"
-              >
+              <button onClick={() => handleDeleteCategory(cat.id)} className="bg-red-500 text-white px-2 py-1 rounded">
                 🗑️ Smazat
               </button>
             </li>

@@ -14,9 +14,55 @@ export type IngredientInput = {
   unit: string;
 };
 
-// ==============================
+// ✅ Ingredients
+export async function getAllIngredientsFromDB(): Promise<Ingredient[]> {
+  const res = await db.query(
+    `SELECT i.id, i.name, i.calories_per_gram, i.category_id, c.name AS category_name
+     FROM ingredients i
+     LEFT JOIN ingredient_categories c ON i.category_id = c.id
+     ORDER BY i.name ASC`
+  );
+  return res.rows;
+}
+
+export async function createIngredientInDB(name: string, calories: number, category_id: number): Promise<Ingredient> {
+  const res = await db.query(
+    `INSERT INTO ingredients (name, calories_per_gram, category_id)
+     VALUES ($1, $2, $3) RETURNING id, name, calories_per_gram, category_id`,
+    [name, calories, category_id]
+  );
+  const cat = await db.query("SELECT name FROM ingredient_categories WHERE id = $1", [category_id]);
+  return { ...res.rows[0], category_name: cat.rows[0]?.name || "" };
+}
+
+export async function updateIngredientInDB(id: number, name: string, calories: number, category_id: number): Promise<void> {
+  console.log("🛠️ UPDATE suroviny:", { id, name, calories, category_id });
+  await db.query("UPDATE ingredients SET name = $1, calories_per_gram = $2, category_id = $3 WHERE id = $4", [name, calories, category_id, id]);
+}
+
+export async function deleteIngredientFromDB(id: number): Promise<void> {
+  await db.query("DELETE FROM ingredients WHERE id = $1", [id]);
+}
+
+export async function getAllIngredientCategories(): Promise<{ id: number; name: string }[]> {
+  const res = await db.query("SELECT id, name FROM ingredient_categories ORDER BY name ASC");
+  return res.rows;
+}
+
+export async function createIngredientCategory(name: string): Promise<{ id: number; name: string }> {
+  const res = await db.query("INSERT INTO ingredient_categories (name) VALUES ($1) RETURNING id, name", [name]);
+  return res.rows[0];
+}
+
+export async function updateIngredientCategory(id: number, name: string): Promise<void> {
+  await db.query("UPDATE ingredient_categories SET name = $1 WHERE id = $2", [name, id]);
+}
+
+export async function deleteIngredientCategory(id: number): Promise<void> {
+  await db.query("DELETE FROM ingredient_categories WHERE id = $1", [id]);
+}
+
 // ✅ Recepty
-// ==============================
 
 export async function getAllRecipes(): Promise<any[]> {
   const res = await db.query("SELECT id, title, notes, image_url, steps, calories FROM recipes");
@@ -78,7 +124,6 @@ export async function createFullRecipe(
 
     await insertRelations(client, recipeId, mealTypes, ingredients, categories);
     await client.query("COMMIT");
-
     return recipeId;
   } catch (err) {
     await client.query("ROLLBACK");
@@ -102,7 +147,6 @@ export async function updateRecipeInDB(
   const client = await db.connect();
   try {
     await client.query("BEGIN");
-
     await client.query(
       `UPDATE recipes
        SET title = $1, notes = $2, image_url = $3, steps = $4::jsonb, calories = $5
@@ -152,77 +196,24 @@ async function insertRelations(client: any, recipeId: number, mealTypes: string[
     }
 
     await client.query("INSERT INTO recipe_ingredients (recipe_id, ingredient_id, amount, unit) VALUES ($1, $2, $3, $4)", [
-      recipeId, ingredientId, ing.amount, ing.unit
+      recipeId,
+      ingredientId,
+      ing.amount,
+      ing.unit,
     ]);
   }
 
   for (const cat of categories) {
     const res = await client.query("SELECT id FROM categories WHERE name = $1", [cat]);
-    const categoryId = res.rows[0]?.id ??
-      (await client.query("INSERT INTO categories (name) VALUES ($1) RETURNING id", [cat])).rows[0].id;
+    const categoryId = res.rows[0]?.id ?? (await client.query("INSERT INTO categories (name) VALUES ($1) RETURNING id", [cat])).rows[0].id;
 
     await client.query("INSERT INTO recipe_categories (recipe_id, category_id) VALUES ($1, $2)", [recipeId, categoryId]);
   }
 
   for (const meal of mealTypes) {
     const res = await client.query("SELECT id FROM meal_types WHERE name = $1", [meal]);
-    const mealTypeId = res.rows[0]?.id ??
-      (await client.query("INSERT INTO meal_types (name) VALUES ($1) RETURNING id", [meal])).rows[0].id;
+    const mealTypeId = res.rows[0]?.id ?? (await client.query("INSERT INTO meal_types (name) VALUES ($1) RETURNING id", [meal])).rows[0].id;
 
     await client.query("INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)", [recipeId, mealTypeId]);
   }
-}
-
-// ==============================
-// ✅ Suroviny a kategorie
-// ==============================
-
-export async function getAllIngredientsFromDB(): Promise<Ingredient[]> {
-  const res = await db.query(
-    `SELECT i.id, i.name, i.calories_per_gram, i.category_id, c.name AS category_name
-     FROM ingredients i
-     LEFT JOIN ingredient_categories c ON i.category_id = c.id
-     ORDER BY i.name ASC`
-  );
-  return res.rows;
-}
-
-export async function createIngredientInDB(name: string, calories: number, category_id: number): Promise<Ingredient> {
-  const res = await db.query(
-    `INSERT INTO ingredients (name, calories_per_gram, category_id)
-     VALUES ($1, $2, $3) RETURNING id, name, calories_per_gram, category_id`,
-    [name, calories, category_id]
-  );
-
-  const cat = await db.query("SELECT name FROM ingredient_categories WHERE id = $1", [category_id]);
-
-  return { ...res.rows[0], category_name: cat.rows[0]?.name || "" };
-}
-
-export async function updateIngredientInDB(id: number, name: string, calories: number, category_id: number): Promise<void> {
-  await db.query("UPDATE ingredients SET name = $1, calories_per_gram = $2, category_id = $3 WHERE id = $4", [
-    name, calories, category_id, id
-  ]);
-}
-
-export async function deleteIngredientFromDB(id: number): Promise<void> {
-  await db.query("DELETE FROM ingredients WHERE id = $1", [id]);
-}
-
-export async function getAllIngredientCategories(): Promise<{ id: number; name: string }[]> {
-  const res = await db.query("SELECT id, name FROM ingredient_categories ORDER BY name ASC");
-  return res.rows;
-}
-
-export async function createIngredientCategory(name: string): Promise<{ id: number; name: string }> {
-  const res = await db.query("INSERT INTO ingredient_categories (name) VALUES ($1) RETURNING id, name", [name]);
-  return res.rows[0];
-}
-
-export async function updateIngredientCategory(id: number, name: string): Promise<void> {
-  await db.query("UPDATE ingredient_categories SET name = $1 WHERE id = $2", [name, id]);
-}
-
-export async function deleteIngredientCategory(id: number): Promise<void> {
-  await db.query("DELETE FROM ingredient_categories WHERE id = $1", [id]);
 }

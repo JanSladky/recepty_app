@@ -7,7 +7,6 @@ import {
   getAllIngredientCategories,
   createIngredientCategory,
   updateIngredientCategory,
-  deleteIngredientCategory,
 } from "../models/recipeModel";
 import db from "../utils/db";
 
@@ -17,14 +16,15 @@ const router = Router();
 // ✅ INGREDIENTS
 // ==============================
 
-router.get("/", async (_req: Request, res: Response): Promise<void> => {
+router.get("/", async (_req: Request, res: Response) => {
   try {
     const ingredients = await getAllIngredientsFromDB();
     const transformed = ingredients.map((i) => ({
       id: i.id,
       name: i.name,
       calories_per_gram: i.calories_per_gram,
-      category: i.category_name,
+      category_id: i.category_id,
+      category_name: i.category_name,
     }));
     res.status(200).json(transformed);
   } catch (err) {
@@ -33,44 +33,50 @@ router.get("/", async (_req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.post("/", async (req: Request, res: Response): Promise<void> => {
-  const { name, category, calories_per_gram } = req.body;
-  if (typeof name !== "string" || typeof category !== "string" || typeof calories_per_gram !== "number") {
+router.post("/", async (req: Request, res: Response) => {
+  const { name, category_id, calories_per_gram } = req.body;
+  if (typeof name !== "string" || typeof category_id !== "number" || typeof calories_per_gram !== "number") {
     res.status(400).json({ error: "Neplatný vstup." });
     return;
   }
 
   try {
-    const result = await db.query("SELECT id FROM ingredient_categories WHERE name = $1", [category]);
-    const category_id = result.rows[0]?.id;
-    if (!category_id) {
-      res.status(400).json({ error: `Kategorie '${category}' neexistuje.` });
+    const result = await db.query("SELECT id FROM ingredient_categories WHERE id = $1", [category_id]);
+    if (result.rows.length === 0) {
+      res.status(400).json({ error: "Zvolená kategorie neexistuje." });
       return;
     }
-    const newIngredient = await createIngredientInDB(name, calories_per_gram, category_id);
-    res.status(201).json({ ...newIngredient, category });
+
+    const newIngredient = await createIngredientInDB(name.trim(), calories_per_gram, category_id);
+    res.status(201).json(newIngredient);
   } catch (err) {
     console.error("❌ Chyba při vytváření suroviny:", err);
     res.status(500).json({ error: "Chyba serveru při vytváření suroviny" });
   }
 });
 
-router.put("/:id", async (req: Request, res: Response): Promise<void> => {
+router.put("/:id", async (req: Request, res: Response) => {
   const id = Number(req.params.id);
-  const { name, category, calories_per_gram } = req.body;
-  if (isNaN(id) || typeof name !== "string" || typeof category !== "string" || typeof calories_per_gram !== "number") {
+  const { name, category_id, calories_per_gram } = req.body;
+
+  if (
+    isNaN(id) ||
+    typeof name !== "string" ||
+    typeof category_id !== "number" ||
+    typeof calories_per_gram !== "number"
+  ) {
     res.status(400).json({ error: "Neplatný vstup." });
     return;
   }
 
   try {
-    const result = await db.query("SELECT id FROM ingredient_categories WHERE name = $1", [category]);
-    const category_id = result.rows[0]?.id;
-    if (!category_id) {
-      res.status(400).json({ error: `Kategorie '${category}' neexistuje.` });
+    const categoryCheck = await db.query("SELECT id FROM ingredient_categories WHERE id = $1", [category_id]);
+    if (categoryCheck.rows.length === 0) {
+      res.status(400).json({ error: `Kategorie s ID '${category_id}' neexistuje.` });
       return;
     }
-    await updateIngredientInDB(id, name, calories_per_gram, category_id);
+
+    await updateIngredientInDB(id, name.trim(), calories_per_gram, category_id);
     res.status(200).json({ message: "✅ Surovina byla úspěšně aktualizována." });
   } catch (err) {
     console.error("❌ Chyba při aktualizaci suroviny:", err);
@@ -78,7 +84,7 @@ router.put("/:id", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
+router.delete("/:id", async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (isNaN(id)) {
     res.status(400).json({ error: "Neplatné ID." });
@@ -98,7 +104,7 @@ router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
 // ✅ INGREDIENT CATEGORIES
 // ==============================
 
-router.get("/categories", async (_req: Request, res: Response): Promise<void> => {
+router.get("/categories", async (_req: Request, res: Response) => {
   try {
     const categories = await getAllIngredientCategories();
     res.status(200).json(categories);
@@ -108,15 +114,23 @@ router.get("/categories", async (_req: Request, res: Response): Promise<void> =>
   }
 });
 
-router.post("/categories", async (req: Request, res: Response): Promise<void> => {
+router.post("/categories", async (req: Request, res: Response) => {
   const { name } = req.body;
   if (typeof name !== "string" || name.trim() === "") {
     res.status(400).json({ error: "Neplatný název kategorie." });
     return;
   }
 
+  const trimmed = name.trim();
+
   try {
-    const category = await createIngredientCategory(name.trim());
+    const exists = await db.query("SELECT id FROM ingredient_categories WHERE LOWER(name) = LOWER($1)", [trimmed]);
+    if (exists.rows.length > 0) {
+      res.status(409).json({ error: `Kategorie '${trimmed}' už existuje.` });
+      return;
+    }
+
+    const category = await createIngredientCategory(trimmed);
     res.status(201).json(category);
   } catch (err) {
     console.error("❌ Chyba při vytváření kategorie:", err);
@@ -124,7 +138,7 @@ router.post("/categories", async (req: Request, res: Response): Promise<void> =>
   }
 });
 
-router.put("/categories/:id", async (req: Request, res: Response): Promise<void> => {
+router.put("/categories/:id", async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const { name } = req.body;
   if (isNaN(id) || typeof name !== "string" || name.trim() === "") {
@@ -141,7 +155,7 @@ router.put("/categories/:id", async (req: Request, res: Response): Promise<void>
   }
 });
 
-router.delete("/categories/:id", async (req: Request, res: Response): Promise<void> => {
+router.delete("/categories/:id", async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (isNaN(id)) {
     res.status(400).json({ error: "Neplatné ID kategorie." });
@@ -149,9 +163,18 @@ router.delete("/categories/:id", async (req: Request, res: Response): Promise<vo
   }
 
   try {
-    await deleteIngredientCategory(id);
-    res.status(200).json({ message: "Kategorie byla smazána." });
+    await db.query("BEGIN");
+
+    // Nastavení category_id = NULL u surovin, které používají danou kategorii
+    await db.query("UPDATE ingredients SET category_id = NULL WHERE category_id = $1", [id]);
+
+    // Smazání samotné kategorie
+    await db.query("DELETE FROM ingredient_categories WHERE id = $1", [id]);
+
+    await db.query("COMMIT");
+    res.status(200).json({ message: "Kategorie byla smazána a surovinám odebrána." });
   } catch (err) {
+    await db.query("ROLLBACK");
     console.error("❌ Chyba při mazání kategorie:", err);
     res.status(500).json({ error: "Chyba serveru při mazání kategorie." });
   }
