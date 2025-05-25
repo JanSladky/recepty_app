@@ -32,7 +32,6 @@ async function createIngredientInDB(name, calories, category_id) {
     return { ...res.rows[0], category_name: cat.rows[0]?.name || "" };
 }
 async function updateIngredientInDB(id, name, calories, category_id) {
-    console.log("🛠️ UPDATE suroviny:", { id, name, calories, category_id });
     await db_1.default.query("UPDATE ingredients SET name = $1, calories_per_gram = $2, category_id = $3 WHERE id = $4", [name, calories, category_id, id]);
 }
 async function deleteIngredientFromDB(id) {
@@ -69,19 +68,30 @@ async function getAllRecipes() {
 async function getRecipeByIdFromDB(id) {
     const res = await db_1.default.query("SELECT * FROM recipes WHERE id = $1", [id]);
     const recipe = res.rows[0];
-    if (!recipe)
+    if (!recipe) {
         return null;
+    }
     const [ingredients, categories, mealTypes] = await Promise.all([
-        db_1.default.query("SELECT ri.amount, ri.unit, i.name FROM recipe_ingredients ri JOIN ingredients i ON ri.ingredient_id = i.id WHERE ri.recipe_id = $1", [id]),
+        db_1.default.query(`
+      SELECT ri.amount, 'g' as unit, i.name, i.calories_per_gram
+      FROM recipe_ingredients ri
+      JOIN ingredients i ON ri.ingredient_id = i.id
+      WHERE ri.recipe_id = $1
+    `, [id]),
         db_1.default.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [id]),
         db_1.default.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [id]),
     ]);
+    // ✅ Deduplikace a formátování meal_types
+    const uniqueMealTypes = Array.from(new Map(mealTypes.rows.map((r) => {
+        const cleaned = r.name.trim();
+        return [cleaned.toLowerCase(), cleaned.charAt(0).toUpperCase() + cleaned.slice(1)];
+    })).values());
     return {
         ...recipe,
         steps: recipe.steps ?? [],
         ingredients: ingredients.rows,
         categories: categories.rows.map((r) => r.name),
-        meal_types: mealTypes.rows.map((r) => r.name),
+        meal_types: uniqueMealTypes,
     };
 }
 async function createFullRecipe(title, notes, imageUrl, mealTypes, ingredients, categories, steps, calories) {
@@ -147,15 +157,14 @@ async function insertRelations(client, recipeId, mealTypes, ingredients, categor
         const res = await client.query("SELECT id FROM ingredients WHERE name = $1", [ing.name]);
         let ingredientId = res.rows[0]?.id;
         if (!ingredientId) {
-            const insert = await client.query("INSERT INTO ingredients (name, calories_per_gram) VALUES ($1, $2) RETURNING id", [ing.name, 0]);
+            const insert = await client.query("INSERT INTO ingredients (name, calories_per_gram) VALUES ($1, $2) RETURNING id", [ing.name, ing.calories_per_gram]);
             ingredientId = insert.rows[0].id;
         }
-        await client.query("INSERT INTO recipe_ingredients (recipe_id, ingredient_id, amount, unit) VALUES ($1, $2, $3, $4)", [
-            recipeId,
-            ingredientId,
-            ing.amount,
-            ing.unit,
-        ]);
+        else {
+            await client.query("UPDATE ingredients SET calories_per_gram = $1 WHERE id = $2", [ing.calories_per_gram, ingredientId]);
+        }
+        await client.query(`INSERT INTO recipe_ingredients (recipe_id, ingredient_id, amount, unit)
+       VALUES ($1, $2, $3, $4)`, [recipeId, ingredientId, ing.amount, ing.unit]);
     }
     for (const cat of categories) {
         const res = await client.query("SELECT id FROM categories WHERE name = $1", [cat]);

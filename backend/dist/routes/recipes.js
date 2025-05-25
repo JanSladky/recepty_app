@@ -1,5 +1,4 @@
 "use strict";
-// ✅ Umístění: backend/src/routes/recipes.ts
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -47,6 +46,7 @@ const router = (0, express_1.Router)();
 const upload = (0, multer_1.default)({ storage: cloudinary_1.storage });
 // ✅ Veřejné GET routy
 router.get("/", recipeController.getRecipes);
+router.get("/ingredients", recipeController.getAllIngredients); // ⬅️ DŮLEŽITÉ!
 router.get("/:id", recipeController.getRecipeById);
 // ✅ Admin pouze pro POST/PUT/DELETE
 router.post("/", auth_1.verifyAdmin, upload.single("image"), recipeController.addFullRecipe);

@@ -1,4 +1,5 @@
 "use strict";
+// ✅ Umístění: backend/src/controllers/recipeController.ts
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteRecipe = exports.updateRecipe = exports.addFullRecipe = exports.getAllIngredients = exports.getRecipeById = exports.getRecipes = void 0;
 const recipeModel_1 = require("../models/recipeModel");
@@ -18,20 +19,20 @@ exports.getRecipes = getRecipes;
 const getRecipeById = async (req, res) => {
     const id = Number(req.params.id);
     if (isNaN(id)) {
-        res.status(400).json({ error: "Neplatné ID" });
+        res.status(400).json({ error: "Neplatné ID receptu." });
         return;
     }
     try {
         const recipe = await (0, recipeModel_1.getRecipeByIdFromDB)(id);
         if (!recipe) {
-            res.status(404).json({ error: "Recept nenalezen" });
+            res.status(404).json({ error: "Recept nenalezen." });
             return;
         }
         res.status(200).json(recipe);
     }
     catch (error) {
         console.error("❌ Chyba při načítání detailu receptu:", error);
-        res.status(500).json({ error: "Chyba serveru" });
+        res.status(500).json({ error: "Chyba serveru při načítání receptu." });
     }
 };
 exports.getRecipeById = getRecipeById;
@@ -50,7 +51,7 @@ exports.getAllIngredients = getAllIngredients;
 // POST /api/recipes
 const addFullRecipe = async (req, res) => {
     try {
-        const { title, notes, ingredients, categories, mealType, steps, calories, } = req.body;
+        const { title, notes, ingredients, categories, mealType, steps, calories } = req.body;
         if (!title || !ingredients || !categories || !mealType || !steps) {
             res.status(400).json({ error: "Chybí povinná pole." });
             return;
@@ -60,6 +61,20 @@ const addFullRecipe = async (req, res) => {
         const parsedMealTypes = JSON.parse(mealType);
         const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
         const parsedCalories = calories ? Number(calories) : null;
+        // ✅ Vynucení jednotky "g"
+        for (const ing of parsedIngredients) {
+            ing.unit = "g";
+        }
+        for (const ing of parsedIngredients) {
+            if (!ing.name ||
+                typeof ing.amount !== "number" ||
+                typeof ing.calories_per_gram !== "number" ||
+                typeof ing.unit !== "string" ||
+                ing.unit.trim().toLowerCase() !== "g") {
+                res.status(400).json({ error: "Neplatná surovina. Pouze jednotka 'g' je povolena." });
+                return;
+            }
+        }
         const imagePath = req.file?.secure_url ||
             req.file?.path ||
             "";
@@ -90,6 +105,20 @@ const updateRecipe = async (req, res) => {
         const parsedMealTypes = JSON.parse(mealType);
         const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
         const parsedCalories = calories ? Number(calories) : null;
+        // ✅ Vynucení jednotky "g"
+        for (const ing of parsedIngredients) {
+            ing.unit = "g";
+        }
+        for (const ing of parsedIngredients) {
+            if (!ing.name ||
+                typeof ing.amount !== "number" ||
+                typeof ing.calories_per_gram !== "number" ||
+                typeof ing.unit !== "string" ||
+                ing.unit.trim().toLowerCase() !== "g") {
+                res.status(400).json({ error: "Neplatná surovina. Pouze jednotka 'g' je povolena." });
+                return;
+            }
+        }
         const uploadedImageUrl = req.file?.secure_url ||
             req.file?.path ||
             null;
