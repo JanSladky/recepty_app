@@ -19,6 +19,11 @@ export type Category = {
 
 export default function IngredientAdminPage() {
   const { isAdmin, loading } = useAdmin();
+
+  // ✅ Kontrola oprávnění
+  if (loading) return <p>Načítání oprávnění...</p>;
+  if (!isAdmin) return <p className="text-red-600 font-semibold">Nemáš oprávnění pro přístup k této stránce.</p>;
+
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
@@ -115,7 +120,6 @@ export default function IngredientAdminPage() {
     }
   };
 
-  // 🧠 Kategorie
   const handleCategoryUpdate = async (id: number) => {
     const name = editedCategories[id];
     if (!name) return;
@@ -210,7 +214,6 @@ export default function IngredientAdminPage() {
         })}
       </div>
 
-      {/* 🧠 Sekce pro správu kategorií */}
       <h2 className="text-xl font-semibold mb-2">Kategorie</h2>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
         <input type="text" placeholder="Nová kategorie" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="border p-2 rounded" />

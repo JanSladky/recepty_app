@@ -103,6 +103,7 @@ export async function getRecipeByIdFromDB(id: number) {
     db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [id]),
   ]);
 
+  // ✅ Deduplikace a formátování meal_types
   const uniqueMealTypes = Array.from(
     new Map(
       mealTypes.rows.map((r) => {
