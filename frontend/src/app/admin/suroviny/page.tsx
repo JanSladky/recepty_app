@@ -19,11 +19,6 @@ export type Category = {
 
 export default function IngredientAdminPage() {
   const { isAdmin, loading } = useAdmin();
-
-  // ✅ Kontrola oprávnění
-  if (loading) return <p>Načítání oprávnění...</p>;
-  if (!isAdmin) return <p className="text-red-600 font-semibold">Nemáš oprávnění pro přístup k této stránce.</p>;
-
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
@@ -33,7 +28,6 @@ export default function IngredientAdminPage() {
     calories_per_gram: "",
     category_id: "",
   });
-
   const [newCategory, setNewCategory] = useState("");
   const [editedCategories, setEditedCategories] = useState<Record<number, string>>({});
 
@@ -53,6 +47,9 @@ export default function IngredientAdminPage() {
     fetchIngredients();
     fetchCategories();
   }, []);
+
+  if (loading) return <p>Načítání oprávnění...</p>;
+  if (!isAdmin) return <p className="text-red-600 font-semibold">Nemáš oprávnění pro přístup k této stránce.</p>;
 
   const handleInputChange = (id: number, field: keyof Ingredient, value: string | number) => {
     setEdited((prev) => ({
@@ -131,9 +128,7 @@ export default function IngredientAdminPage() {
     });
 
     if (res.ok) {
-      setCategories((prev) =>
-        prev.map((cat) => (cat.id === id ? { ...cat, name } : cat))
-      );
+      setCategories((prev) => prev.map((cat) => (cat.id === id ? { ...cat, name } : cat)));
       const copy = { ...editedCategories };
       delete copy[id];
       setEditedCategories(copy);
@@ -144,8 +139,7 @@ export default function IngredientAdminPage() {
     if (!confirm("Opravdu chceš smazat tuto kategorii?")) return;
 
     const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, {
-      method: "DELETE",
-    });
+      method: "DELETE" });
 
     if (res.ok) {
       setCategories((prev) => prev.filter((c) => c.id !== id));
