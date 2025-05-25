@@ -32,7 +32,10 @@ export default function EditPage() {
           title: data.title,
           notes: data.notes,
           image_url: data.image_url,
-          ingredients: data.ingredients,
+          ingredients: data.ingredients.map((i: any) => ({
+            ...i,
+            unit: "g", // ✅ přidáno kvůli validaci na backendu
+          })),
           categories: data.categories,
           meal_types: data.meal_types ?? [],
           steps: data.steps ?? [],

@@ -57,15 +57,7 @@ export const getAllIngredients = async (_req: Request, res: Response): Promise<v
 // POST /api/recipes
 export const addFullRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
-    const {
-      title,
-      notes,
-      ingredients,
-      categories,
-      mealType,
-      steps,
-      calories,
-    } = req.body;
+    const { title, notes, ingredients, categories, mealType, steps, calories } = req.body;
 
     if (!title || !ingredients || !categories || !mealType || !steps) {
       res.status(400).json({ error: "Chybí povinná pole." });
@@ -78,12 +70,18 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
     const parsedCalories = calories ? Number(calories) : null;
 
+    // ✅ Vynucení jednotky "g"
+    for (const ing of parsedIngredients) {
+      ing.unit = "g";
+    }
+
     for (const ing of parsedIngredients) {
       if (
         !ing.name ||
         typeof ing.amount !== "number" ||
         typeof ing.calories_per_gram !== "number" ||
-        ing.unit !== "g"
+        typeof ing.unit !== "string" ||
+        ing.unit.trim().toLowerCase() !== "g"
       ) {
         res.status(400).json({ error: "Neplatná surovina. Pouze jednotka 'g' je povolena." });
         return;
@@ -144,12 +142,18 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
     const parsedCalories = calories ? Number(calories) : null;
 
+    // ✅ Vynucení jednotky "g"
+    for (const ing of parsedIngredients) {
+      ing.unit = "g";
+    }
+
     for (const ing of parsedIngredients) {
       if (
         !ing.name ||
         typeof ing.amount !== "number" ||
         typeof ing.calories_per_gram !== "number" ||
-        ing.unit !== "g"
+        typeof ing.unit !== "string" ||
+        ing.unit.trim().toLowerCase() !== "g"
       ) {
         res.status(400).json({ error: "Neplatná surovina. Pouze jednotka 'g' je povolena." });
         return;

@@ -68,7 +68,7 @@ export default function RecipeForm({
     const interval = setInterval(() => {
       const ingredients = ingredientRef.current?.getIngredients() || [];
       const total = ingredients.reduce((sum, ing) => {
-        return sum + ing.amount * ing.calories_per_gram;
+        return sum + ing.amount * Number(ing.calories_per_gram);
       }, 0);
       setCalories(Math.round(total));
     }, 1000);
@@ -79,7 +79,15 @@ export default function RecipeForm({
     e.preventDefault();
     setSubmitting(true);
 
-    const ingredients: Ingredient[] = ingredientRef.current?.getIngredients() || [];
+    const rawIngredients = ingredientRef.current?.getIngredients() || [];
+
+    const ingredients: Ingredient[] = rawIngredients.map((ing) => ({
+      ...ing,
+      calories_per_gram: Number(ing.calories_per_gram),
+    }));
+
+    console.log("🧪 Odesílané suroviny (parsed):", ingredients);
+    console.log("🧪 JSON.stringify:", JSON.stringify(ingredients));
 
     const formData = new FormData();
     formData.append("title", title);
@@ -103,11 +111,7 @@ export default function RecipeForm({
   const currentImage = imagePreview || "/placeholder.jpg";
 
   return (
-    <form
-      onSubmit={handleFormSubmit}
-      className="max-w-xl mx-auto p-4 space-y-4"
-      encType="multipart/form-data"
-    >
+    <form onSubmit={handleFormSubmit} className="max-w-xl mx-auto p-4 space-y-4" encType="multipart/form-data">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
         <input
           type="text"
@@ -202,10 +206,7 @@ export default function RecipeForm({
       </div>
 
       <h3 className="font-semibold">Ingredience</h3>
-      <IngredientAutocomplete
-        ref={ingredientRef}
-        initialIngredients={initialIngredients}
-      />
+      <IngredientAutocomplete ref={ingredientRef} initialIngredients={initialIngredients} />
 
       <h3 className="font-semibold">Kategorie</h3>
       <CategorySelector selected={categories} onToggle={toggleCategory} />
