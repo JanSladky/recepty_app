@@ -7,40 +7,75 @@ import useAdmin from "@/hooks/useAdmin";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-type Ingredient = {
+// Typy surovin a receptu
+interface Ingredient {
   name: string;
   amount: number;
   unit: string;
-};
+  calories_per_gram: number;
+}
 
-type Recipe = {
+interface Recipe {
   id: number;
   title: string;
-  notes: string;
-  image_url: string;
-  categories: string[];
-  ingredients: Ingredient[];
+  notes?: string;
+  image_url?: string;
+  categories?: string[];
+  ingredients?: Ingredient[];
   meal_types?: string[];
   steps?: string[];
-  calories: number;
-};
+  calories?: number;
+}
 
 export default function DetailPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { isAdmin, loading: adminLoading } = useAdmin();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
-  const { isAdmin, loading: adminLoading } = useAdmin();
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     const fetchRecipe = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/recipes/${id}`);
-        const data = await res.json();
+      console.log("🆔 URL param id:", id);
+      console.log("🌐 API_URL:", API_URL);
 
+      if (!API_URL) {
+        setErrorMsg("❌ API_URL není definováno.");
+        setLoading(false);
+        return;
+      }
+
+      if (!id || typeof id !== "string") {
+        setErrorMsg("❌ ID receptu není platné.");
+        setLoading(false);
+        return;
+      }
+
+      const numericId = Number(id);
+      console.log("🔢 numericId:", numericId);
+
+      if (isNaN(numericId)) {
+        setErrorMsg("❌ ID receptu musí být číslo.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/api/recipes/${numericId}`);
+        console.log("📡 Fetch status:", res.status);
+        if (!res.ok) {
+          const text = await res.text();
+          setErrorMsg(`❌ Chyba ${res.status}: ${text}`);
+          setLoading(false);
+          return;
+        }
+        const data: Recipe = await res.json();
+        console.log("📦 Načtený recept:", data);
         setRecipe(data);
       } catch (err) {
-        console.error("❌ Chyba při načítání detailu receptu:", err);
+        console.error("❌ Chyba při načítání receptu:", err);
+        setErrorMsg("❌ Nepodařilo se načíst recept.");
       } finally {
         setLoading(false);
       }
@@ -51,26 +86,20 @@ export default function DetailPage() {
 
   const handleDelete = async () => {
     if (!confirm("Opravdu chceš smazat tento recept?")) return;
-
     try {
       const res = await fetch(`${API_URL}/api/recipes/${recipe?.id}`, {
         method: "DELETE",
-        headers: {
-          "x-user-email": localStorage.getItem("userEmail") || "",
-        },
+        headers: { "x-user-email": localStorage.getItem("userEmail") || "" },
       });
-
       if (res.ok) {
         alert("✅ Recept smazán");
         router.push("/recepty");
       } else {
-        const errorText = await res.text();
-        console.error("❌ Chyba při mazání receptu:", errorText);
-        alert("❌ Chyba při mazání receptu: " + errorText);
+        const text = await res.text();
+        alert("❌ Chyba při mazání: " + text);
       }
     } catch (err) {
-      console.error("❌ Neznámá chyba při mazání:", err);
-      alert("❌ Chyba při mazání");
+      alert("❌ Neznámá chyba při mazání.");
     }
   };
 
@@ -79,28 +108,30 @@ export default function DetailPage() {
   };
 
   if (loading) return <p>Načítání...</p>;
-  if (!recipe) return <p>Recept nenalezen</p>;
+  if (errorMsg) return <p className="text-red-600">{errorMsg}</p>;
+  if (!recipe) return <p>Recept nenalezen.</p>;
 
-  const mealTypes = recipe.meal_types ?? [];
-
-  // 🔍 Správné vyhodnocení obrázku
-  const imageUrl = recipe.image_url ? (recipe.image_url.startsWith("http") ? recipe.image_url : `${API_URL}${recipe.image_url}`) : "/placeholder.jpg"; // ✅ přímo string, bez importu
-
-  console.log("🖼 Zobrazený obrázek:", imageUrl);
+  const imageUrl = recipe.image_url?.startsWith("http")
+    ? recipe.image_url
+    : recipe.image_url
+    ? `${API_URL}${recipe.image_url}`
+    : "/placeholder.jpg";
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-        <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-          <h1 className="text-3xl font-bold flex-1">{recipe.title}</h1>
-          {recipe.calories != null && <div className="text-sm text-gray-700 bg-yellow-100 px-3 py-1 rounded whitespace-nowrap">{recipe.calories} kcal</div>}
-        </div>
+    <div className="max-w-3xl mx-auto p-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <h1 className="text-3xl font-bold">{recipe.title}</h1>
+        {typeof recipe.calories === "number" && (
+          <div className="text-sm bg-yellow-100 text-gray-700 px-3 py-1 rounded">
+            {recipe.calories} kcal celkem
+          </div>
+        )}
       </div>
 
-      {mealTypes.length > 0 && (
+      {!!recipe.meal_types?.length && (
         <div className="mb-4 text-sm">
           <strong>Typ jídla:</strong>{" "}
-          {mealTypes.map((type, i) => (
+          {recipe.meal_types.map((type, i) => (
             <span key={i} className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded mr-2">
               {type}
             </span>
@@ -108,54 +139,76 @@ export default function DetailPage() {
         </div>
       )}
 
-      <div className="relative w-full h-64 mb-4">
+      <div className="relative w-full h-64 mb-6">
         <Image
           src={imageUrl}
           alt={recipe.title}
           fill
-          unoptimized // ✅ důležité pro obrázky mimo Image CDN
+          unoptimized
           className="object-cover rounded"
         />
       </div>
-      {recipe.steps && recipe.steps.length > 0 && (
-        <div className="mb-6">
+
+      {!!recipe.steps?.length && (
+        <>
           <h3 className="font-semibold mt-4 mb-2">Postup</h3>
-          <div className="space-y-6">
+          <ol className="space-y-4">
             {recipe.steps.map((step, i) => (
-              <div key={i} className="relative bg-white border-l-4 border-green-500 pl-6 pr-4 py-4 shadow-xl rounded-md">
-                <div className="absolute -left-4 top-4 w-8 h-8 bg-green-500 text-white font-bold rounded-full flex items-center justify-center shadow">
+              <li key={i} className="relative border-l-4 border-green-600 pl-6 pr-2 py-3 bg-white rounded shadow-sm">
+                <div className="absolute -left-4 top-3 w-7 h-7 bg-green-600 text-white font-bold rounded-full flex items-center justify-center">
                   {i + 1}
                 </div>
-                <p className="text-gray-800 leading-relaxed">{step}</p>
-              </div>
+                {step}
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+
+      {recipe.notes && (
+        <p className="mt-6 whitespace-pre-line text-gray-700">{recipe.notes}</p>
+      )}
+
+      {!!recipe.categories?.length && (
+        <>
+          <h3 className="font-semibold mt-6">Kategorie</h3>
+          <div className="flex flex-wrap gap-2 text-sm mt-2">
+            {recipe.categories.map((cat) => (
+              <span key={cat} className="bg-gray-200 px-3 py-1 rounded text-gray-700">
+                {cat}
+              </span>
             ))}
           </div>
-        </div>
+        </>
       )}
-      <p className="mb-4">{recipe.notes}</p>
 
-      <h3 className="font-semibold mt-4">Kategorie</h3>
-      <div className="flex gap-2 mb-4 flex-wrap text-sm">
-        {recipe.categories.map((cat) => (
-          <span key={cat} className="bg-gray-200 px-3 py-1 rounded">
-            {cat}
-          </span>
-        ))}
-      </div>
-
-      <h3 className="font-semibold mt-4 mb-2">Ingredience</h3>
-      <ul className="list-disc list-inside mb-6">
-        {recipe.ingredients.map((ing, i) => (
-          <li key={i}>{["hrst", "špetka"].includes(ing.unit) ? `${ing.unit} - ${ing.name}` : `${ing.amount} ${ing.unit} -  ${ing.name}`}</li>
-        ))}
-      </ul>
+      {!!recipe.ingredients?.length && (
+        <>
+          <h3 className="font-semibold mt-6">Ingredience</h3>
+          <ul className="list-disc list-inside mt-2 mb-6">
+            {recipe.ingredients.map((ing, i) => {
+              const kcal = ["g", "ml"].includes(ing.unit) && typeof ing.calories_per_gram === "number"
+                ? Math.round(ing.amount * ing.calories_per_gram)
+                : 0;
+              return (
+                <li key={i}>
+                  {ing.amount} {ing.unit} – {ing.name}
+                  {kcal > 0 && (
+                    <span className="text-sm text-gray-500 ml-2">({kcal} kcal)</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
 
       {!adminLoading && isAdmin && (
-        <div className="flex gap-4">
+        <div className="flex gap-4 mt-6">
           <button onClick={handleEdit} className="bg-blue-600 text-white px-4 py-2 rounded">
             Upravit
           </button>
-          <button onClick={handleDelete} className="text-red-600 border px-4 py-2 rounded">
+          <button onClick={handleDelete} className="border border-red-600 text-red-600 px-4 py-2 rounded">
             Smazat
           </button>
         </div>

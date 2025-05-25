@@ -1,3 +1,5 @@
+// ✅ Umístění: backend/src/controllers/recipeController.ts
+
 import { Request, Response } from "express";
 import {
   getAllRecipes,
@@ -23,20 +25,21 @@ export const getRecipes = async (_req: Request, res: Response): Promise<void> =>
 export const getRecipeById = async (req: Request, res: Response): Promise<void> => {
   const id = Number(req.params.id);
   if (isNaN(id)) {
-    res.status(400).json({ error: "Neplatné ID" });
+    res.status(400).json({ error: "Neplatné ID receptu." });
     return;
   }
 
   try {
     const recipe = await getRecipeByIdFromDB(id);
     if (!recipe) {
-      res.status(404).json({ error: "Recept nenalezen" });
+      res.status(404).json({ error: "Recept nenalezen." });
       return;
     }
+
     res.status(200).json(recipe);
   } catch (error) {
     console.error("❌ Chyba při načítání detailu receptu:", error);
-    res.status(500).json({ error: "Chyba serveru" });
+    res.status(500).json({ error: "Chyba serveru při načítání receptu." });
   }
 };
 
@@ -74,6 +77,18 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
     const parsedMealTypes = JSON.parse(mealType);
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
     const parsedCalories = calories ? Number(calories) : null;
+
+    for (const ing of parsedIngredients) {
+      if (
+        !ing.name ||
+        typeof ing.amount !== "number" ||
+        typeof ing.calories_per_gram !== "number" ||
+        ing.unit !== "g"
+      ) {
+        res.status(400).json({ error: "Neplatná surovina. Pouze jednotka 'g' je povolena." });
+        return;
+      }
+    }
 
     const imagePath =
       (req.file as { secure_url?: string; path?: string })?.secure_url ||
@@ -128,6 +143,18 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     const parsedMealTypes = JSON.parse(mealType);
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
     const parsedCalories = calories ? Number(calories) : null;
+
+    for (const ing of parsedIngredients) {
+      if (
+        !ing.name ||
+        typeof ing.amount !== "number" ||
+        typeof ing.calories_per_gram !== "number" ||
+        ing.unit !== "g"
+      ) {
+        res.status(400).json({ error: "Neplatná surovina. Pouze jednotka 'g' je povolena." });
+        return;
+      }
+    }
 
     const uploadedImageUrl =
       (req.file as { secure_url?: string; path?: string })?.secure_url ||

@@ -1,161 +1,202 @@
 "use client";
 
-import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useState,
+  useEffect,
+  useRef,
+} from "react";
 
-export type Ingredient = {
+type Ingredient = {
   name: string;
   amount: number;
-  unit: string;
+  unit: "g";
+  calories_per_gram: number;
 };
 
-export type IngredientAutocompleteHandle = {
+type IngredientAutocompleteHandle = {
   getIngredients: () => Ingredient[];
 };
 
-type Props = {
+type IngredientAutocompleteProps = {
   initialIngredients?: Ingredient[];
+  onChange?: (ingredients: Ingredient[]) => void;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, IngredientAutocompleteProps>(
+  ({ initialIngredients = [], onChange }, ref) => {
+    const [ingredients, setIngredients] = useState<Ingredient[]>(initialIngredients);
+    const [inputName, setInputName] = useState("");
+    const [inputAmount, setInputAmount] = useState<number | "">("");
+    const [inputCalories, setInputCalories] = useState<number | "">("");
+    const [allSuggestions, setAllSuggestions] = useState<{ name: string; calories_per_gram: number }[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
 
-const heuristics = [
-  { keywords: ["jogurt", "mléko", "smetana", "olej", "sirup", "šťáva"], unit: "ml", amount: 100 },
-  { keywords: ["vejce", "párek", "klobása", "šunka", "rajče", "cibule", "kuře"], unit: "ks", amount: 1 },
-  { keywords: ["máslo", "mouka", "cukr", "sýr", "strouhanka", "rýže", "těstoviny"], unit: "g", amount: 100 },
-];
+    const inputNameRef = useRef<HTMLInputElement>(null);
+    const inputAmountRef = useRef<HTMLInputElement>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
 
-function getDefaultForIngredient(name: string): { unit: string; amount: number } {
-  const lower = name.toLowerCase();
-  for (const rule of heuristics) {
-    if (rule.keywords.some((k) => lower.includes(k))) {
-      return { unit: rule.unit, amount: rule.amount };
-    }
-  }
-  return { unit: "g", amount: 0 };
-}
+    useImperativeHandle(ref, () => ({
+      getIngredients: () => ingredients,
+    }));
 
-const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(({ initialIngredients = [] }, ref) => {
-  const [ingredients, setIngredients] = useState<Ingredient[]>(initialIngredients);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [input, setInput] = useState("");
-  const [filtered, setFiltered] = useState<string[]>([]);
-  const [amount, setAmount] = useState<number>(0);
-  const [unit, setUnit] = useState<string>("g");
+    useEffect(() => {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ingredients`)
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          return res.json();
+        })
+        .then((data) => setAllSuggestions(data))
+        .catch((err) => console.error("❌ Nelze načíst seznam surovin:", err));
+    }, []);
 
-  useImperativeHandle(ref, () => ({
-    getIngredients: () => ingredients,
-  }));
+    useEffect(() => {
+      const handleClickOutside = (e: MouseEvent) => {
+        if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+          setShowSuggestions(false);
+        }
+      };
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }, []);
 
-  useEffect(() => {
-    const fetchSuggestions = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/ingredients`);
-        const data = await res.json();
-        const names = data.map((i: { name: string }) => i.name);
-        setSuggestions(names);
-      } catch (err) {
-        console.error("❌ Chyba při načítání autocomplete surovin:", err);
+    const notifyChange = (next: Ingredient[]) => {
+      setIngredients(next);
+      if (onChange) {
+        onChange(next);
       }
     };
 
-    fetchSuggestions();
-  }, []);
+    const handleSelectSuggestion = (name: string) => {
+      const match = allSuggestions.find((i) => i.name.toLowerCase() === name.toLowerCase());
+      if (match) {
+        setInputName(match.name);
+        setInputCalories(match.calories_per_gram);
+        setTimeout(() => inputAmountRef.current?.focus(), 0);
+      }
+      setShowSuggestions(false);
+    };
 
-  const normalize = (str: string) =>
-    str
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
+    const handleAddIngredient = () => {
+      if (
+        inputName.trim() === "" ||
+        inputAmount === "" ||
+        inputCalories === ""
+      ) return;
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setInput(value);
+      const newIngredient: Ingredient = {
+        name: inputName.trim(),
+        amount: Number(inputAmount),
+        unit: "g", // pevně nastaveno
+        calories_per_gram: Number(inputCalories),
+      };
 
-    if (value.length > 0) {
-      const normalized = normalize(value);
-      const matches = suggestions.filter((s) => normalize(s).includes(normalized));
-      setFiltered(matches.slice(0, 10));
-    } else {
-      setFiltered([]);
-    }
-  };
+      const updated = [...ingredients, newIngredient];
+      notifyChange(updated);
 
-  const handleSelect = (name: string) => {
-    if (name.trim() === "") return;
-    if ((unit === "g" || unit === "ml") && amount <= 0) return;
-    const alreadyExists = ingredients.some((i) => i.name === name && i.unit === unit);
-    if (alreadyExists) return;
+      setInputName("");
+      setInputAmount("");
+      setInputCalories("");
+      setShowSuggestions(false);
+      inputNameRef.current?.focus();
+    };
 
-    setIngredients((prev) => [...prev, { name, amount, unit }]);
-    setInput("");
-    setAmount(0);
-    setUnit("g");
-    setFiltered([]);
-  };
+    const handleDeleteIngredient = (index: number) => {
+      const updated = ingredients.filter((_, i) => i !== index);
+      notifyChange(updated);
+    };
 
-  const removeIngredient = (index: number) => {
-    setIngredients((prev) => prev.filter((_, i) => i !== index));
-  };
+    const suggestions = allSuggestions
+      .filter((i) => inputName && i.name.toLowerCase().includes(inputName.toLowerCase()))
+      .slice(0, 5);
 
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2 items-center">
-        <input type="text" value={input} onChange={handleInputChange} placeholder="Název suroviny" className="flex-1 p-2 border rounded" />
-        <select value={unit} onChange={(e) => setUnit(e.target.value)} className="w-24 p-2 border rounded">
-          <option value="g">g</option>
-          <option value="ml">ml</option>
-          <option value="ks">ks</option>
-          <option value="hrst">hrst</option>
-          <option value="špetka">špetka</option>
-          <option value="lžička">lžička</option>
-          <option value="lžíce">lžíce</option>
-        </select>
-        {(unit === "g" || unit === "ml") && (
-          <input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} placeholder="Množství" className="w-24 p-2 border rounded" />
-        )}
-        <button type="button" onClick={() => handleSelect(input)} className="bg-blue-600 text-white px-3 py-2 rounded">
-          ➕ Přidat
-        </button>
-      </div>
-
-      {filtered.length > 0 && (
-        <ul className="border rounded p-2 bg-white shadow">
-          {filtered.map((suggestion) => (
-            <li
-              key={suggestion}
-              className="cursor-pointer px-2 py-1 hover:bg-gray-100"
-              onClick={() => {
-                const defaults = getDefaultForIngredient(suggestion);
-                setInput(suggestion);
-                setAmount(defaults.amount);
-                setUnit(defaults.unit);
-                setFiltered([]);
+    return (
+      <div className="space-y-4 autocomplete-wrapper" ref={wrapperRef}>
+        <div className="relative">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={inputName}
+              onChange={(e) => {
+                setInputName(e.target.value);
+                setShowSuggestions(true);
               }}
-            >
-              {suggestion}
-            </li>
-          ))}
-        </ul>
-      )}
+              onFocus={() => setShowSuggestions(true)}
+              ref={inputNameRef}
+              placeholder="Název"
+              className="p-2 border rounded w-full sm:w-1/3"
+            />
 
-      <div>
-        <h3 className="font-semibold mb-2">Zvolené suroviny:</h3>
-        <ul className="space-y-1 text-sm">
-          {ingredients.map((ing, i) => (
-            <li key={i} className="flex justify-between items-center">
+            <input
+              type="number"
+              value={inputAmount}
+              onChange={(e) => setInputAmount(e.target.value === "" ? "" : Number(e.target.value))}
+              placeholder="Množství"
+              ref={inputAmountRef}
+              className="p-2 border rounded w-full sm:w-1/4"
+            />
+
+            <input
+              type="text"
+              value="g"
+              readOnly
+              disabled
+              className="p-2 border rounded w-full sm:w-1/6 bg-gray-100 text-gray-500"
+            />
+
+            <input
+              type="number"
+              value={inputCalories !== null && inputCalories !== undefined ? inputCalories : ""}
+              placeholder="kcal/g"
+              readOnly
+              className="p-2 border rounded w-full sm:w-1/4 bg-gray-100 text-gray-700"
+            />
+          </div>
+
+          {showSuggestions && suggestions.length > 0 && (
+            <ul className="absolute z-20 bg-white border w-full sm:w-1/3 mt-1 rounded shadow">
+              {suggestions.map((s, index) => (
+                <li
+                  key={index}
+                  onClick={() => handleSelectSuggestion(s.name)}
+                  className="p-2 hover:bg-green-100 cursor-pointer"
+                >
+                  {s.name} ({s.calories_per_gram} kcal/g)
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={handleAddIngredient}
+          className="bg-green-600 text-white px-4 py-2 rounded"
+        >
+          ➕ Přidat surovinu
+        </button>
+
+        <ul className="space-y-2">
+          {ingredients.map((ing, index) => (
+            <li key={index} className="flex justify-between items-center border p-2 rounded">
               <span>
-                {ing.name} – {["hrst", "špetka"].includes(ing.unit) ? ing.unit : `${ing.amount} ${ing.unit}`}
+                {ing.name} – {ing.amount} g ({Math.round(ing.amount * ing.calories_per_gram)} kcal)
               </span>
-              <button type="button" onClick={() => removeIngredient(i)} className="text-red-600 text-xs hover:underline">
-                Odebrat
+              <button
+                type="button"
+                onClick={() => handleDeleteIngredient(index)}
+                className="text-red-600"
+              >
+                🗑
               </button>
             </li>
           ))}
         </ul>
       </div>
-    </div>
-  );
-});
+    );
+  }
+);
 
-IngredientAutocomplete.displayName = "IngredientAutocomplete";
 export default IngredientAutocomplete;
+export type { IngredientAutocompleteHandle, Ingredient };

@@ -1,5 +1,3 @@
-// ✅ Umístění: backend/src/routes/recipes.ts
-
 import { Router } from "express";
 import multer from "multer";
 import { storage } from "../utils/cloudinary";
@@ -13,6 +11,7 @@ const upload = multer({ storage });
 
 // ✅ Veřejné GET routy
 router.get("/", recipeController.getRecipes);
+router.get("/ingredients", recipeController.getAllIngredients); // ⬅️ DŮLEŽITÉ!
 router.get("/:id", recipeController.getRecipeById);
 
 // ✅ Admin pouze pro POST/PUT/DELETE

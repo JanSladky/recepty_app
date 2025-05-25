@@ -12,6 +12,7 @@ export type IngredientInput = {
   name: string;
   amount: number;
   unit: string;
+  calories_per_gram: number;
 };
 
 // ✅ Ingredients
@@ -36,7 +37,6 @@ export async function createIngredientInDB(name: string, calories: number, categ
 }
 
 export async function updateIngredientInDB(id: number, name: string, calories: number, category_id: number): Promise<void> {
-  console.log("🛠️ UPDATE suroviny:", { id, name, calories, category_id });
   await db.query("UPDATE ingredients SET name = $1, calories_per_gram = $2, category_id = $3 WHERE id = $4", [name, calories, category_id, id]);
 }
 
@@ -82,15 +82,31 @@ export async function getAllRecipes(): Promise<any[]> {
 }
 
 export async function getRecipeByIdFromDB(id: number) {
+  console.log("📥 getRecipeByIdFromDB called with ID:", id);
+
   const res = await db.query("SELECT * FROM recipes WHERE id = $1", [id]);
+  console.log("🔎 recipes query returned rows:", res.rows.length);
+
   const recipe = res.rows[0];
-  if (!recipe) return null;
+  if (!recipe) {
+    console.warn("⚠️ Recept s tímto ID nenalezen:", id);
+    return null;
+  }
 
   const [ingredients, categories, mealTypes] = await Promise.all([
-    db.query("SELECT ri.amount, ri.unit, i.name FROM recipe_ingredients ri JOIN ingredients i ON ri.ingredient_id = i.id WHERE ri.recipe_id = $1", [id]),
+    db.query(`
+      SELECT ri.amount, ri.unit, i.name, i.calories_per_gram
+      FROM recipe_ingredients ri
+      JOIN ingredients i ON ri.ingredient_id = i.id
+      WHERE ri.recipe_id = $1
+    `, [id]),
     db.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [id]),
     db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [id]),
   ]);
+
+  console.log("🥕 Ingredients found:", ingredients.rows.length);
+  console.log("📂 Categories found:", categories.rows.map((r) => r.name));
+  console.log("🍽️ Meal types found:", mealTypes.rows.map((r) => r.name));
 
   return {
     ...recipe,
@@ -185,34 +201,51 @@ export async function deleteRecipeFromDB(id: number): Promise<void> {
   }
 }
 
-async function insertRelations(client: any, recipeId: number, mealTypes: string[], ingredients: IngredientInput[], categories: string[]) {
+async function insertRelations(
+  client: any,
+  recipeId: number,
+  mealTypes: string[],
+  ingredients: IngredientInput[],
+  categories: string[]
+) {
   for (const ing of ingredients) {
     const res = await client.query("SELECT id FROM ingredients WHERE name = $1", [ing.name]);
     let ingredientId = res.rows[0]?.id;
 
     if (!ingredientId) {
-      const insert = await client.query("INSERT INTO ingredients (name, calories_per_gram) VALUES ($1, $2) RETURNING id", [ing.name, 0]);
+      const insert = await client.query(
+        "INSERT INTO ingredients (name, calories_per_gram) VALUES ($1, $2) RETURNING id",
+        [ing.name, ing.calories_per_gram]
+      );
       ingredientId = insert.rows[0].id;
+    } else {
+      await client.query(
+        "UPDATE ingredients SET calories_per_gram = $1 WHERE id = $2",
+        [ing.calories_per_gram, ingredientId]
+      );
     }
 
-    await client.query("INSERT INTO recipe_ingredients (recipe_id, ingredient_id, amount, unit) VALUES ($1, $2, $3, $4)", [
-      recipeId,
-      ingredientId,
-      ing.amount,
-      ing.unit,
-    ]);
+    await client.query(
+      `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, amount, unit)
+       VALUES ($1, $2, $3, $4)`,
+      [recipeId, ingredientId, ing.amount, ing.unit]
+    );
   }
 
   for (const cat of categories) {
     const res = await client.query("SELECT id FROM categories WHERE name = $1", [cat]);
-    const categoryId = res.rows[0]?.id ?? (await client.query("INSERT INTO categories (name) VALUES ($1) RETURNING id", [cat])).rows[0].id;
+    const categoryId = res.rows[0]?.id ?? (
+      await client.query("INSERT INTO categories (name) VALUES ($1) RETURNING id", [cat])
+    ).rows[0].id;
 
     await client.query("INSERT INTO recipe_categories (recipe_id, category_id) VALUES ($1, $2)", [recipeId, categoryId]);
   }
 
   for (const meal of mealTypes) {
     const res = await client.query("SELECT id FROM meal_types WHERE name = $1", [meal]);
-    const mealTypeId = res.rows[0]?.id ?? (await client.query("INSERT INTO meal_types (name) VALUES ($1) RETURNING id", [meal])).rows[0].id;
+    const mealTypeId = res.rows[0]?.id ?? (
+      await client.query("INSERT INTO meal_types (name) VALUES ($1) RETURNING id", [meal])
+    ).rows[0].id;
 
     await client.query("INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)", [recipeId, mealTypeId]);
   }

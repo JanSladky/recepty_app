@@ -35,17 +35,19 @@ export default function AddRecipePage() {
   };
 
   return (
-    <main className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Přidat recept</h1>
-      <RecipeForm
-        onSubmit={handleSubmit}
-        initialTitle=""
-        initialNotes=""
-        initialImageUrl={undefined}
-        initialCategories={[]}
-        initialMealTypes={[]}
-        submitLabel="Přidat recept"
-      />
+    <main className="px-4 sm:px-6 md:px-8 lg:px-12 py-6 max-w-4xl mx-auto">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6 text-center sm:text-left">Přidat recept</h1>
+      <div className="bg-white shadow rounded-lg p-4 sm:p-6">
+        <RecipeForm
+          onSubmit={handleSubmit}
+          initialTitle=""
+          initialNotes=""
+          initialImageUrl={undefined}
+          initialCategories={[]}
+          initialMealTypes={[]}
+          submitLabel="Přidat recept"
+        />
+      </div>
     </main>
   );
 }
