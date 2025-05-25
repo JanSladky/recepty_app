@@ -50,8 +50,7 @@ const IngredientAutocomplete = forwardRef<
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ingredients`)
       .then((res) => {
-        if (!res.ok)
-          throw new Error(`HTTP error! status: ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return res.json();
       })
       .then((data) => setAllSuggestions(data))
@@ -96,14 +95,24 @@ const IngredientAutocomplete = forwardRef<
       inputName.trim() === "" ||
       inputAmount === "" ||
       inputCalories === ""
-    )
+    ) {
+      alert("⚠️ Vyplň název, množství i kalorie.");
       return;
+    }
+
+    const caloriesValue = Number(inputCalories);
+    if (isNaN(caloriesValue)) {
+      alert(
+        "⚠️ Zadej počet kalorií na gram nebo vyber známou surovinu ze seznamu."
+      );
+      return;
+    }
 
     const newIngredient: Ingredient = {
       name: inputName.trim(),
       amount: Number(inputAmount),
       unit: "g",
-      calories_per_gram: Number(inputCalories),
+      calories_per_gram: caloriesValue,
     };
 
     console.log("🧪 Přidávám surovinu:", newIngredient);
@@ -170,13 +179,15 @@ const IngredientAutocomplete = forwardRef<
           <input
             type="number"
             value={
-              inputCalories !== null && inputCalories !== undefined
-                ? inputCalories
-                : ""
+              typeof inputCalories === "number" ? inputCalories : ""
             }
             placeholder="kcal/g"
-            readOnly
-            className="p-2 border rounded w-full sm:w-1/4 bg-gray-100 text-gray-700"
+            className="p-2 border rounded w-full sm:w-1/4"
+            onChange={(e) =>
+              setInputCalories(
+                e.target.value === "" ? "" : Number(e.target.value)
+              )
+            }
           />
         </div>
 
@@ -227,7 +238,7 @@ const IngredientAutocomplete = forwardRef<
   );
 });
 
-// ✅ doplněno kvůli ESLint chybě "react/display-name"
+// ✅ doplněno kvůli ESLint chybě
 IngredientAutocomplete.displayName = "IngredientAutocomplete";
 
 export default IngredientAutocomplete;
