@@ -21,28 +21,31 @@ export default function EditPage() {
     steps: string[];
     calories?: number;
   } | null>(null);
-  console.log("🌍 API_URL z .env:", API_URL);
+
   useEffect(() => {
     const fetchRecipe = async () => {
       try {
         const res = await fetch(`${API_URL}/api/recipes/${id}`);
+        if (!res.ok) {
+          throw new Error("Chyba při načítání receptu");
+        }
         const data = await res.json();
 
         setInitialData({
           title: data.title,
           notes: data.notes,
           image_url: data.image_url,
-          ingredients: data.ingredients.map((i: any) => ({
+          ingredients: data.ingredients.map((i: Ingredient) => ({
             ...i,
-            unit: "g", // ✅ přidáno kvůli validaci na backendu
+            unit: "g",
           })),
           categories: data.categories,
           meal_types: data.meal_types ?? [],
           steps: data.steps ?? [],
           calories: data.calories,
         });
-      } catch (err) {
-        console.error("❌ Chyba při načítání receptu:", err);
+      } catch (e) {
+        console.error("❌ Chyba při načítání receptu:", e);
         alert("Nepodařilo se načíst recept.");
       } finally {
         setLoading(false);
@@ -68,11 +71,11 @@ export default function EditPage() {
       } else if (res.status === 401) {
         alert("❌ Nemáš oprávnění upravit recept.");
       } else {
-        const err = await res.text();
-        alert(`❌ Chyba při úpravě: ${err}`);
+        const text = await res.text();
+        alert(`❌ Chyba při úpravě: ${text}`);
       }
-    } catch (err) {
-      console.error("❌ Chyba při odesílání požadavku:", err);
+    } catch (e) {
+      console.error("❌ Chyba při odesílání požadavku:", e);
       alert("❌ Chyba při komunikaci se serverem.");
     }
   };

@@ -1,3 +1,4 @@
+// ✅ Soubor: src/app/recepty/[id]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,7 +8,6 @@ import useAdmin from "@/hooks/useAdmin";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-// Typy surovin a receptu
 interface Ingredient {
   name: string;
   amount: number;
@@ -37,44 +37,21 @@ export default function DetailPage() {
 
   useEffect(() => {
     const fetchRecipe = async () => {
-      console.log("🆔 URL param id:", id);
-      console.log("🌐 API_URL:", API_URL);
-
-      if (!API_URL) {
-        setErrorMsg("❌ API_URL není definováno.");
-        setLoading(false);
-        return;
-      }
-
-      if (!id || typeof id !== "string") {
-        setErrorMsg("❌ ID receptu není platné.");
-        setLoading(false);
-        return;
-      }
+      if (!API_URL) return setErrorMsg("❌ API_URL není definováno."), setLoading(false);
+      if (!id || typeof id !== "string") return setErrorMsg("❌ ID receptu není platné."), setLoading(false);
 
       const numericId = Number(id);
-      console.log("🔢 numericId:", numericId);
-
-      if (isNaN(numericId)) {
-        setErrorMsg("❌ ID receptu musí být číslo.");
-        setLoading(false);
-        return;
-      }
+      if (isNaN(numericId)) return setErrorMsg("❌ ID receptu musí být číslo."), setLoading(false);
 
       try {
         const res = await fetch(`${API_URL}/api/recipes/${numericId}`);
-        console.log("📡 Fetch status:", res.status);
         if (!res.ok) {
           const text = await res.text();
-          setErrorMsg(`❌ Chyba ${res.status}: ${text}`);
-          setLoading(false);
-          return;
+          return setErrorMsg(`❌ Chyba ${res.status}: ${text}`);
         }
         const data: Recipe = await res.json();
-        console.log("📦 Načtený recept:", data);
         setRecipe(data);
-      } catch (err) {
-        console.error("❌ Chyba při načítání receptu:", err);
+      } catch {
         setErrorMsg("❌ Nepodařilo se načíst recept.");
       } finally {
         setLoading(false);
@@ -98,14 +75,12 @@ export default function DetailPage() {
         const text = await res.text();
         alert("❌ Chyba při mazání: " + text);
       }
-    } catch (err) {
+    } catch {
       alert("❌ Neznámá chyba při mazání.");
     }
   };
 
-  const handleEdit = () => {
-    router.push(`/recepty/${recipe?.id}/upravit`);
-  };
+  const handleEdit = () => router.push(`/recepty/${recipe?.id}/upravit`);
 
   if (loading) return <p>Načítání...</p>;
   if (errorMsg) return <p className="text-red-600">{errorMsg}</p>;
@@ -140,13 +115,7 @@ export default function DetailPage() {
       )}
 
       <div className="relative w-full h-64 mb-6">
-        <Image
-          src={imageUrl}
-          alt={recipe.title}
-          fill
-          unoptimized
-          className="object-cover rounded"
-        />
+        <Image src={imageUrl} alt={recipe.title} fill unoptimized className="object-cover rounded" />
       </div>
 
       {!!recipe.steps?.length && (
@@ -165,9 +134,7 @@ export default function DetailPage() {
         </>
       )}
 
-      {recipe.notes && (
-        <p className="mt-6 whitespace-pre-line text-gray-700">{recipe.notes}</p>
-      )}
+      {recipe.notes && <p className="mt-6 whitespace-pre-line text-gray-700">{recipe.notes}</p>}
 
       {!!recipe.categories?.length && (
         <>
@@ -193,9 +160,7 @@ export default function DetailPage() {
               return (
                 <li key={i}>
                   {ing.amount} {ing.unit} – {ing.name}
-                  {kcal > 0 && (
-                    <span className="text-sm text-gray-500 ml-2">({kcal} kcal)</span>
-                  )}
+                  {kcal > 0 && <span className="text-sm text-gray-500 ml-2">({kcal} kcal)</span>}
                 </li>
               );
             })}
@@ -205,12 +170,8 @@ export default function DetailPage() {
 
       {!adminLoading && isAdmin && (
         <div className="flex gap-4 mt-6">
-          <button onClick={handleEdit} className="bg-blue-600 text-white px-4 py-2 rounded">
-            Upravit
-          </button>
-          <button onClick={handleDelete} className="border border-red-600 text-red-600 px-4 py-2 rounded">
-            Smazat
-          </button>
+          <button onClick={handleEdit} className="bg-blue-600 text-white px-4 py-2 rounded">Upravit</button>
+          <button onClick={handleDelete} className="border border-red-600 text-red-600 px-4 py-2 rounded">Smazat</button>
         </div>
       )}
     </div>
