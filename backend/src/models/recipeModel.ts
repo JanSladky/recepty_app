@@ -41,7 +41,23 @@ export async function updateIngredientInDB(id: number, name: string, calories: n
 }
 
 export async function deleteIngredientFromDB(id: number): Promise<void> {
-  await db.query("DELETE FROM ingredients WHERE id = $1", [id]);
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Nejprve smažeme vazby v recipe_ingredients
+    await client.query("DELETE FROM recipe_ingredients WHERE ingredient_id = $1", [id]);
+
+    // Potom samotnou surovinu
+    await client.query("DELETE FROM ingredients WHERE id = $1", [id]);
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getAllIngredientCategories(): Promise<{ id: number; name: string }[]> {
