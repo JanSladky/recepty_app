@@ -51,10 +51,23 @@ app.get("/", (_req, res) => {
   res.send("✅ API pro recepty je v provozu!");
 });
 
+
+
 // 📚 Různé routy
 app.use("/api/recipes", recipeRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/ingredients", ingredientRoutes); // ✅ Připojeno správně
+
+// ⚠️ Globální error handler – musí být až *po* všech routách!
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("🔥 Globální serverová chyba:", err);
+
+  // Pokud je to instance Error, extrahuj message
+  const errorMessage = err?.message || "Neznámá chyba";
+  const status = err?.status || 500;
+
+  res.status(status).json({ error: "Serverová chyba", detail: errorMessage });
+});
 
 // 🚀 Spuštění serveru
 app.listen(PORT, () => {

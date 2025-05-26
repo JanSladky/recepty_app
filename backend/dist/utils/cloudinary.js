@@ -9,7 +9,6 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const cloudinary_1 = require("cloudinary");
 const multer_storage_cloudinary_1 = require("multer-storage-cloudinary");
-// Ověření proměnných prostředí
 if (!process.env.CLOUDINARY_CLOUD_NAME ||
     !process.env.CLOUDINARY_API_KEY ||
     !process.env.CLOUDINARY_API_SECRET) {
@@ -22,9 +21,11 @@ cloudinary_1.v2.config({
 });
 exports.storage = new multer_storage_cloudinary_1.CloudinaryStorage({
     cloudinary: cloudinary_1.v2,
-    params: async () => ({
-        folder: "recepty", // ✅ správně uvnitř funkce
-        format: "png", // nebo "auto" / nebo přesně definovaný jeden formát
+    params: (req, file) => ({
+        folder: "recepty",
+        public_id: `${Date.now()}-${file.originalname.split(".")[0]}`,
+        resource_type: "image",
+        format: "png", // nebo "auto"
         transformation: [{ width: 1200, crop: "limit" }],
     }),
 });

@@ -5,7 +5,6 @@ dotenv.config();
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 
-// Ověření proměnných prostředí
 if (
   !process.env.CLOUDINARY_CLOUD_NAME ||
   !process.env.CLOUDINARY_API_KEY ||
@@ -22,9 +21,11 @@ cloudinary.config({
 
 export const storage = new CloudinaryStorage({
   cloudinary,
-  params: async () => ({
-    folder: "recepty", // ✅ správně uvnitř funkce
-    format: "png", // nebo "auto" / nebo přesně definovaný jeden formát
+  params: (req, file) => ({
+    folder: "recepty",
+    public_id: `${Date.now()}-${file.originalname.split(".")[0]}`,
+    resource_type: "image",
+    format: "png", // nebo "auto"
     transformation: [{ width: 1200, crop: "limit" }],
   }),
 });

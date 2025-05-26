@@ -52,6 +52,12 @@ export default function RecipeForm({
     setImagePreview(initialImageUrl || null);
   }, [initialImageUrl]);
 
+  useEffect(() => {
+    if (ingredientRef.current && initialIngredients.length > 0) {
+      ingredientRef.current.setInitialIngredients(initialIngredients);
+    }
+  }, [initialIngredients]);
+
   const toggleCategory = (cat: string) => {
     setCategories((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
@@ -67,9 +73,10 @@ export default function RecipeForm({
   useEffect(() => {
     const interval = setInterval(() => {
       const ingredients = ingredientRef.current?.getIngredients() || [];
-      const total = ingredients.reduce((sum, ing) => {
-        return sum + ing.amount * Number(ing.calories_per_gram);
-      }, 0);
+      const total = ingredients.reduce(
+        (sum, ing) => sum + ing.amount * ing.calories_per_gram,
+        0
+      );
       setCalories(Math.round(total));
     }, 1000);
     return () => clearInterval(interval);
@@ -80,6 +87,12 @@ export default function RecipeForm({
     setSubmitting(true);
 
     const rawIngredients = ingredientRef.current?.getIngredients() || [];
+
+    if (rawIngredients.length === 0) {
+      alert("Musíš zadat alespoň jednu surovinu.");
+      setSubmitting(false);
+      return;
+    }
 
     const ingredients: Ingredient[] = rawIngredients.map((ing) => ({
       ...ing,
@@ -100,8 +113,19 @@ export default function RecipeForm({
 
     if (imageFile) {
       formData.append("image", imageFile);
+      console.log("📸 Přidávám nový obrázek:", imageFile);
     } else {
       formData.append("existingImageUrl", initialImageUrl || "");
+      console.log("📸 Používám původní obrázek:", initialImageUrl || "žádný");
+    }
+
+    // 📂 Výpis všech položek z FormData (pro ladění backendu)
+    for (const [key, value] of formData.entries()) {
+      if (value instanceof File) {
+        console.log(`📂 FormData - ${key}:`, value);
+      } else {
+        console.log(`📂 FormData - ${key}:`, value);
+      }
     }
 
     await onSubmit(formData);
@@ -111,7 +135,11 @@ export default function RecipeForm({
   const currentImage = imagePreview || "/placeholder.jpg";
 
   return (
-    <form onSubmit={handleFormSubmit} className="max-w-xl mx-auto p-4 space-y-4" encType="multipart/form-data">
+    <form
+      onSubmit={handleFormSubmit}
+      className="max-w-xl mx-auto p-4 space-y-4"
+      encType="multipart/form-data"
+    >
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
         <input
           type="text"
@@ -193,7 +221,6 @@ export default function RecipeForm({
         }}
         className="w-full p-2 border rounded"
       />
-
       <div className="relative w-full h-48 mb-4 border rounded overflow-hidden">
         <Image
           src={currentImage}

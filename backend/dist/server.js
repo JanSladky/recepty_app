@@ -50,6 +50,14 @@ app.get("/", (_req, res) => {
 app.use("/api/recipes", recipes_1.default);
 app.use("/api/users", users_1.default);
 app.use("/api/ingredients", ingredients_1.default); // ✅ Připojeno správně
+// ⚠️ Globální error handler – musí být až *po* všech routách!
+app.use((err, req, res, _next) => {
+    console.error("🔥 Globální serverová chyba:", err);
+    // Pokud je to instance Error, extrahuj message
+    const errorMessage = err?.message || "Neznámá chyba";
+    const status = err?.status || 500;
+    res.status(status).json({ error: "Serverová chyba", detail: errorMessage });
+});
 // 🚀 Spuštění serveru
 app.listen(PORT, () => {
     console.log(`✅ Server běží na http://localhost:${PORT}`);

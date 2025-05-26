@@ -56,6 +56,12 @@ export default function EditPage() {
   }, [id]);
 
   const handleSubmit = async (formData: FormData) => {
+    // 🔍 Debug výpis
+    console.log("🧪 Odesílám data:");
+    for (const [key, value] of formData.entries()) {
+      console.log(`${key}:`, value);
+    }
+
     try {
       const res = await fetch(`${API_URL}/api/recipes/${id}`, {
         method: "PUT",
@@ -65,17 +71,29 @@ export default function EditPage() {
         body: formData,
       });
 
-      if (res.ok) {
-        alert("✅ Recept upraven!");
-        router.push(`/recepty/${id}`);
-      } else if (res.status === 401) {
-        alert("❌ Nemáš oprávnění upravit recept.");
-      } else {
-        const text = await res.text();
-        alert(`❌ Chyba při úpravě: ${text}`);
+      if (!res.ok) {
+        let errorMessage = "Neznámá chyba";
+        try {
+          const contentType = res.headers.get("Content-Type") || "";
+          if (contentType.includes("application/json")) {
+            const errorJson = await res.json();
+            errorMessage = errorJson?.error || errorJson?.message || JSON.stringify(errorJson);
+          } else {
+            errorMessage = await res.text();
+          }
+        } catch (parseErr) {
+          console.error("❌ Chyba při parsování odpovědi:", parseErr);
+        }
+
+        console.error("❌ Chyba při úpravě:", errorMessage);
+        alert(`❌ Chyba při úpravě: ${errorMessage}`);
+        return;
       }
-    } catch (e) {
-      console.error("❌ Chyba při odesílání požadavku:", e);
+
+      alert("✅ Recept upraven!");
+      router.push(`/recepty/${id}`);
+    } catch (err) {
+      console.error("❌ Chyba při komunikaci:", err);
       alert("❌ Chyba při komunikaci se serverem.");
     }
   };
