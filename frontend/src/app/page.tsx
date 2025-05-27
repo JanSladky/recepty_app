@@ -52,7 +52,8 @@ export default function HomePage() {
     const filtered = recipes.filter((recipe) => {
       const matchesQuery = normalizeText(recipe.title).includes(normalizeText(query));
       const matchesCuisine = selectedCuisine.length === 0 || selectedCuisine.some((c) => recipe.categories.includes(c));
-      const matchesMealType = selectedMealTypes.length === 0 || (recipe.meal_types ?? []).some((t) => selectedMealTypes.includes(t));
+      const mealTypes = Array.isArray(recipe.meal_types) ? recipe.meal_types : [];
+      const matchesMealType = selectedMealTypes.length === 0 || selectedMealTypes.some((type) => recipe.categories.includes(type));
       return matchesQuery && matchesCuisine && matchesMealType;
     });
     setFilteredRecipes(filtered);
@@ -71,7 +72,7 @@ export default function HomePage() {
   return (
     <main className="p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-4">Aplikace na recepty</h1>
-     
+
       {!loading && isAdmin && (
         <Link href="/pridat-recept" className="bg-green-600 text-white px-4 py-2 rounded inline-block mb-6">
           ➕ Přidat recept
