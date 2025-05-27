@@ -1,6 +1,12 @@
-// src/controllers/recipeController.ts
 import { Request, Response } from "express";
-import { getAllRecipes, getRecipeByIdFromDB, createFullRecipe, updateRecipeInDB, deleteRecipeFromDB, getAllIngredientsFromDB } from "../models/recipeModel";
+import {
+  getAllRecipes,
+  getRecipeByIdFromDB,
+  createFullRecipe,
+  updateRecipeInDB,
+  deleteRecipeFromDB,
+  getAllIngredientsFromDB,
+} from "../models/recipeModel";
 
 // Převodní tabulka jednotek na gramy
 const UNIT_CONVERSIONS: Record<string, number> = {
@@ -11,20 +17,52 @@ const UNIT_CONVERSIONS: Record<string, number> = {
   ks: 50,
 };
 
-function normalizeIngredientUnit(ingredient: any): { amount: number; unit: string } {
-  const rawAmount = ingredient.amount;
+function normalizeIngredientUnit(ingredient: any): { amount: number; unit: string; display: string } {
+  const rawAmount = Number(ingredient.amount);
   const rawUnit = ingredient.unit?.trim().toLowerCase();
 
-  if (rawUnit === "g" || !rawUnit) {
-    return { amount: Number(rawAmount), unit: "g" };
+  if (!rawUnit || rawUnit === "g") {
+    return {
+      amount: rawAmount,
+      unit: "g",
+      display: `${rawAmount} g`,
+    };
   }
 
   const conversion = UNIT_CONVERSIONS[rawUnit];
-  if (!conversion) {
-    throw new Error(`Neznámá jednotka: ${rawUnit}`);
-  }
+  if (!conversion) throw new Error(`Neznámá jednotka: ${rawUnit}`);
 
-  return { amount: Number(rawAmount) * conversion, unit: "g" };
+  return {
+    amount: rawAmount * conversion,
+    unit: "g",
+    display: `${rawAmount} ${rawUnit}`,
+  };
+}
+
+// ✅ společná funkce pro zpracování ingrediencí
+function processIngredients(rawIngredients: any): any[] {
+  return JSON.parse(rawIngredients).map((ing: any) => {
+    // Pokud je display ručně zadaný (např. "1 lžíce"), použij ho
+    if (typeof ing.display === "string" && ing.display.trim() !== "") {
+      return {
+        name: ing.name,
+        amount: Number(ing.amount),
+        unit: ing.unit,
+        calories_per_gram: Number(ing.calories_per_gram),
+        display: ing.display.trim(),
+      };
+    }
+
+    // Jinak vypočítej z jednotky
+    const { amount, unit, display } = normalizeIngredientUnit(ing);
+    return {
+      name: ing.name,
+      amount,
+      unit,
+      calories_per_gram: Number(ing.calories_per_gram),
+      display,
+    };
+  });
 }
 
 export const addFullRecipe = async (req: Request, res: Response): Promise<void> => {
@@ -36,16 +74,7 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const parsedIngredients = JSON.parse(ingredients).map((ing: any) => {
-      const { amount, unit } = normalizeIngredientUnit(ing);
-      return {
-        name: ing.name,
-        amount,
-        unit,
-        calories_per_gram: Number(ing.calories_per_gram),
-      };
-    });
-
+    const parsedIngredients = processIngredients(ingredients);
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
@@ -54,7 +83,16 @@ export const addFullRecipe = async (req: Request, res: Response): Promise<void> 
     const fileMeta = req.file as { secure_url?: string; path?: string };
     const imagePath = fileMeta?.secure_url || fileMeta?.path || "";
 
-    const recipeId = await createFullRecipe(title, notes, imagePath, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps, parsedCalories);
+    const recipeId = await createFullRecipe(
+      title,
+      notes,
+      imagePath,
+      parsedMealTypes,
+      parsedIngredients,
+      parsedCategories,
+      parsedSteps,
+      parsedCalories
+    );
 
     res.status(201).json({ message: "Recept uložen", id: recipeId });
   } catch (error) {
@@ -81,16 +119,7 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const parsedIngredients = JSON.parse(ingredients).map((ing: any) => {
-      const { amount, unit } = normalizeIngredientUnit(ing);
-      return {
-        name: ing.name,
-        amount,
-        unit,
-        calories_per_gram: Number(ing.calories_per_gram),
-      };
-    });
-
+    const parsedIngredients = processIngredients(ingredients);
     const parsedCategories = JSON.parse(categories);
     const parsedMealTypes = JSON.parse(mealType);
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
@@ -98,12 +127,21 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
 
     const fileMeta = req.file as { secure_url?: string; path?: string } | undefined;
     let finalImageUrl = fileMeta?.secure_url || fileMeta?.path || existingImageUrl || null;
-
     if (typeof finalImageUrl === "string" && (!finalImageUrl.trim() || finalImageUrl === "null")) {
       finalImageUrl = null;
     }
 
-    await updateRecipeInDB(id, title, notes, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps, parsedCalories);
+    await updateRecipeInDB(
+      id,
+      title,
+      notes,
+      finalImageUrl,
+      parsedMealTypes,
+      parsedIngredients,
+      parsedCategories,
+      parsedSteps,
+      parsedCalories
+    );
 
     res.status(200).json({ message: "Recept úspěšně upraven." });
   } catch (error) {
@@ -114,6 +152,7 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     });
   }
 };
+
 export const getRecipes = async (_req: Request, res: Response): Promise<void> => {
   try {
     const recipes = await getAllRecipes();

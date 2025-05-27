@@ -1,4 +1,3 @@
-// ✅ Soubor: src/app/recepty/[id]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -12,7 +11,8 @@ interface Ingredient {
   name: string;
   amount: number;
   unit: string;
-  calories_per_gram: number;
+  calories_per_gram: number | string;
+  display?: string | null;
 }
 
 interface Recipe {
@@ -50,6 +50,7 @@ export default function DetailPage() {
           return setErrorMsg(`❌ Chyba ${res.status}: ${text}`);
         }
         const data: Recipe = await res.json();
+        console.log("📦 Načtený recept:", data);
         setRecipe(data);
       } catch {
         setErrorMsg("❌ Nepodařilo se načíst recept.");
@@ -86,32 +87,33 @@ export default function DetailPage() {
   if (errorMsg) return <p className="text-red-600">{errorMsg}</p>;
   if (!recipe) return <p>Recept nenalezen.</p>;
 
-  const imageUrl = recipe.image_url?.startsWith("http")
-    ? recipe.image_url
-    : recipe.image_url
-    ? `${API_URL}${recipe.image_url}`
-    : "/placeholder.jpg";
+  const imageUrl = recipe.image_url?.startsWith("http") ? recipe.image_url : recipe.image_url ? `${API_URL}${recipe.image_url}` : "/placeholder.jpg";
 
   return (
     <div className="max-w-3xl mx-auto p-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <h1 className="text-3xl font-bold">{recipe.title}</h1>
-        {typeof recipe.calories === "number" && (
-          <div className="text-sm bg-yellow-100 text-gray-700 px-3 py-1 rounded">
-            {recipe.calories} kcal celkem
-          </div>
-        )}
+        {typeof recipe.calories === "number" && <div className="text-sm bg-yellow-100 text-gray-700 px-3 py-1 rounded">{recipe.calories} kcal celkem</div>}
       </div>
 
-      {!!recipe.meal_types?.length && (
-        <div className="mb-4 text-sm">
-          <strong>Typ jídla:</strong>{" "}
-          {recipe.meal_types.map((type, i) => (
-            <span key={i} className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded mr-2">
-              {type}
-            </span>
-          ))}
-        </div>
+      {!!recipe.ingredients?.length && (
+        <>
+          <h3 className="font-semibold mt-6">Ingredience</h3>
+          <ul className="list-disc list-inside mt-2 mb-6">
+            {recipe.ingredients.map((ing, i) => {
+              const kcal = Math.round(Number(ing.amount) * Number(ing.calories_per_gram));
+              const amountInGrams = Math.round(Number(ing.amount));
+
+              const unitDisplay = typeof ing.display === "string" && ing.display.trim() !== "" ? ing.display.trim() : `${amountInGrams} g`;
+
+              return (
+                <li key={i}>
+                  {ing.name} – {unitDisplay} ({amountInGrams} g, {kcal} kcal)
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
 
       <div className="relative w-full h-64 mb-6">
@@ -124,9 +126,7 @@ export default function DetailPage() {
           <ol className="space-y-4">
             {recipe.steps.map((step, i) => (
               <li key={i} className="relative border-l-4 border-green-600 pl-6 pr-2 py-3 bg-white rounded shadow-sm">
-                <div className="absolute -left-4 top-3 w-7 h-7 bg-green-600 text-white font-bold rounded-full flex items-center justify-center">
-                  {i + 1}
-                </div>
+                <div className="absolute -left-4 top-3 w-7 h-7 bg-green-600 text-white font-bold rounded-full flex items-center justify-center">{i + 1}</div>
                 {step}
               </li>
             ))}
@@ -149,29 +149,14 @@ export default function DetailPage() {
         </>
       )}
 
-      {!!recipe.ingredients?.length && (
-        <>
-          <h3 className="font-semibold mt-6">Ingredience</h3>
-          <ul className="list-disc list-inside mt-2 mb-6">
-            {recipe.ingredients.map((ing, i) => {
-              const kcal = ["g", "ml"].includes(ing.unit) && typeof ing.calories_per_gram === "number"
-                ? Math.round(ing.amount * ing.calories_per_gram)
-                : 0;
-              return (
-                <li key={i}>
-                  {ing.amount} {ing.unit} – {ing.name}
-                  {kcal > 0 && <span className="text-sm text-gray-500 ml-2">({kcal} kcal)</span>}
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      )}
-
       {!adminLoading && isAdmin && (
         <div className="flex gap-4 mt-6">
-          <button onClick={handleEdit} className="bg-blue-600 text-white px-4 py-2 rounded">Upravit</button>
-          <button onClick={handleDelete} className="border border-red-600 text-red-600 px-4 py-2 rounded">Smazat</button>
+          <button onClick={handleEdit} className="bg-blue-600 text-white px-4 py-2 rounded">
+            Upravit
+          </button>
+          <button onClick={handleDelete} className="border border-red-600 text-red-600 px-4 py-2 rounded">
+            Smazat
+          </button>
         </div>
       )}
     </div>

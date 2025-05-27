@@ -13,6 +13,7 @@ export type IngredientInput = {
   amount: number;
   unit: string;
   calories_per_gram: number;
+  display?: string;
 };
 
 // ✅ Ingredients
@@ -83,40 +84,38 @@ export async function getAllRecipes(): Promise<any[]> {
 
 export async function getRecipeByIdFromDB(id: number) {
   const res = await db.query("SELECT * FROM recipes WHERE id = $1", [id]);
-
   const recipe = res.rows[0];
-  if (!recipe) {
-    return null;
-  }
+  if (!recipe) return null;
 
   const [ingredients, categories, mealTypes] = await Promise.all([
     db.query(
-      `
-      SELECT ri.amount, 'g' as unit, i.name, i.calories_per_gram
-      FROM recipe_ingredients ri
-      JOIN ingredients i ON ri.ingredient_id = i.id
-      WHERE ri.recipe_id = $1
-    `,
+      `SELECT ri.amount, ri.unit, ri.display, i.name, i.calories_per_gram
+       FROM recipe_ingredients ri
+       JOIN ingredients i ON ri.ingredient_id = i.id
+       WHERE ri.recipe_id = $1`,
       [id]
     ),
     db.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [id]),
     db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [id]),
   ]);
 
-  // ✅ Deduplikace a formátování meal_types
   const uniqueMealTypes = Array.from(
-    new Map(
-      mealTypes.rows.map((r) => {
-        const cleaned = r.name.trim();
-        return [cleaned.toLowerCase(), cleaned.charAt(0).toUpperCase() + cleaned.slice(1)];
-      })
-    ).values()
+    new Map(mealTypes.rows.map((r) => {
+      const cleaned = r.name.trim();
+      return [cleaned.toLowerCase(), cleaned.charAt(0).toUpperCase() + cleaned.slice(1)];
+    })).values()
   );
 
   return {
     ...recipe,
     steps: recipe.steps ?? [],
-    ingredients: ingredients.rows,
+    ingredients: ingredients.rows.map((row) => ({
+      name: row.name,
+      amount: row.amount,
+      unit: row.unit,
+      calories_per_gram: row.calories_per_gram,
+      display: row.display ?? undefined,
+    })),
     categories: categories.rows.map((r) => r.name),
     meal_types: uniqueMealTypes,
   };
@@ -140,9 +139,7 @@ export async function createFullRecipe(
        VALUES ($1, $2, $3, $4::jsonb, $5) RETURNING id`,
       [title, notes, imageUrl, JSON.stringify(steps), calories]
     );
-
     const recipeId = result.rows[0].id;
-
     await insertRelations(client, recipeId, mealTypes, ingredients, categories);
     await client.query("COMMIT");
     return recipeId;
@@ -165,22 +162,16 @@ export async function updateRecipeInDB(
   steps: string[],
   calories: number | null
 ): Promise<void> {
-  console.log("🛠️ UPDATE recipe:");
-  console.log({ id, title, notes, imageUrl, mealTypes, ingredients, categories, steps, calories });
   const client = await db.connect();
   try {
     await client.query("BEGIN");
     await client.query(
-      `UPDATE recipes
-       SET title = $1, notes = $2, image_url = $3, steps = $4::jsonb, calories = $5
-       WHERE id = $6`,
+      `UPDATE recipes SET title = $1, notes = $2, image_url = $3, steps = $4::jsonb, calories = $5 WHERE id = $6`,
       [title, notes, imageUrl, JSON.stringify(steps), calories, id]
     );
-
     await client.query("DELETE FROM recipe_ingredients WHERE recipe_id = $1", [id]);
     await client.query("DELETE FROM recipe_categories WHERE recipe_id = $1", [id]);
     await client.query("DELETE FROM recipe_meal_types WHERE recipe_id = $1", [id]);
-
     await insertRelations(client, id, mealTypes, ingredients, categories);
     await client.query("COMMIT");
   } catch (err) {
@@ -208,61 +199,41 @@ export async function deleteRecipeFromDB(id: number): Promise<void> {
   }
 }
 
-async function insertRelations(client: any, recipeId: number, mealTypes: string[], ingredients: IngredientInput[], categories: string[]) {
-  // 🔍 SUROVINY
+async function insertRelations(
+  client: any,
+  recipeId: number,
+  mealTypes: string[],
+  ingredients: IngredientInput[],
+  categories: string[]
+) {
   for (const ing of ingredients) {
-    console.log("🧪 Zpracovávám surovinu:", ing);
-
-    if (!ing.name || typeof ing.calories_per_gram !== "number" || typeof ing.amount !== "number" || typeof ing.unit !== "string") {
-      console.error("❌ Neplatná surovina:", ing);
-      throw new Error(`Neplatná surovina: ${JSON.stringify(ing)}`);
-    }
-
-    try {
-      const res = await client.query("SELECT id FROM ingredients WHERE name = $1", [ing.name]);
-      let ingredientId = res.rows[0]?.id;
-
-      if (!ingredientId) {
-        const insert = await client.query("INSERT INTO ingredients (name, calories_per_gram) VALUES ($1, $2) RETURNING id", [ing.name, ing.calories_per_gram]);
-        ingredientId = insert.rows[0].id;
-      } else {
-        await client.query("UPDATE ingredients SET calories_per_gram = $1 WHERE id = $2", [ing.calories_per_gram, ingredientId]);
-      }
-
-      await client.query(
-        `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, amount, unit)
-         VALUES ($1, $2, $3, $4)`,
-        [recipeId, ingredientId, ing.amount, ing.unit]
+    const res = await client.query("SELECT id FROM ingredients WHERE name = $1", [ing.name]);
+    let ingredientId = res.rows[0]?.id;
+    if (!ingredientId) {
+      const insert = await client.query(
+        "INSERT INTO ingredients (name, calories_per_gram) VALUES ($1, $2) RETURNING id",
+        [ing.name, ing.calories_per_gram]
       );
-    } catch (err) {
-      console.error("❌ Chyba při zpracování suroviny:", ing.name, err);
-      throw err;
+      ingredientId = insert.rows[0].id;
+    } else {
+      await client.query("UPDATE ingredients SET calories_per_gram = $1 WHERE id = $2", [ing.calories_per_gram, ingredientId]);
     }
+    await client.query(
+      `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, amount, unit, display)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [recipeId, ingredientId, ing.amount, ing.unit, ing.display ?? null]
+    );
   }
 
-  // 🍽️ KATEGORIE
   for (const cat of categories) {
-    try {
-      const res = await client.query("SELECT id FROM categories WHERE name = $1", [cat]);
-      const categoryId = res.rows[0]?.id ?? (await client.query("INSERT INTO categories (name) VALUES ($1) RETURNING id", [cat])).rows[0].id;
-
-      await client.query("INSERT INTO recipe_categories (recipe_id, category_id) VALUES ($1, $2)", [recipeId, categoryId]);
-    } catch (err) {
-      console.error("❌ Chyba při ukládání kategorie:", cat, err);
-      throw err;
-    }
+    const res = await client.query("SELECT id FROM categories WHERE name = $1", [cat]);
+    const categoryId = res.rows[0]?.id ?? (await client.query("INSERT INTO categories (name) VALUES ($1) RETURNING id", [cat])).rows[0].id;
+    await client.query("INSERT INTO recipe_categories (recipe_id, category_id) VALUES ($1, $2)", [recipeId, categoryId]);
   }
 
-  // 🍲 TYPY JÍDLA
   for (const meal of mealTypes) {
-    try {
-      const res = await client.query("SELECT id FROM meal_types WHERE name = $1", [meal]);
-      const mealTypeId = res.rows[0]?.id ?? (await client.query("INSERT INTO meal_types (name) VALUES ($1) RETURNING id", [meal])).rows[0].id;
-
-      await client.query("INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)", [recipeId, mealTypeId]);
-    } catch (err) {
-      console.error("❌ Chyba při ukládání meal_type:", meal, err);
-      throw err;
-    }
+    const res = await client.query("SELECT id FROM meal_types WHERE name = $1", [meal]);
+    const mealTypeId = res.rows[0]?.id ?? (await client.query("INSERT INTO meal_types (name) VALUES ($1) RETURNING id", [meal])).rows[0].id;
+    await client.query("INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)", [recipeId, mealTypeId]);
   }
 }

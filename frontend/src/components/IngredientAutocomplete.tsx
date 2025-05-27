@@ -10,9 +10,10 @@ import React, {
 
 export type Ingredient = {
   name: string;
-  amount: number; // vždy v gramech
-  unit: string; // vždy "g"
+  amount: number; // v gramech
+  unit: string;   // vždy "g"
   calories_per_gram: number;
+  display?: string; // např. "3 lžíce"
 };
 
 export type IngredientAutocompleteHandle = {
@@ -110,6 +111,7 @@ const IngredientAutocomplete = forwardRef<
       amount: amountInGrams,
       unit: "g",
       calories_per_gram: caloriesValue,
+      display: `${amountValue} ${inputUnit}`, // uložení původního vstupu
     };
 
     notifyChange([...ingredients, newIngredient]);
@@ -176,12 +178,9 @@ const IngredientAutocomplete = forwardRef<
             onChange={(e) => setInputUnit(e.target.value)}
             className="p-2 border rounded w-full sm:w-1/6"
           >
-            <option value="g">g</option>
-            <option value="lžíce">lžíce</option>
-            <option value="lžička">lžička</option>
-            <option value="šálek">šálek</option>
-            <option value="hrnek">hrnek</option>
-            <option value="ks">ks</option>
+            {Object.keys(unitConversionToGrams).map((unit) => (
+              <option key={unit} value={unit}>{unit}</option>
+            ))}
           </select>
 
           <input
@@ -231,7 +230,7 @@ const IngredientAutocomplete = forwardRef<
             className="flex justify-between items-center border p-2 rounded"
           >
             <span>
-              {ing.name} – {Math.round(ing.amount)} g ({Math.round(ing.amount * ing.calories_per_gram)} kcal)
+              {ing.name} – {ing.display ?? `${Math.round(ing.amount)} g`} ({Math.round(ing.amount)} g, {Math.round(ing.amount * ing.calories_per_gram)} kcal)
             </span>
             <button
               type="button"
