@@ -24,7 +24,7 @@ const normalizeText = (text: string): string =>
     .toLowerCase();
 
 export default function HomePage() {
-  const { isAdmin, loading } = useAdmin(); // přidáno `loading` pro bezpečné načtení
+  const { isAdmin, loading } = useAdmin();
 
   const [query, setQuery] = useState("");
   const [selectedCuisine, setSelectedCuisine] = useState<string[]>([]);
@@ -51,20 +51,26 @@ export default function HomePage() {
   useEffect(() => {
     const filtered = recipes.filter((recipe) => {
       const matchesQuery = normalizeText(recipe.title).includes(normalizeText(query));
-      const matchesCuisine = selectedCuisine.length === 0 || selectedCuisine.some((c) => recipe.categories.includes(c));
+      const matchesCuisine =
+        selectedCuisine.length === 0 || selectedCuisine.some((c) => recipe.categories.includes(c));
       const mealTypes = Array.isArray(recipe.meal_types) ? recipe.meal_types : [];
-      const matchesMealType = selectedMealTypes.length === 0 || selectedMealTypes.some((type) => recipe.categories.includes(type));
+      const matchesMealType =
+        selectedMealTypes.length === 0 || mealTypes.some((t) => selectedMealTypes.includes(t));
       return matchesQuery && matchesCuisine && matchesMealType;
     });
     setFilteredRecipes(filtered);
   }, [query, selectedCuisine, selectedMealTypes, recipes]);
 
   const toggleCuisine = (type: string) => {
-    setSelectedCuisine((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
+    setSelectedCuisine((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
   };
 
   const toggleMealType = (type: string) => {
-    setSelectedMealTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
+    setSelectedMealTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
   };
 
   const hasFiltersOrQuery = query || selectedCuisine.length > 0 || selectedMealTypes.length > 0;
@@ -87,7 +93,9 @@ export default function HomePage() {
             key={type}
             onClick={() => toggleMealType(type)}
             className={`px-4 py-1 rounded-full border text-sm transition ${
-              selectedMealTypes.includes(type) ? "bg-green-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              selectedMealTypes.includes(type)
+                ? "bg-green-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
             {type}
@@ -97,14 +105,22 @@ export default function HomePage() {
 
       <div className="space-y-4">
         <div>
-          <button onClick={() => setShowCuisine(!showCuisine)} className="w-full text-left font-semibold text-gray-700 bg-gray-100 px-4 py-2 rounded-md">
+          <button
+            onClick={() => setShowCuisine(!showCuisine)}
+            className="w-full text-left font-semibold text-gray-700 bg-gray-100 px-4 py-2 rounded-md"
+          >
             Typ kuchyně {showCuisine ? "▲" : "▼"}
           </button>
           {showCuisine && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
               {CUISINE_CATEGORIES.map((type) => (
                 <label key={type} className="inline-flex items-center">
-                  <input type="checkbox" checked={selectedCuisine.includes(type)} onChange={() => toggleCuisine(type)} className="mr-2" />
+                  <input
+                    type="checkbox"
+                    checked={selectedCuisine.includes(type)}
+                    onChange={() => toggleCuisine(type)}
+                    className="mr-2"
+                  />
                   {type}
                 </label>
               ))}
@@ -113,14 +129,22 @@ export default function HomePage() {
         </div>
 
         <div>
-          <button onClick={() => setShowMealTypes(!showMealTypes)} className="w-full text-left font-semibold text-gray-700 bg-gray-100 px-4 py-2 rounded-md">
+          <button
+            onClick={() => setShowMealTypes(!showMealTypes)}
+            className="w-full text-left font-semibold text-gray-700 bg-gray-100 px-4 py-2 rounded-md"
+          >
             Typ jídla {showMealTypes ? "▲" : "▼"}
           </button>
           {showMealTypes && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
               {MEALTYPE_CATEGORIES.map((type) => (
                 <label key={type} className="inline-flex items-center">
-                  <input type="checkbox" checked={selectedMealTypes.includes(type)} onChange={() => toggleMealType(type)} className="mr-2" />
+                  <input
+                    type="checkbox"
+                    checked={selectedMealTypes.includes(type)}
+                    onChange={() => toggleMealType(type)}
+                    className="mr-2"
+                  />
                   {type}
                 </label>
               ))}
@@ -133,7 +157,11 @@ export default function HomePage() {
         filteredRecipes.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-6">
             {filteredRecipes.map((recipe) => (
-              <Link key={recipe.id} href={`/recepty/${recipe.id}`} className="border rounded shadow hover:shadow-lg transition overflow-hidden block">
+              <Link
+                key={recipe.id}
+                href={`/recepty/${recipe.id}`}
+                className="border rounded shadow hover:shadow-lg transition overflow-hidden block"
+              >
                 <div className="relative w-full h-48">
                   <Image
                     src={
@@ -150,7 +178,11 @@ export default function HomePage() {
                 </div>
                 <div className="p-4">
                   <h2 className="text-xl font-semibold">{recipe.title}</h2>
-                  {recipe.meal_types && recipe.meal_types.length > 0 && <p className="text-sm text-gray-500">{recipe.meal_types.join(", ")}</p>}
+                  {recipe.meal_types && recipe.meal_types.length > 0 && (
+                    <p className="text-sm text-gray-500">
+                      {recipe.meal_types.join(", ")}
+                    </p>
+                  )}
                 </div>
               </Link>
             ))}
