@@ -163,6 +163,7 @@ export default function HomePage() {
                 className="border rounded shadow hover:shadow-lg transition overflow-hidden block"
               >
                 <div className="relative w-full h-48">
+                {/* Komponenta obrázku */}  
                   <Image
                     src={
                       recipe.image_url && recipe.image_url.startsWith("http")
