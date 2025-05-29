@@ -140,6 +140,16 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
         const text = await res.text();
         throw new Error(text || "Nepodařilo se přidat ingredienci");
       }
+      const createdIngredient = await res.json();
+      setIngredients((prev) => [
+        ...prev,
+        {
+          name: createdIngredient.name,
+          amount: 0,
+          unit_name: createdIngredient.unit_name || "g",
+          calories_per_gram: createdIngredient.calories_per_gram,
+        },
+      ]);
 
       alert("Ingredience přidána.");
       setNewIngredient({
@@ -269,7 +279,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
               </option>
             ))}
           </select>
-          <button onClick={handleCreate} className="bg-blue-600 text-white rounded px-4 py-2">
+          <button type="button" onClick={handleCreate} className="bg-blue-600 text-white rounded px-4 py-2">
             ➕ Přidat
           </button>
         </div>
