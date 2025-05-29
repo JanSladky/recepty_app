@@ -181,17 +181,46 @@ export default function IngredientAdminPage() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-6 gap-2 mb-4">
-        <input type="text" placeholder="Název" value={newIngredient.name} onChange={(e) => handleNewChange("name", e.target.value)} className="border p-2 rounded" />
-        <input type="number" placeholder="Kalorie / 1g" value={newIngredient.calories_per_gram} onChange={(e) => handleNewChange("calories_per_gram", e.target.value)} className="border p-2 rounded" />
+        <input
+          type="text"
+          placeholder="Název"
+          value={newIngredient.name}
+          onChange={(e) => handleNewChange("name", e.target.value)}
+          className="border p-2 rounded"
+        />
+        <input
+          type="number"
+          placeholder="Kalorie / 1g"
+          value={newIngredient.calories_per_gram}
+          onChange={(e) => handleNewChange("calories_per_gram", e.target.value)}
+          className="border p-2 rounded"
+        />
         <select value={newIngredient.category_id} onChange={(e) => handleNewChange("category_id", e.target.value)} className="border p-2 rounded">
           <option value="">Vyber kategorii</option>
           {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>{cat.name}</option>
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
+            </option>
           ))}
         </select>
-        <input type="number" placeholder="Default gramy" value={newIngredient.default_grams} onChange={(e) => handleNewChange("default_grams", e.target.value)} className="border p-2 rounded" />
-        <input type="text" placeholder="Jednotka (např. ks)" value={newIngredient.unit_name} onChange={(e) => handleNewChange("unit_name", e.target.value)} className="border p-2 rounded" />
-        <button onClick={handleCreate} className="bg-blue-600 text-white rounded px-3 py-2">➕ Přidat</button>
+        <input
+          type="number"
+          placeholder="Default gramy"
+          value={newIngredient.default_grams}
+          onChange={(e) => handleNewChange("default_grams", e.target.value)}
+          className="border p-2 rounded"
+        />
+        <select value={newIngredient.unit_name} onChange={(e) => handleNewChange("unit_name", e.target.value)} className="border p-2 rounded">
+          <option value="">Vyber jednotku</option>
+          {["g", "ml", "ks", "lžíce", "lžička", "šálek", "hrnek"].map((unit) => (
+            <option key={unit} value={unit}>
+              {unit}
+            </option>
+          ))}
+        </select>
+        <button onClick={handleCreate} className="bg-blue-600 text-white rounded px-3 py-2">
+          ➕ Přidat
+        </button>
       </div>
 
       <div className="space-y-4 mb-10">
@@ -199,19 +228,51 @@ export default function IngredientAdminPage() {
           const editedItem = edited[ingredient.id] || {};
           return (
             <div key={ingredient.id} className="border rounded p-4 space-y-2 sm:flex sm:flex-wrap sm:items-center sm:space-y-0 sm:gap-2">
-              <input type="text" value={editedItem.name ?? ingredient.name} onChange={(e) => handleInputChange(ingredient.id, "name", e.target.value)} className="border rounded p-2 w-full sm:w-1/6" />
-              <input type="number" value={editedItem.calories_per_gram ?? ingredient.calories_per_gram ?? ""} onChange={(e) => handleInputChange(ingredient.id, "calories_per_gram", e.target.value)} className="border rounded p-2 w-full sm:w-1/6" />
-              <select value={editedItem.category_id ?? ingredient.category_id ?? ""} onChange={(e) => handleInputChange(ingredient.id, "category_id", e.target.value)} className="border rounded p-2 w-full sm:w-1/6">
+              <input
+                type="text"
+                value={editedItem.name ?? ingredient.name}
+                onChange={(e) => handleInputChange(ingredient.id, "name", e.target.value)}
+                className="border rounded p-2 w-full sm:w-1/6"
+              />
+              <input
+                type="number"
+                value={editedItem.calories_per_gram ?? ingredient.calories_per_gram ?? ""}
+                onChange={(e) => handleInputChange(ingredient.id, "calories_per_gram", e.target.value)}
+                className="border rounded p-2 w-full sm:w-1/6"
+              />
+              <select
+                value={editedItem.category_id ?? ingredient.category_id ?? ""}
+                onChange={(e) => handleInputChange(ingredient.id, "category_id", e.target.value)}
+                className="border rounded p-2 w-full sm:w-1/6"
+              >
                 <option value="">Vyber kategorii</option>
                 {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
                 ))}
               </select>
-              <input type="number" placeholder="Gramy" value={editedItem.default_grams ?? ingredient.default_grams ?? ""} onChange={(e) => handleInputChange(ingredient.id, "default_grams", e.target.value)} className="border rounded p-2 w-full sm:w-1/6" />
-              <input type="text" placeholder="Jednotka" value={editedItem.unit_name ?? ingredient.unit_name ?? ""} onChange={(e) => handleInputChange(ingredient.id, "unit_name", e.target.value)} className="border rounded p-2 w-full sm:w-1/6" />
+              <input
+                type="number"
+                placeholder="Gramy"
+                value={editedItem.default_grams ?? ingredient.default_grams ?? ""}
+                onChange={(e) => handleInputChange(ingredient.id, "default_grams", e.target.value)}
+                className="border rounded p-2 w-full sm:w-1/6"
+              />
+              <input
+                type="text"
+                placeholder="Jednotka"
+                value={editedItem.unit_name ?? ingredient.unit_name ?? ""}
+                onChange={(e) => handleInputChange(ingredient.id, "unit_name", e.target.value)}
+                className="border rounded p-2 w-full sm:w-1/6"
+              />
               <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                <button onClick={() => handleSave(ingredient.id)} className="bg-green-600 text-white px-3 py-2 rounded w-full sm:w-auto">💾 Uložit</button>
-                <button onClick={() => handleDelete(ingredient.id)} className="bg-red-600 text-white px-3 py-2 rounded w-full sm:w-auto">🗑️ Smazat</button>
+                <button onClick={() => handleSave(ingredient.id)} className="bg-green-600 text-white px-3 py-2 rounded w-full sm:w-auto">
+                  💾 Uložit
+                </button>
+                <button onClick={() => handleDelete(ingredient.id)} className="bg-red-600 text-white px-3 py-2 rounded w-full sm:w-auto">
+                  🗑️ Smazat
+                </button>
               </div>
             </div>
           );
@@ -221,15 +282,26 @@ export default function IngredientAdminPage() {
       <h2 className="text-xl font-semibold mb-2">Kategorie</h2>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
         <input type="text" placeholder="Nová kategorie" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="border p-2 rounded" />
-        <button onClick={handleCategoryCreate} className="bg-blue-600 text-white px-3 py-2 rounded">➕ Přidat kategorii</button>
+        <button onClick={handleCategoryCreate} className="bg-blue-600 text-white px-3 py-2 rounded">
+          ➕ Přidat kategorii
+        </button>
       </div>
 
       <div className="space-y-2">
         {categories.map((cat) => (
           <div key={cat.id} className="flex gap-2 items-center">
-            <input type="text" value={editedCategories[cat.id] ?? cat.name} onChange={(e) => setEditedCategories((prev) => ({ ...prev, [cat.id]: e.target.value }))} className="border p-2 rounded w-full sm:w-1/3" />
-            <button onClick={() => handleCategoryUpdate(cat.id)} className="bg-green-600 text-white px-3 py-2 rounded">💾</button>
-            <button onClick={() => handleCategoryDelete(cat.id)} className="bg-red-600 text-white px-3 py-2 rounded">🗑️</button>
+            <input
+              type="text"
+              value={editedCategories[cat.id] ?? cat.name}
+              onChange={(e) => setEditedCategories((prev) => ({ ...prev, [cat.id]: e.target.value }))}
+              className="border p-2 rounded w-full sm:w-1/3"
+            />
+            <button onClick={() => handleCategoryUpdate(cat.id)} className="bg-green-600 text-white px-3 py-2 rounded">
+              💾
+            </button>
+            <button onClick={() => handleCategoryDelete(cat.id)} className="bg-red-600 text-white px-3 py-2 rounded">
+              🗑️
+            </button>
           </div>
         ))}
       </div>
