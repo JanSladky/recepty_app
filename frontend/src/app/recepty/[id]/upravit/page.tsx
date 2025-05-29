@@ -30,7 +30,7 @@ export default function EditPage() {
           throw new Error("Chyba při načítání receptu");
         }
         const data = await res.json();
-
+        console.log("Loaded recipe:", data);
         setInitialData({
           title: data.title,
           notes: data.notes,

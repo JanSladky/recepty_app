@@ -26,6 +26,13 @@ type IngredientAutocompleteProps = {
   onChange?: (ingredients: Ingredient[]) => void;
 };
 
+type Suggestion = {
+  name: string;
+  calories_per_gram: number;
+  default_grams?: number;
+  unit_name?: string;
+};
+
 const IngredientAutocomplete = forwardRef<
   IngredientAutocompleteHandle,
   IngredientAutocompleteProps
@@ -35,7 +42,7 @@ const IngredientAutocomplete = forwardRef<
   const [inputAmount, setInputAmount] = useState<number | "">("");
   const [inputUnit, setInputUnit] = useState("g");
   const [inputCalories, setInputCalories] = useState<number | "">("");
-  const [allSuggestions, setAllSuggestions] = useState<{ name: string; calories_per_gram: number }[]>([]);
+  const [allSuggestions, setAllSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const inputNameRef = useRef<HTMLInputElement>(null);
@@ -85,6 +92,8 @@ const IngredientAutocomplete = forwardRef<
     if (match) {
       setInputName(match.name);
       setInputCalories(match.calories_per_gram);
+      if (match.unit_name) setInputUnit(match.unit_name);
+      if (match.default_grams) setInputAmount(1); // předvyplní 1 ks
       setTimeout(() => inputAmountRef.current?.focus(), 0);
     }
     setShowSuggestions(false);
@@ -103,7 +112,8 @@ const IngredientAutocomplete = forwardRef<
       return;
     }
 
-    const factor = unitConversionToGrams[inputUnit] || 1;
+    const suggestion = allSuggestions.find(i => i.name.toLowerCase() === inputName.toLowerCase());
+    const factor = suggestion?.default_grams || unitConversionToGrams[inputUnit] || 1;
     const amountInGrams = amountValue * factor;
 
     const newIngredient: Ingredient = {
@@ -135,7 +145,8 @@ const IngredientAutocomplete = forwardRef<
 
   const calculatedGrams = (): number => {
     const amt = typeof inputAmount === "number" ? inputAmount : 0;
-    const conv = unitConversionToGrams[inputUnit] || 1;
+    const suggestion = allSuggestions.find(i => i.name.toLowerCase() === inputName.toLowerCase());
+    const conv = suggestion?.default_grams || unitConversionToGrams[inputUnit] || 1;
     return Math.round(amt * conv);
   };
 

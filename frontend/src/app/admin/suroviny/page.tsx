@@ -10,6 +10,8 @@ export type Ingredient = {
   name: string;
   calories_per_gram: number;
   category_id: number;
+  default_grams?: number;
+  unit_name?: string;
 };
 
 export type Category = {
@@ -27,6 +29,8 @@ export default function IngredientAdminPage() {
     name: "",
     calories_per_gram: "",
     category_id: "",
+    default_grams: "",
+    unit_name: "",
   });
   const [newCategory, setNewCategory] = useState("");
   const [editedCategories, setEditedCategories] = useState<Record<number, string>>({});
@@ -56,7 +60,7 @@ export default function IngredientAdminPage() {
       ...prev,
       [id]: {
         ...prev[id],
-        [field]: field === "calories_per_gram" || field === "category_id" ? Number(value) : value,
+        [field]: ["calories_per_gram", "category_id", "default_grams"].includes(field) ? Number(value) : value,
       },
     }));
   };
@@ -69,6 +73,8 @@ export default function IngredientAdminPage() {
       name: edited[id]?.name ?? current.name,
       calories_per_gram: Number(edited[id]?.calories_per_gram ?? current.calories_per_gram),
       category_id: Number(edited[id]?.category_id ?? current.category_id),
+      default_grams: Number(edited[id]?.default_grams ?? current.default_grams),
+      unit_name: edited[id]?.unit_name ?? current.unit_name,
     };
 
     const res = await fetch(`${API_URL}/api/ingredients/${id}`, {
@@ -99,7 +105,7 @@ export default function IngredientAdminPage() {
   };
 
   const handleCreate = async () => {
-    const { name, calories_per_gram, category_id } = newIngredient;
+    const { name, calories_per_gram, category_id, default_grams, unit_name } = newIngredient;
     const res = await fetch(`${API_URL}/api/ingredients`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -107,13 +113,15 @@ export default function IngredientAdminPage() {
         name,
         category_id: Number(category_id),
         calories_per_gram: Number(calories_per_gram),
+        default_grams: Number(default_grams) || undefined,
+        unit_name: unit_name || undefined,
       }),
     });
 
     if (res.ok) {
       const created = await res.json();
       setIngredients((prev) => [...prev, created]);
-      setNewIngredient({ name: "", calories_per_gram: "", category_id: "" });
+      setNewIngredient({ name: "", calories_per_gram: "", category_id: "", default_grams: "", unit_name: "" });
     }
   };
 
@@ -138,9 +146,7 @@ export default function IngredientAdminPage() {
   const handleCategoryDelete = async (id: number) => {
     if (!confirm("Opravdu chceš smazat tuto kategorii?")) return;
 
-    const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, {
-      method: "DELETE" });
-
+    const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, { method: "DELETE" });
     if (res.ok) {
       setCategories((prev) => prev.filter((c) => c.id !== id));
     }
@@ -174,15 +180,17 @@ export default function IngredientAdminPage() {
         className="w-full p-2 border rounded mb-4"
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-6 gap-2 mb-4">
         <input type="text" placeholder="Název" value={newIngredient.name} onChange={(e) => handleNewChange("name", e.target.value)} className="border p-2 rounded" />
-        <input type="number" placeholder="Kalorie / 1g" value={newIngredient.calories_per_gram || ""} onChange={(e) => handleNewChange("calories_per_gram", e.target.value)} className="border p-2 rounded" />
-        <select value={newIngredient.category_id || ""} onChange={(e) => handleNewChange("category_id", e.target.value)} className="border p-2 rounded">
+        <input type="number" placeholder="Kalorie / 1g" value={newIngredient.calories_per_gram} onChange={(e) => handleNewChange("calories_per_gram", e.target.value)} className="border p-2 rounded" />
+        <select value={newIngredient.category_id} onChange={(e) => handleNewChange("category_id", e.target.value)} className="border p-2 rounded">
           <option value="">Vyber kategorii</option>
           {categories.map((cat) => (
             <option key={cat.id} value={cat.id}>{cat.name}</option>
           ))}
         </select>
+        <input type="number" placeholder="Default gramy" value={newIngredient.default_grams} onChange={(e) => handleNewChange("default_grams", e.target.value)} className="border p-2 rounded" />
+        <input type="text" placeholder="Jednotka (např. ks)" value={newIngredient.unit_name} onChange={(e) => handleNewChange("unit_name", e.target.value)} className="border p-2 rounded" />
         <button onClick={handleCreate} className="bg-blue-600 text-white rounded px-3 py-2">➕ Přidat</button>
       </div>
 
@@ -190,15 +198,17 @@ export default function IngredientAdminPage() {
         {filtered.map((ingredient) => {
           const editedItem = edited[ingredient.id] || {};
           return (
-            <div key={ingredient.id} className="border rounded p-4 space-y-2 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
-              <input type="text" value={editedItem.name ?? ingredient.name} onChange={(e) => handleInputChange(ingredient.id, "name", e.target.value)} className="border rounded p-2 w-full sm:w-1/4" />
-              <input type="number" value={editedItem.calories_per_gram ?? ingredient.calories_per_gram ?? ""} onChange={(e) => handleInputChange(ingredient.id, "calories_per_gram", e.target.value)} className="border rounded p-2 w-full sm:w-1/4" />
-              <select value={editedItem.category_id ?? ingredient.category_id ?? ""} onChange={(e) => handleInputChange(ingredient.id, "category_id", e.target.value)} className="border rounded p-2 w-full sm:w-1/4">
+            <div key={ingredient.id} className="border rounded p-4 space-y-2 sm:flex sm:flex-wrap sm:items-center sm:space-y-0 sm:gap-2">
+              <input type="text" value={editedItem.name ?? ingredient.name} onChange={(e) => handleInputChange(ingredient.id, "name", e.target.value)} className="border rounded p-2 w-full sm:w-1/6" />
+              <input type="number" value={editedItem.calories_per_gram ?? ingredient.calories_per_gram ?? ""} onChange={(e) => handleInputChange(ingredient.id, "calories_per_gram", e.target.value)} className="border rounded p-2 w-full sm:w-1/6" />
+              <select value={editedItem.category_id ?? ingredient.category_id ?? ""} onChange={(e) => handleInputChange(ingredient.id, "category_id", e.target.value)} className="border rounded p-2 w-full sm:w-1/6">
                 <option value="">Vyber kategorii</option>
                 {categories.map((cat) => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
+              <input type="number" placeholder="Gramy" value={editedItem.default_grams ?? ingredient.default_grams ?? ""} onChange={(e) => handleInputChange(ingredient.id, "default_grams", e.target.value)} className="border rounded p-2 w-full sm:w-1/6" />
+              <input type="text" placeholder="Jednotka" value={editedItem.unit_name ?? ingredient.unit_name ?? ""} onChange={(e) => handleInputChange(ingredient.id, "unit_name", e.target.value)} className="border rounded p-2 w-full sm:w-1/6" />
               <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                 <button onClick={() => handleSave(ingredient.id)} className="bg-green-600 text-white px-3 py-2 rounded w-full sm:w-auto">💾 Uložit</button>
                 <button onClick={() => handleDelete(ingredient.id)} className="bg-red-600 text-white px-3 py-2 rounded w-full sm:w-auto">🗑️ Smazat</button>
@@ -217,17 +227,7 @@ export default function IngredientAdminPage() {
       <div className="space-y-2">
         {categories.map((cat) => (
           <div key={cat.id} className="flex gap-2 items-center">
-            <input
-              type="text"
-              value={editedCategories[cat.id] ?? cat.name}
-              onChange={(e) =>
-                setEditedCategories((prev) => ({
-                  ...prev,
-                  [cat.id]: e.target.value,
-                }))
-              }
-              className="border p-2 rounded w-full sm:w-1/3"
-            />
+            <input type="text" value={editedCategories[cat.id] ?? cat.name} onChange={(e) => setEditedCategories((prev) => ({ ...prev, [cat.id]: e.target.value }))} className="border p-2 rounded w-full sm:w-1/3" />
             <button onClick={() => handleCategoryUpdate(cat.id)} className="bg-green-600 text-white px-3 py-2 rounded">💾</button>
             <button onClick={() => handleCategoryDelete(cat.id)} className="bg-red-600 text-white px-3 py-2 rounded">🗑️</button>
           </div>

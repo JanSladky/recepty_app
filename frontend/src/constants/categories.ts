@@ -6,7 +6,7 @@ export const CUISINE_CATEGORIES = [
 
 export const MEALTYPE_CATEGORIES = [
   "Maso", "Ryby", "Mořské plody", "Sýr", "Sendviče", "Těstoviny",
-  "Pizza", "Polévka", "Pečivo", "Dezerty", "Káva", "Nápoje"
+  "Pizza", "Polévka", "Pečivo", "Dezerty", "Káva", "Nápoje", "Bezmasé"
 ];
 
 export const ALL_MEAL_TYPES = ["Snídaně", "Svačina", "Oběd", "Večere"];
