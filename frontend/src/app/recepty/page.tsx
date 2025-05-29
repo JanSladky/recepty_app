@@ -10,6 +10,7 @@ type Recipe = {
   id: number;
   title: string;
   image_url: string;
+  meal_types?: string[];
 };
 
 export default function ReceptyPage() {
@@ -54,6 +55,11 @@ export default function ReceptyPage() {
             </div>
             <div className="p-4">
               <h2 className="text-xl font-semibold">{recipe.title}</h2>
+              {recipe.meal_types && recipe.meal_types.length > 0 && (
+                <p className="text-sm text-gray-500">
+                  {[...new Set(recipe.meal_types.map((m) => m.trim().charAt(0).toUpperCase() + m.trim().slice(1).toLowerCase()))].join(", ")}
+                </p>
+              )}
             </div>
           </Link>
         ))}

@@ -70,9 +70,13 @@ export default function RecipeForm({
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const ingredients = ingredientRef.current?.getIngredients() || [];
-      const total = ingredients.reduce((sum, ing) => sum + ing.amount * ing.calories_per_gram, 0);
-      setCalories(Math.round(total));
+      try {
+        const ingredients = ingredientRef.current?.getIngredients() || [];
+        const total = ingredients.reduce((sum, ing) => sum + ing.amount * ing.calories_per_gram, 0);
+        setCalories(Math.round(total));
+      } catch (err) {
+        console.error("Chyba při výpočtu kalorií:", err);
+      }
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -94,9 +98,6 @@ export default function RecipeForm({
       calories_per_gram: Number(ing.calories_per_gram),
     }));
 
-    console.log("🧪 Odesílané suroviny (parsed):", ingredients);
-    console.log("🧪 JSON.stringify:", JSON.stringify(ingredients));
-
     const formData = new FormData();
     formData.append("title", title);
     const cleanedNotes = typeof notes === "string" ? notes.trim() : "";
@@ -107,7 +108,7 @@ export default function RecipeForm({
     formData.append("categories", JSON.stringify(categories));
     formData.append("mealType", JSON.stringify(mealTypes));
     formData.append("steps", JSON.stringify(steps));
-    if (!isNaN(calories)) {
+    if (Number.isFinite(calories)) {
       formData.append("calories", calories.toString());
     }
 
@@ -115,14 +116,6 @@ export default function RecipeForm({
       formData.append("image", imageFile);
     } else if (initialImageUrl) {
       formData.append("existingImageUrl", initialImageUrl);
-    }
-
-    for (const [key, value] of formData.entries()) {
-      if (value instanceof File) {
-        console.log(`📂 FormData - ${key}:`, value);
-      } else {
-        console.log(`📂 FormData - ${key}:`, value);
-      }
     }
 
     await onSubmit(formData);
@@ -142,7 +135,14 @@ export default function RecipeForm({
           required
           className="md:col-span-9 p-2 border rounded w-full"
         />
-        <input type="number" value={calories} disabled readOnly placeholder="Kalorie" className="md:col-span-3 p-2 border rounded w-full bg-gray-100" />
+        <input
+          type="number"
+          value={Number.isFinite(calories) ? calories : ""}
+          disabled
+          readOnly
+          placeholder="Kalorie"
+          className="md:col-span-3 p-2 border rounded w-full bg-gray-100"
+        />
       </div>
 
       <h3 className="font-semibold">Typ jídla</h3>
@@ -174,7 +174,7 @@ export default function RecipeForm({
         </button>
       </div>
 
-      <textarea value={notes ?? ""} onChange={(e) => setNotes(e.target.value)} placeholder="Další poznámky" className="w-full p-2 border rounded" />
+      <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Další poznámky" className="w-full p-2 border rounded" />
 
       <input
         type="file"

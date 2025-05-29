@@ -9,4 +9,4 @@ export const MEALTYPE_CATEGORIES = [
   "Pizza", "Polévka", "Pečivo", "Dezerty", "Káva", "Nápoje", "Bezmasé"
 ];
 
-export const ALL_MEAL_TYPES = ["Snídaně", "Svačina", "Oběd", "Večere"];
+export const ALL_MEAL_TYPES = ["Snídaně", "Svačina", "Oběd", "Večeře"];

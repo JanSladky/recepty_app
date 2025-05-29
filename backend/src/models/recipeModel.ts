@@ -86,7 +86,6 @@ export async function deleteIngredientCategory(id: number): Promise<void> {
   await db.query("DELETE FROM ingredient_categories WHERE id = $1", [id]);
 }
 
-// ✅ Helper pro formátování názvů
 function normalizeMealType(name: string): string {
   const trimmed = name.trim().toLowerCase();
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
@@ -94,20 +93,36 @@ function normalizeMealType(name: string): string {
 
 const ALL_MEAL_TYPES = ["Snídaně", "Oběd", "Večeře", "Svačina"];
 
-// ✅ Recepty
 export async function getAllRecipes(): Promise<any[]> {
   const res = await db.query("SELECT id, title, notes, image_url, steps, calories FROM recipes");
   const recipes = res.rows;
 
   for (const recipe of recipes) {
     const [catRes, mealRes] = await Promise.all([
-      db.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [recipe.id]),
-      db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.recipe_id = $1", [recipe.id]),
+      db.query(
+        `SELECT c.name FROM recipe_categories rc 
+         JOIN categories c ON rc.category_id = c.id 
+         WHERE rc.recipe_id = $1`,
+        [recipe.id]
+      ),
+      db.query(
+        `SELECT DISTINCT m.name FROM recipe_meal_types rmt 
+         JOIN meal_types m ON rmt.meal_type_id = m.id 
+         WHERE rmt.recipe_id = $1`,
+        [recipe.id]
+      ),
     ]);
 
     recipe.categories = catRes.rows.map((r) => r.name);
 
-    const uniqueMealTypes = Array.from(new Set(mealRes.rows.map((r) => normalizeMealType(r.name))));
+    const uniqueMealTypes = Array.from(
+      new Set(
+        mealRes.rows
+          .map((r) => r.name?.trim().toLowerCase())
+          .filter(Boolean)
+          .map((name) => name.charAt(0).toUpperCase() + name.slice(1))
+      )
+    );
 
     recipe.meal_types = uniqueMealTypes;
   }
@@ -129,15 +144,14 @@ export async function getRecipeByIdFromDB(id: number) {
       [id]
     ),
     db.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [id]),
-    db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [id]), // 💡 fix JOIN
+    db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [id]),
   ]);
 
-  // 🧹 Vyčistí názvy a odstraní duplicity
   const uniqueMealTypes = Array.from(
     new Set(
       mealTypes.rows.map((r) => {
         const name = r.name.trim().toLowerCase();
-        return name.charAt(0).toUpperCase() + name.slice(1); // např. "snídaně" -> "Snídaně"
+        return name.charAt(0).toUpperCase() + name.slice(1);
       })
     )
   );
@@ -239,7 +253,6 @@ export async function deleteRecipeFromDB(id: number): Promise<void> {
   }
 }
 
-// ✅ NOVÁ VERZE insertRelations
 async function insertRelations(client: any, recipeId: number, mealTypes: string[], ingredients: IngredientInput[], categories: string[]) {
   for (const ing of ingredients) {
     const res = await client.query("SELECT id FROM ingredients WHERE name = $1", [ing.name]);
@@ -276,11 +289,24 @@ async function insertRelations(client: any, recipeId: number, mealTypes: string[
     await client.query("INSERT INTO recipe_categories (recipe_id, category_id) VALUES ($1, $2)", [recipeId, categoryId]);
   }
 
-  const uniqueMealTypes = [...new Set(mealTypes.map((m) => m.trim()))];
+  const uniqueMealTypes = [...new Set(mealTypes.map((m) => m.trim().toLowerCase()))];
 
   for (const meal of uniqueMealTypes) {
-    const res = await client.query("SELECT id FROM meal_types WHERE name = $1", [meal]);
-    const mealTypeId = res.rows[0]?.id ?? (await client.query("INSERT INTO meal_types (name) VALUES ($1) RETURNING id", [meal])).rows[0].id;
+    const existing = await client.query("SELECT id, name FROM meal_types WHERE LOWER(name) = $1", [meal]);
+
+    let mealTypeId: number;
+    const properName = meal.charAt(0).toUpperCase() + meal.slice(1);
+
+    if (existing.rows.length > 0) {
+      mealTypeId = existing.rows[0].id;
+      if (existing.rows[0].name !== properName) {
+        await client.query("UPDATE meal_types SET name = $1 WHERE id = $2", [properName, mealTypeId]);
+      }
+    } else {
+      const insert = await client.query("INSERT INTO meal_types (name) VALUES ($1) RETURNING id", [properName]);
+      mealTypeId = insert.rows[0].id;
+    }
+
     await client.query("INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)", [recipeId, mealTypeId]);
   }
 }
