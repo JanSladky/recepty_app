@@ -161,8 +161,8 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
         const filtered = ingredient.name.length >= 3 ? allSuggestions.filter((s) => s.name.toLowerCase().includes(ingredient.name.toLowerCase())) : [];
 
         return (
-          <div key={index} className="relative grid grid-cols-6 gap-2 items-center">
-            <div className="relative">
+          <div key={index} className="relative grid grid-cols-1 sm:grid-cols-5 gap-2 items-center border rounded p-3 bg-gray-50">
+            <div className="relative col-span-2">
               <input
                 type="text"
                 value={ingredient.name}
@@ -189,25 +189,36 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
               value={ingredient.amount}
               onChange={(e) => handleInputChange(index, "amount", e.target.value)}
               placeholder="Množství"
-              className="border p-2 rounded"
+              className="border p-2 rounded w-full"
               required
             />
-            <select value={ingredient.unit_name || "g"} onChange={(e) => handleInputChange(index, "unit_name", e.target.value)} className="border p-2 rounded">
+
+            <select
+              value={ingredient.unit_name || "g"}
+              onChange={(e) => handleInputChange(index, "unit_name", e.target.value)}
+              className="border p-2 rounded w-full"
+            >
               {units.map((unit) => (
                 <option key={unit} value={unit}>
                   {unit}
                 </option>
               ))}
             </select>
+
             <input
               type="number"
               value={ingredient.calories_per_gram}
               onChange={(e) => handleInputChange(index, "calories_per_gram", e.target.value)}
               placeholder="Kalorie / gram"
-              className="border p-2 rounded"
+              className="border p-2 rounded w-full"
               required
             />
-            <button type="button" onClick={() => removeIngredient(index)} className="text-red-500 font-bold text-xl">
+
+            <button
+              type="button"
+              onClick={() => removeIngredient(index)}
+              className="text-red-500 text-lg hover:text-red-700 transition-colors sm:col-span-full"
+            >
               🗑
             </button>
           </div>
@@ -219,23 +230,23 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
       </button>
 
       <div className="mt-6">
-        <h4 className="font-semibold mb-2">Přidat novou ingredienci do databáze:</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-6 gap-2 mb-4">
+        <h4 className="font-semibold mb-4">Přidat novou ingredienci do databáze:</h4>
+        <div className="flex flex-wrap gap-3 mb-4">
           <input
             type="text"
             placeholder="Název"
             value={newIngredient.name}
             onChange={(e) => handleNewChange("name", e.target.value)}
-            className="border p-2 rounded"
+            className="border p-2 rounded w-full sm:w-[150px] flex-1 min-w-[120px]"
           />
           <input
             type="number"
             placeholder="Kalorie / 1g"
             value={newIngredient.calories_per_gram}
             onChange={(e) => handleNewChange("calories_per_gram", e.target.value)}
-            className="border p-2 rounded"
+            className="border p-2 rounded w-32"
           />
-          <select value={newIngredient.category_id} onChange={(e) => handleNewChange("category_id", e.target.value)} className="border p-2 rounded">
+          <select value={newIngredient.category_id} onChange={(e) => handleNewChange("category_id", e.target.value)} className="border p-2 rounded w-48">
             <option value="">Vyber kategorii</option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>
@@ -248,17 +259,17 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
             placeholder="Default gramy"
             value={newIngredient.default_grams || ""}
             onChange={(e) => handleNewChange("default_grams", e.target.value)}
-            className="border p-2 rounded"
+            className="border p-2 rounded w-32"
           />
-          <select value={newIngredient.unit_name || ""} onChange={(e) => handleNewChange("unit_name", e.target.value)} className="border p-2 rounded">
-            <option value="">Vyber jednotku</option>
+          <select value={newIngredient.unit_name || ""} onChange={(e) => handleNewChange("unit_name", e.target.value)} className="border p-2 rounded w-32">
+            <option value="">Jednotka</option>
             {units.map((unit) => (
               <option key={unit} value={unit}>
                 {unit}
               </option>
             ))}
           </select>
-          <button onClick={handleCreate} className="bg-blue-600 text-white rounded px-3 py-2">
+          <button onClick={handleCreate} className="bg-blue-600 text-white rounded px-4 py-2">
             ➕ Přidat
           </button>
         </div>
