@@ -1,6 +1,6 @@
 "use client";
 
-import React, { forwardRef, useImperativeHandle, useState, useEffect, useRef } from "react";
+import React, { forwardRef, useImperativeHandle, useState, useEffect } from "react";
 
 export type Ingredient = {
   name: string;
@@ -111,10 +111,10 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
     setIngredients(ingredients.filter((_, i) => i !== index));
   };
 
-  const handleNewChange = (field: keyof NewIngredient, value: any) => {
+  const handleNewChange = (field: keyof NewIngredient, value: string | number) => {
     setNewIngredient({
       ...newIngredient,
-      [field]: field === "category_id" ? parseInt(value) : value,
+      [field]: field === "category_id" ? parseInt(value as string) : value,
     });
   };
 
