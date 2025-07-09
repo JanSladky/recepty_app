@@ -247,14 +247,11 @@ export const updateIngredient = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    await updateIngredientInDB(
-      id,
-      name,
-      Number(calories_per_gram),
-      Number(category_id),
-      default_grams === "" ? null : Number(default_grams),
-      unit_name?.trim() === "" ? null : unit_name
-    );
+    const parsedDefaultGrams = default_grams === "" || default_grams === undefined ? null : Number(default_grams);
+
+    const parsedUnitName = unit_name === "" || unit_name === undefined ? null : unit_name;
+
+    await updateIngredientInDB(id, name, Number(calories_per_gram), Number(category_id), parsedDefaultGrams, parsedUnitName);
     res.status(200).json({ message: "Surovina upravena." });
   } catch (error) {
     console.error("❌ Chyba při úpravě suroviny:", error);
