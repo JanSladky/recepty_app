@@ -259,13 +259,18 @@ export default function IngredientAdminPage() {
                 onChange={(e) => handleInputChange(ingredient.id, "default_grams", e.target.value)}
                 className="border rounded p-2 w-full sm:w-1/6"
               />
-              <input
-                type="text"
-                placeholder="Jednotka"
+              <select
                 value={editedItem.unit_name ?? ingredient.unit_name ?? ""}
                 onChange={(e) => handleInputChange(ingredient.id, "unit_name", e.target.value)}
                 className="border rounded p-2 w-full sm:w-1/6"
-              />
+              >
+                <option value="">Vyber jednotku</option>
+                {["g", "ml", "ks", "lžíce", "lžička", "šálek", "hrnek"].map((unit) => (
+                  <option key={unit} value={unit}>
+                    {unit}
+                  </option>
+                ))}
+              </select>
               <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                 <button onClick={() => handleSave(ingredient.id)} className="bg-green-600 text-white px-3 py-2 rounded w-full sm:w-auto">
                   💾 Uložit

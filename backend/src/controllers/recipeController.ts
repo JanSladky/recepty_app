@@ -252,8 +252,8 @@ export const updateIngredient = async (req: Request, res: Response): Promise<voi
       name,
       Number(calories_per_gram),
       Number(category_id),
-      default_grams ? Number(default_grams) : undefined,
-      unit_name || undefined
+      default_grams === "" ? null : Number(default_grams),
+      unit_name?.trim() === "" ? null : unit_name
     );
     res.status(200).json({ message: "Surovina upravena." });
   } catch (error) {

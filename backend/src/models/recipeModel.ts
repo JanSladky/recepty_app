@@ -52,8 +52,8 @@ export async function updateIngredientInDB(
   name: string,
   calories: number,
   category_id: number,
-  default_grams?: number,
-  unit_name?: string
+  default_grams: number | null,
+  unit_name: string | null
 ): Promise<void> {
   await db.query(
     `UPDATE ingredients
