@@ -78,8 +78,8 @@ router.put("/:id", async (req: Request, res: Response) => {
       name.trim(),
       calories_per_gram,
       category_id,
-      typeof default_grams === "number" ? default_grams : undefined,
-      typeof unit_name === "string" ? unit_name.trim() : undefined
+      typeof default_grams === "number" ? default_grams : null,
+      typeof unit_name === "string" ? unit_name.trim() : null
     );
 
     res.status(200).json({ message: "✅ Surovina byla úspěšně aktualizována." });
