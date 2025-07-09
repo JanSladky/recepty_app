@@ -25,7 +25,7 @@ export default function LoginPage() {
 
       alert("✅ Přihlášení úspěšné.");
 
-      // ✅ Vynucený reload pro správný stav admina
+      // ✅ Vynucený reload pro správný stav admina.
       window.location.href = "/";
     } catch (err) {
       console.error("❌ Chyba při přihlašování:", err);
