@@ -11,7 +11,7 @@ import {
   deleteIngredientFromDB,
 } from "../models/recipeModel";
 
-// Převodní tabulka jednotek na gramy
+// Převodní tabulka jednotek na gramy.
 const UNIT_CONVERSIONS: Record<string, number> = {
   lžíce: 10,
   lžička: 5,
