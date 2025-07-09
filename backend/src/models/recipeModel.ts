@@ -18,7 +18,7 @@ export type IngredientInput = {
   display?: string;
 };
 
-// ✅ Ingredients
+// ✅ Ingredients.
 export async function getAllIngredientsFromDB(): Promise<Ingredient[]> {
   const res = await db.query(
     `SELECT i.id, i.name, i.calories_per_gram, i.category_id, c.name AS category_name,
