@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteRecipe = exports.getRecipeById = exports.getAllIngredients = exports.getRecipes = exports.updateRecipe = exports.addFullRecipe = void 0;
+exports.deleteIngredient = exports.updateIngredient = exports.createIngredient = exports.getAllIngredients = exports.deleteRecipe = exports.getRecipeById = exports.getRecipes = exports.updateRecipe = exports.addFullRecipe = void 0;
 const recipeModel_1 = require("../models/recipeModel");
-// Převodní tabulka jednotek na gramy
+// Převodní tabulka jednotek na gramy.
 const UNIT_CONVERSIONS = {
     lžíce: 10,
     lžička: 5,
@@ -22,21 +22,18 @@ function normalizeIngredientUnit(ingredient) {
     }
     const conversion = UNIT_CONVERSIONS[rawUnit];
     if (!conversion || isNaN(conversion)) {
-        // Neznámá nebo nedefinovaná jednotka – použij tak, jak je
         return {
             amount: rawAmount,
             unit: rawUnit,
             display: `${rawAmount} ${rawUnit}`,
         };
     }
-    // Známe jednotku – přepočítáme na gramy, ale zachováme původní zápis
     return {
         amount: rawAmount * conversion,
         unit: "g",
         display: `${rawAmount} ${rawUnit}`,
     };
 }
-// ✅ společná funkce pro zpracování ingrediencí
 function processIngredients(rawIngredients) {
     let parsed;
     if (typeof rawIngredients === "string") {
@@ -74,6 +71,7 @@ function processIngredients(rawIngredients) {
         };
     });
 }
+// ✅ Recepty
 const addFullRecipe = async (req, res) => {
     try {
         const { title, notes, ingredients, categories, mealType, steps, calories } = req.body;
@@ -93,10 +91,7 @@ const addFullRecipe = async (req, res) => {
     }
     catch (error) {
         console.error("❌ Chyba při ukládání receptu:", error);
-        res.status(500).json({
-            error: "Nepodařilo se uložit recept.",
-            detail: error.message,
-        });
+        res.status(500).json({ error: "Nepodařilo se uložit recept.", detail: error.message });
     }
 };
 exports.addFullRecipe = addFullRecipe;
@@ -127,10 +122,7 @@ const updateRecipe = async (req, res) => {
     }
     catch (error) {
         console.error("❌ Chyba při update receptu:", error);
-        res.status(500).json({
-            error: "Nepodařilo se upravit recept.",
-            detail: error.message,
-        });
+        res.status(500).json({ error: "Nepodařilo se upravit recept.", detail: error.message });
     }
 };
 exports.updateRecipe = updateRecipe;
@@ -145,17 +137,6 @@ const getRecipes = async (_req, res) => {
     }
 };
 exports.getRecipes = getRecipes;
-const getAllIngredients = async (_req, res) => {
-    try {
-        const ingredients = await (0, recipeModel_1.getAllIngredientsFromDB)();
-        res.status(200).json(ingredients);
-    }
-    catch (error) {
-        console.error("❌ Chyba při načítání surovin:", error);
-        res.status(500).json({ error: "Chyba serveru při načítání surovin" });
-    }
-};
-exports.getAllIngredients = getAllIngredients;
 const getRecipeById = async (req, res) => {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -192,3 +173,70 @@ const deleteRecipe = async (req, res) => {
     }
 };
 exports.deleteRecipe = deleteRecipe;
+// ✅ Ingredience
+const getAllIngredients = async (_req, res) => {
+    try {
+        const ingredients = await (0, recipeModel_1.getAllIngredientsFromDB)();
+        res.status(200).json(ingredients);
+    }
+    catch (error) {
+        console.error("❌ Chyba při načítání surovin:", error);
+        res.status(500).json({ error: "Chyba serveru při načítání surovin" });
+    }
+};
+exports.getAllIngredients = getAllIngredients;
+const createIngredient = async (req, res) => {
+    try {
+        const { name, calories_per_gram, category_id, default_grams, unit_name } = req.body;
+        if (!name || !category_id || calories_per_gram === undefined) {
+            res.status(400).json({ error: "Chybí povinné údaje pro surovinu." });
+            return;
+        }
+        const created = await (0, recipeModel_1.createIngredientInDB)(name, Number(calories_per_gram), Number(category_id), default_grams ? Number(default_grams) : undefined, unit_name || undefined);
+        res.status(201).json(created);
+    }
+    catch (error) {
+        console.error("❌ Chyba při přidávání suroviny:", error);
+        res.status(500).json({ error: "Nepodařilo se přidat surovinu." });
+    }
+};
+exports.createIngredient = createIngredient;
+const updateIngredient = async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+        res.status(400).json({ error: "Neplatné ID suroviny." });
+        return;
+    }
+    try {
+        const { name, calories_per_gram, category_id, default_grams, unit_name } = req.body;
+        if (!name || !category_id || calories_per_gram === undefined) {
+            res.status(400).json({ error: "Chybí povinné údaje pro úpravu suroviny." });
+            return;
+        }
+        const parsedDefaultGrams = default_grams === "" || default_grams === undefined ? null : Number(default_grams);
+        const parsedUnitName = unit_name === "" || unit_name === undefined ? null : unit_name;
+        await (0, recipeModel_1.updateIngredientInDB)(id, name, Number(calories_per_gram), Number(category_id), parsedDefaultGrams, parsedUnitName);
+        res.status(200).json({ message: "Surovina upravena." });
+    }
+    catch (error) {
+        console.error("❌ Chyba při úpravě suroviny:", error);
+        res.status(500).json({ error: "Nepodařilo se upravit surovinu." });
+    }
+};
+exports.updateIngredient = updateIngredient;
+const deleteIngredient = async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+        res.status(400).json({ error: "Neplatné ID suroviny." });
+        return;
+    }
+    try {
+        await (0, recipeModel_1.deleteIngredientFromDB)(id);
+        res.status(200).json({ message: "Surovina smazána." });
+    }
+    catch (error) {
+        console.error("❌ Chyba při mazání suroviny:", error);
+        res.status(500).json({ error: "Nepodařilo se smazat surovinu." });
+    }
+};
+exports.deleteIngredient = deleteIngredient;
