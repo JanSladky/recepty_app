@@ -27,7 +27,7 @@ async function getAllIngredientsFromDB() {
     return res.rows;
 }
 async function createIngredientInDB(name, calories, category_id, default_grams, unit_name) {
-    const res = await db_1.default.query(`INSERT INTO ingredients (name, calories_per_gram, category_id, default_grams, unit_name)
+    const res = await db_1.default.query(`INSERT INTO ingredients (name, calories_per_gram, category_id,clien default_grams, unit_name)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING id, name, calories_per_gram, category_id, default_grams, unit_name`, [name, calories, category_id ?? null, default_grams ?? null, unit_name ?? null]);
     const cat = await db_1.default.query("SELECT name FROM ingredient_categories WHERE id = $1", [category_id]);
@@ -88,7 +88,7 @@ async function getRecipeByIdFromDB(id) {
     if (!recipe)
         return null;
     const [ingredients, categories, mealTypes] = await Promise.all([
-        db_1.default.query(`SELECT ri.amount, ri.unit, ri.display, i.name, i.calories_per_gram
+        db_1.default.query(`SELECT ri.amount, ri.unit, ri.display, i.name, i.calories_per_gram, i.default_grams
        FROM recipe_ingredients ri
        JOIN ingredients i ON ri.ingredient_id = i.id
        WHERE ri.recipe_id = $1`, [id]),
@@ -108,17 +108,35 @@ async function getRecipeByIdFromDB(id) {
             unit: row.unit,
             calories_per_gram: row.calories_per_gram,
             display: row.display ?? undefined,
+            default_grams: row.default_grams ?? null,
         })),
         categories: categories.rows.map((r) => r.name),
         meal_types: uniqueMealTypes,
     };
 }
+function calculateTotalCalories(ingredients) {
+    return ingredients.reduce((sum, ing) => {
+        let weightInGrams = 0;
+        if (ing.unit === "g" || ing.unit === "ml") {
+            weightInGrams = ing.amount;
+        }
+        else if (ing.unit === "ks") {
+            weightInGrams = (ing.default_grams ?? 0) * ing.amount;
+        }
+        else {
+            weightInGrams = ing.amount; // fallback
+        }
+        const kcal = weightInGrams * ing.calories_per_gram;
+        return sum + kcal;
+    }, 0);
+}
 async function createFullRecipe(title, notes, imageUrl, mealTypes, ingredients, categories, steps, calories) {
     const client = await db_1.default.connect();
     try {
         await client.query("BEGIN");
+        const computedCalories = calculateTotalCalories(ingredients);
         const result = await client.query(`INSERT INTO recipes (title, notes, image_url, steps, calories)
-       VALUES ($1, $2, $3, $4::jsonb, $5) RETURNING id`, [title, notes, imageUrl, JSON.stringify(steps), calories]);
+       VALUES ($1, $2, $3, $4::jsonb, $5) RETURNING id`, [title, notes, imageUrl, JSON.stringify(steps), computedCalories]);
         const recipeId = result.rows[0].id;
         await insertRelations(client, recipeId, mealTypes, ingredients, categories);
         await client.query("COMMIT");
@@ -136,12 +154,13 @@ async function updateRecipeInDB(id, title, notes, imageUrl, mealTypes, ingredien
     const client = await db_1.default.connect();
     try {
         await client.query("BEGIN");
+        const computedCalories = calculateTotalCalories(ingredients);
         await client.query(`UPDATE recipes SET title = $1, notes = $2, image_url = $3, steps = $4::jsonb, calories = $5 WHERE id = $6`, [
             title,
             notes,
             imageUrl,
             JSON.stringify(steps),
-            calories,
+            computedCalories,
             id,
         ]);
         await client.query("DELETE FROM recipe_ingredients WHERE recipe_id = $1", [id]);
@@ -185,13 +204,6 @@ async function insertRelations(client, recipeId, mealTypes, ingredients, categor
          VALUES ($1, $2, $3, $4)
          RETURNING id`, [ing.name, ing.calories_per_gram, ing.amount || null, ing.unit || null]);
             ingredientId = insert.rows[0].id;
-        }
-        else {
-            await client.query(`UPDATE ingredients
-         SET calories_per_gram = $1,
-             default_grams = $2,
-             unit_name = $3
-         WHERE id = $4`, [ing.calories_per_gram, ing.amount || null, ing.unit || null, ingredientId]);
         }
         await client.query(`INSERT INTO recipe_ingredients (recipe_id, ingredient_id, amount, unit, display)
        VALUES ($1, $2, $3, $4, $5)`, [recipeId, ingredientId, ing.amount, ing.unit, ing.display ?? null]);
