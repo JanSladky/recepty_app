@@ -137,7 +137,7 @@ export async function getRecipeByIdFromDB(id: number) {
 
   const [ingredients, categories, mealTypes] = await Promise.all([
     db.query(
-      `SELECT ri.amount, ri.unit, ri.display, i.name, i.calories_per_gram
+      `SELECT ri.amount, ri.unit, ri.display, i.name, i.calories_per_gram, i.default_grams
        FROM recipe_ingredients ri
        JOIN ingredients i ON ri.ingredient_id = i.id
        WHERE ri.recipe_id = $1`,
@@ -165,10 +165,28 @@ export async function getRecipeByIdFromDB(id: number) {
       unit: row.unit,
       calories_per_gram: row.calories_per_gram,
       display: row.display ?? undefined,
+      default_grams: row.default_grams ?? null,
     })),
     categories: categories.rows.map((r) => r.name),
     meal_types: uniqueMealTypes,
   };
+}
+
+function calculateTotalCalories(ingredients: (IngredientInput & { default_grams?: number })[]): number {
+  return ingredients.reduce((sum, ing) => {
+    let weightInGrams = 0;
+
+    if (ing.unit === "g" || ing.unit === "ml") {
+      weightInGrams = ing.amount;
+    } else if (ing.unit === "ks") {
+      weightInGrams = (ing.default_grams ?? 0) * ing.amount;
+    } else {
+      weightInGrams = ing.amount; // fallback
+    }
+
+    const kcal = weightInGrams * ing.calories_per_gram;
+    return sum + kcal;
+  }, 0);
 }
 
 export async function createFullRecipe(
@@ -184,10 +202,11 @@ export async function createFullRecipe(
   const client = await db.connect();
   try {
     await client.query("BEGIN");
+    const computedCalories = calculateTotalCalories(ingredients);
     const result = await client.query(
       `INSERT INTO recipes (title, notes, image_url, steps, calories)
        VALUES ($1, $2, $3, $4::jsonb, $5) RETURNING id`,
-      [title, notes, imageUrl, JSON.stringify(steps), calories]
+      [title, notes, imageUrl, JSON.stringify(steps), computedCalories]
     );
     const recipeId = result.rows[0].id;
     await insertRelations(client, recipeId, mealTypes, ingredients, categories);
@@ -215,12 +234,13 @@ export async function updateRecipeInDB(
   const client = await db.connect();
   try {
     await client.query("BEGIN");
+    const computedCalories = calculateTotalCalories(ingredients);
     await client.query(`UPDATE recipes SET title = $1, notes = $2, image_url = $3, steps = $4::jsonb, calories = $5 WHERE id = $6`, [
       title,
       notes,
       imageUrl,
       JSON.stringify(steps),
-      calories,
+      computedCalories,
       id,
     ]);
     await client.query("DELETE FROM recipe_ingredients WHERE recipe_id = $1", [id]);

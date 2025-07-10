@@ -13,6 +13,7 @@ interface Ingredient {
   unit: string;
   calories_per_gram: number | string;
   display?: string | null;
+  default_grams?: number;
 }
 
 interface Recipe {
@@ -101,14 +102,24 @@ export default function DetailPage() {
           <h3 className="font-semibold mt-6">Ingredience</h3>
           <ul className="list-disc list-inside mt-2 mb-6">
             {recipe.ingredients.map((ing, i) => {
-              const kcal = Math.round(Number(ing.amount) * Number(ing.calories_per_gram));
-              const amountInGrams = Math.round(Number(ing.amount));
+              const unit = ing.unit ?? "g";
+              const amount = Number(ing.amount) || 0;
+              const caloriesPerGram = Number(ing.calories_per_gram) || 0;
 
-              const unitDisplay = typeof ing.display === "string" && ing.display.trim() !== "" ? ing.display.trim() : `${amountInGrams} g`;
+              let grams = amount;
+              let note = "";
+
+              if (unit !== "g" && ing.default_grams) {
+                grams = amount * ing.default_grams;
+                note = ` (${amount} ${unit} = ${grams} g)`;
+              }
+
+              const kcal = Math.round(grams * caloriesPerGram);
+              const displayAmount = `${amount} ${unit}`;
 
               return (
                 <li key={i}>
-                  {ing.name} – {unitDisplay} ({amountInGrams} g, {kcal} kcal)
+                  {ing.name} – {displayAmount} = {Math.round(grams)} g, {kcal} kcal{note}
                 </li>
               );
             })}

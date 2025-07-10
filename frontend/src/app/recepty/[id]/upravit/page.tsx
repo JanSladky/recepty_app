@@ -26,18 +26,19 @@ export default function EditPage() {
     const fetchRecipe = async () => {
       try {
         const res = await fetch(`${API_URL}/api/recipes/${id}`);
-        if (!res.ok) {
-          throw new Error("Chyba při načítání receptu");
-        }
+        if (!res.ok) throw new Error("Chyba při načítání receptu");
         const data = await res.json();
+
         console.log("Loaded recipe:", data);
+
         setInitialData({
           title: data.title,
           notes: data.notes,
           image_url: data.image_url,
           ingredients: data.ingredients.map((i: Ingredient) => ({
             ...i,
-            unit: "g",
+            unit: i.unit,
+            default_grams: i.default_grams,
           })),
           categories: data.categories,
           meal_types: data.meal_types ?? [],
@@ -56,30 +57,32 @@ export default function EditPage() {
   }, [id]);
 
   const handleSubmit = async (formData: FormData) => {
-    // 🔍 Debug výpis
-    console.log("🧪 Odesílám data:");
-    for (const [key, value] of formData.entries()) {
-      console.log(`${key}:`, value);
-    }
+    const userEmail = localStorage.getItem("userEmail");
 
     try {
       const res = await fetch(`${API_URL}/api/recipes/${id}`, {
         method: "PUT",
-        headers: {
-          "x-user-email": localStorage.getItem("userEmail") || "",
-        },
+        headers: userEmail ? { "x-user-email": userEmail } : undefined,
         body: formData,
       });
 
+      // DEBUG – výpis stavu a hlaviček
+      console.log("Status:", res.status);
+      console.log("Headers:", Array.from(res.headers.entries()));
+
+      const responseText = await res.text();
+      console.log("Response Text:", responseText);
+
       if (!res.ok) {
         let errorMessage = "Neznámá chyba";
+
         try {
           const contentType = res.headers.get("Content-Type") || "";
           if (contentType.includes("application/json")) {
-            const errorJson = await res.json();
+            const errorJson = JSON.parse(responseText);
             errorMessage = errorJson?.error || errorJson?.message || JSON.stringify(errorJson);
           } else {
-            errorMessage = await res.text();
+            errorMessage = responseText;
           }
         } catch (parseErr) {
           console.error("❌ Chyba při parsování odpovědi:", parseErr);

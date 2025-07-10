@@ -5,10 +5,10 @@ import React, { forwardRef, useImperativeHandle, useState, useEffect } from "rea
 export type Ingredient = {
   name: string;
   amount: number;
-  unit_name?: string;
+  unit: Unit;
+  default_grams?: number;
   calories_per_gram: number;
 };
-
 export type IngredientAutocompleteHandle = {
   getIngredients: () => Ingredient[];
   setInitialIngredients: (ingredients: Ingredient[]) => void;
@@ -37,11 +37,12 @@ type Category = {
   name: string;
 };
 
-const units = ["g", "ml", "ks", "lžíce", "lžička", "šálek", "hrnek"];
+const units = ["g", "ml", "ks", "lžíce", "lžička", "šálek", "hrnek"] as const;
+type Unit = typeof units[number];
 
 const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, IngredientAutocompleteProps>(({ initialIngredients = [] }, ref) => {
   const [ingredients, setIngredients] = useState<Ingredient[]>(
-    initialIngredients.length > 0 ? initialIngredients : [{ name: "", amount: 0, unit_name: "g", calories_per_gram: 0 }]
+    initialIngredients.length > 0 ? initialIngredients : [{ name: "", amount: 0, unit: "g", calories_per_gram: 0 }]
   );
   const [allSuggestions, setAllSuggestions] = useState<Suggestion[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -57,7 +58,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
   useImperativeHandle(ref, () => ({
     getIngredients: () => ingredients,
     setInitialIngredients: (initial) => {
-      setIngredients(initial.length > 0 ? initial : [{ name: "", amount: 0, unit_name: "g", calories_per_gram: 0 }]);
+      setIngredients(initial.length > 0 ? initial : [{ name: "", amount: 0, unit: "g", calories_per_gram: 0 }]);
     },
   }));
 
@@ -77,17 +78,29 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
 
   const handleInputChange = (index: number, field: keyof Ingredient, value: string) => {
     const updated = [...ingredients];
-    if (field === "amount" || field === "calories_per_gram") {
-      updated[index][field] = parseFloat(value) || 0;
-    } else {
-      updated[index][field] = value;
-    }
 
-    if (field === "name") {
+    if (field === "amount" || field === "calories_per_gram") {
+      updated[index] = {
+        ...updated[index],
+        [field]: parseFloat(value) || 0,
+      };
+    } else if (field === "unit") {
+      updated[index] = {
+        ...updated[index],
+        unit: value as Unit,
+      };
+    } else if (field === "name") {
+      updated[index] = {
+        ...updated[index],
+        name: value,
+      };
+
       const found = allSuggestions.find((s) => s.name.toLowerCase() === value.toLowerCase());
       if (found) {
         updated[index].calories_per_gram = found.calories_per_gram;
-        if (found.unit_name) updated[index].unit_name = found.unit_name;
+        if (found.unit_name) {
+          updated[index].unit = found.unit_name as Unit;
+        }
       }
     }
 
@@ -98,13 +111,13 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
     const updated = [...ingredients];
     updated[index].name = suggestion.name;
     updated[index].calories_per_gram = suggestion.calories_per_gram;
-    updated[index].unit_name = suggestion.unit_name || "g";
+    updated[index].unit = (suggestion.unit_name as Unit) || "g";
     setIngredients(updated);
     setFocusedInputIndex(null);
   };
 
   const addIngredient = () => {
-    setIngredients([...ingredients, { name: "", amount: 0, unit_name: "g", calories_per_gram: 0 }]);
+    setIngredients([...ingredients, { name: "", amount: 0, unit: "g", calories_per_gram: 0 }]);
   };
 
   const removeIngredient = (index: number) => {
@@ -146,7 +159,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
         {
           name: createdIngredient.name,
           amount: 0,
-          unit_name: createdIngredient.unit_name || "g",
+          unit: createdIngredient.unit_name || "g", // zůstane takto
           calories_per_gram: createdIngredient.calories_per_gram,
         },
       ]);
@@ -203,11 +216,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
               required
             />
 
-            <select
-              value={ingredient.unit_name || "g"}
-              onChange={(e) => handleInputChange(index, "unit_name", e.target.value)}
-              className="border p-2 rounded w-full"
-            >
+            <select value={ingredient.unit || "g"} onChange={(e) => handleInputChange(index, "unit", e.target.value)} className="border p-2 rounded w-full">
               {units.map((unit) => (
                 <option key={unit} value={unit}>
                   {unit}

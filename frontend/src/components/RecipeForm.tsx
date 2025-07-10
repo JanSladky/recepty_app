@@ -72,7 +72,19 @@ export default function RecipeForm({
     const interval = setInterval(() => {
       try {
         const ingredients = ingredientRef.current?.getIngredients() || [];
-        const total = ingredients.reduce((sum, ing) => sum + ing.amount * ing.calories_per_gram, 0);
+        const total = ingredients.reduce((sum, ing) => {
+          const unit = ing.unit ?? "g";
+          const amount = Number(ing.amount) || 0;
+          const caloriesPerGram = Number(ing.calories_per_gram) || 0;
+          const defaultGrams = Number(ing.default_grams) || 0;
+
+          let grams = amount;
+          if (unit !== "g") {
+            grams = defaultGrams ? amount * defaultGrams : 0;
+          }
+
+          return sum + grams * caloriesPerGram;
+        }, 0);
         setCalories(Math.round(total));
       } catch (err) {
         console.error("Chyba při výpočtu kalorií:", err);
