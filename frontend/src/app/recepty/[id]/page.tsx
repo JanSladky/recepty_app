@@ -87,14 +87,31 @@ export default function DetailPage() {
   if (loading) return <p>Načítání...</p>;
   if (errorMsg) return <p className="text-red-600">{errorMsg}</p>;
   if (!recipe) return <p>Recept nenalezen.</p>;
+  const totalCalories =
+    recipe.ingredients?.reduce((sum, ing) => {
+      const unit = ing.unit ?? "g";
+      const amount = Number(ing.amount) || 0;
+      const caloriesPerGram = Number(ing.calories_per_gram) || 0;
 
+      let grams = amount;
+
+      if (unit !== "g" && ing.default_grams) {
+        grams = amount * ing.default_grams;
+      }
+
+      return sum + Math.round(grams * caloriesPerGram);
+    }, 0) || 0;
+
+  console.log("Kontrola recipe.calories:", recipe.calories, typeof recipe.calories);
   const imageUrl = recipe.image_url?.startsWith("http") ? recipe.image_url : recipe.image_url ? `${API_URL}${recipe.image_url}` : "/placeholder.jpg";
 
   return (
     <div className="max-w-3xl mx-auto p-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        <h1 className="text-3xl font-bold">{recipe.title}</h1>
-        {typeof recipe.calories === "number" && <div className="text-sm bg-yellow-100 text-gray-700 px-3 py-1 rounded">{recipe.calories} kcal celkem</div>}
+        <h1 className="text-3xl font-bold flex flex-wrap items-center gap-2">
+          {recipe.title}
+          {totalCalories > 0 && <span className="ml-3 text-xl bg-yellow-100 text-gray-800 px-2 py-1 rounded">{totalCalories} kcal celkem</span>}
+        </h1>
       </div>
 
       {!!recipe.ingredients?.length && (
@@ -118,8 +135,12 @@ export default function DetailPage() {
               const displayAmount = `${amount} ${unit}`;
 
               return (
-                <li key={i}>
-                  {ing.name} – {displayAmount} = {Math.round(grams)} g, {kcal} kcal{note}
+                <li key={i} className="flex items-center mb-1">
+                  <span>
+                    {ing.name} – {amount} {unit}
+                    {unit !== "g" && ing.default_grams ? ` (${Math.round(grams)} g)` : ""} /
+                  </span>
+                  <span className="ml-2 bg-yellow-100 text-gray-800 text-sm px-2 py-1 rounded">{kcal} kcal</span>
                 </li>
               );
             })}
