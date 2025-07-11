@@ -124,15 +124,8 @@ export default function DetailPage() {
               const caloriesPerGram = Number(ing.calories_per_gram) || 0;
 
               let grams = amount;
-              let note = "";
-
-              if (unit !== "g" && ing.default_grams) {
-                grams = amount * ing.default_grams;
-                note = ` (${amount} ${unit} = ${grams} g)`;
-              }
 
               const kcal = Math.round(grams * caloriesPerGram);
-              const displayAmount = `${amount} ${unit}`;
 
               return (
                 <li key={i} className="flex items-center mb-1">
