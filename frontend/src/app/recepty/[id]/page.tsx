@@ -93,7 +93,7 @@ export default function DetailPage() {
       const amount = Number(ing.amount) || 0;
       const caloriesPerGram = Number(ing.calories_per_gram) || 0;
 
-      const grams = unit !== "g" && ing.default_grams ? amount * ing.default_grams : amount;
+      const grams = unit === "ks" && ing.default_grams ? amount * ing.default_grams : amount;
 
       return sum + Math.round(grams * caloriesPerGram);
     }, 0) || 0;
@@ -119,15 +119,14 @@ export default function DetailPage() {
               const amount = Number(ing.amount) || 0;
               const caloriesPerGram = Number(ing.calories_per_gram) || 0;
 
-              const grams = amount;
-
+              const grams = unit === "ks" && ing.default_grams ? amount * ing.default_grams : amount;
               const kcal = Math.round(grams * caloriesPerGram);
 
               return (
                 <li key={i} className="flex items-center mb-1">
                   <span>
                     {ing.name} – {amount} {unit}
-                    {unit !== "g" && ing.default_grams ? ` (${Math.round(grams)} g)` : ""} /
+                    {unit === "ks" && ing.default_grams ? ` (${Math.round(grams)} g)` : ""} /
                   </span>
                   <span className="ml-2 bg-yellow-100 text-gray-800 text-sm px-2 py-1 rounded">{kcal} kcal</span>
                 </li>
