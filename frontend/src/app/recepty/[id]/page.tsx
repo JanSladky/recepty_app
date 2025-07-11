@@ -93,11 +93,7 @@ export default function DetailPage() {
       const amount = Number(ing.amount) || 0;
       const caloriesPerGram = Number(ing.calories_per_gram) || 0;
 
-      let grams = amount;
-
-      if (unit !== "g" && ing.default_grams) {
-        grams = amount * ing.default_grams;
-      }
+      const grams = unit !== "g" && ing.default_grams ? amount * ing.default_grams : amount;
 
       return sum + Math.round(grams * caloriesPerGram);
     }, 0) || 0;
@@ -123,7 +119,7 @@ export default function DetailPage() {
               const amount = Number(ing.amount) || 0;
               const caloriesPerGram = Number(ing.calories_per_gram) || 0;
 
-              let grams = amount;
+              const grams = amount;
 
               const kcal = Math.round(grams * caloriesPerGram);
 
