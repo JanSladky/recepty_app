@@ -17,6 +17,7 @@ type Recipe = {
   meal_types?: string[];
 };
 
+// Pomocná funkce pro normalizaci textu (odstranění diakritiky a malá písmena)
 const normalizeText = (text: string): string =>
   text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
@@ -46,29 +47,32 @@ export default function HomePage() {
     fetchRecipes();
   }, []);
 
+  // --- FINÁLNÍ OPRAVENÁ LOGIKA FILTROVÁNÍ ---
   useEffect(() => {
     const filtered = recipes.filter((recipe) => {
+      // 1. Filtr podle textového vyhledávání v názvu
       const matchesQuery = normalizeText(recipe.title).includes(normalizeText(query));
 
+      // 2. Filtr podle druhu jídla (Oběd, Večeře...)
+      // Recept musí obsahovat ALESPOŇ JEDEN vybraný druh jídla.
+      // Používáme normalizaci pro robustní porovnání.
       const matchesMealType =
         selectedMealTypes.length === 0 ||
         selectedMealTypes.some((selected) =>
           (recipe.meal_types || []).some((type) => normalizeText(type) === normalizeText(selected))
         );
 
+      // 3. Sjednocený filtr pro kategorie (Typ jídla + Typ kuchyně)
+      // Recept musí obsahovat ALESPOŇ JEDNU vybranou kategorii.
+      // Používáme normalizaci pro robustní porovnání.
+      const allSelectedCategories = [...selectedCategories, ...selectedCuisine];
       const matchesCategory =
-        selectedCategories.length === 0 ||
-        selectedCategories.some((selected) =>
+        allSelectedCategories.length === 0 ||
+        allSelectedCategories.some((selected) =>
           recipe.categories.some((cat) => normalizeText(cat) === normalizeText(selected))
         );
 
-      const matchesCuisine =
-        selectedCuisine.length === 0 ||
-        selectedCuisine.some((selected) =>
-          recipe.categories.some((cat) => normalizeText(cat) === normalizeText(selected))
-        );
-
-      return matchesQuery && matchesMealType && matchesCategory && matchesCuisine;
+      return matchesQuery && matchesMealType && matchesCategory;
     });
 
     setFilteredRecipes(filtered);

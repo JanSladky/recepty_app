@@ -60,11 +60,10 @@ export default function RecipeForm({
   };
 
   const toggleMealType = (type: string) => {
-    const normalized = (s: string) => s.toLowerCase();
     setMealTypes((prev) =>
-      prev.map(normalized).includes(normalized(type))
-        ? prev.filter((t) => normalized(t) !== normalized(type))
-        : [...prev.filter((t, i, arr) => arr.indexOf(t) === i), type]
+      prev.includes(type)
+        ? prev.filter((t) => t !== type)
+        : [...prev, type]
     );
   };
 
@@ -79,7 +78,8 @@ export default function RecipeForm({
           const defaultGrams = Number(ing.default_grams) || 0;
 
           let grams = amount;
-          if (unit !== "g") {
+          if (unit !== "g" && unit !== "ml") {
+             // Jednoduchý fallback, ideálně by zde byla konverzní logika
             grams = defaultGrams ? amount * defaultGrams : 0;
           }
 
@@ -87,7 +87,7 @@ export default function RecipeForm({
         }, 0);
         setCalories(Math.round(total));
       } catch (err) {
-        console.error("Chyba při výpočtu kalorií:", err);
+        // Tichá chyba, aby neotravovala uživatele
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -118,7 +118,11 @@ export default function RecipeForm({
     }
     formData.append("ingredients", JSON.stringify(ingredients));
     formData.append("categories", JSON.stringify(categories));
-    formData.append("mealType", JSON.stringify(mealTypes));
+    
+    // --- ZDE JE KLÍČOVÁ OPRAVA ---
+    // Přejmenováno z "mealType" na "mealTypes", aby to odpovídalo backendu
+    formData.append("mealTypes", JSON.stringify(mealTypes)); 
+    
     formData.append("steps", JSON.stringify(steps));
     if (Number.isFinite(calories)) {
       formData.append("calories", calories.toString());

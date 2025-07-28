@@ -105,11 +105,33 @@ function calculateTotalCalories(ingredients: (IngredientInput & { default_grams?
   }, 0);
 }
 
+// FINÁLNÍ OPRAVENÁ VERZE TÉTO FUNKCE
 export async function getAllRecipes(): Promise<any[]> {
-    const res = await db.query("SELECT id, title, notes, image_url, steps FROM recipes");
-    // Poznámka: Tento seznam neukazuje dynamicky spočítané kalorie pro úsporu výkonu.
-    // Ty se počítají až v detailu receptu.
-    return res.rows;
+  const res = await db.query("SELECT id, title, notes, image_url, steps FROM recipes ORDER BY title ASC");
+  const recipes = res.rows;
+
+  // Pro každý recept donačteme jeho kategorie a druhy jídla, aby je filtr mohl najít
+  for (const recipe of recipes) {
+    const [mealRes, catRes] = await Promise.all([
+        db.query(
+            `SELECT m.name FROM recipe_meal_types rmt 
+             JOIN meal_types m ON rmt.meal_type_id = m.id 
+             WHERE rmt.recipe_id = $1`,
+            [recipe.id]
+        ),
+        db.query(
+            `SELECT c.name FROM recipe_categories rc 
+             JOIN categories c ON rc.category_id = c.id 
+             WHERE rc.recipe_id = $1`,
+            [recipe.id]
+        )
+    ]);
+
+    recipe.meal_types = mealRes.rows.map((r: {name: string}) => r.name);
+    recipe.categories = catRes.rows.map((r: {name: string}) => r.name);
+  }
+
+  return recipes;
 }
 
 export async function getRecipeByIdFromDB(id: number) {

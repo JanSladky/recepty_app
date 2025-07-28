@@ -59,14 +59,16 @@ export const getRecipeById = async (req: Request, res: Response): Promise<void> 
 
 export const addRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, notes, ingredients, categories, mealType, steps } = req.body;
-    if (!title || !ingredients || !categories || !mealType || !steps) {
+    // OPRAVA: Očekáváme 'mealTypes' (množné číslo) z formuláře
+    const { title, notes, ingredients, categories, mealTypes, steps } = req.body;
+    if (!title || !ingredients || !categories || !mealTypes || !steps) {
       res.status(400).json({ error: "Chybí povinná pole." });
       return;
     }
     const parsedIngredients = processIngredients(ingredients);
     const parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
-    const parsedMealTypes = typeof mealType === 'string' ? JSON.parse(mealType) : mealType;
+    // OPRAVA: Používáme proměnnou 'mealTypes'
+    const parsedMealTypes = typeof mealTypes === 'string' ? JSON.parse(mealTypes) : mealTypes;
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
     const fileMeta = req.file as { secure_url?: string; path?: string };
     const imagePath = fileMeta?.secure_url || fileMeta?.path || "";
@@ -84,14 +86,16 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     return;
   }
   try {
-    const { title, notes, ingredients, categories, mealType, steps, existingImageUrl } = req.body;
-    if (!title || !ingredients || !categories || !mealType || !steps) {
+    // OPRAVA: Očekáváme 'mealTypes' (množné číslo) z formuláře
+    const { title, notes, ingredients, categories, mealTypes, steps, existingImageUrl } = req.body;
+    if (!title || !ingredients || !categories || !mealTypes || !steps) {
       res.status(400).json({ error: "Chybí povinná pole." });
       return;
     }
     const parsedIngredients = processIngredients(ingredients);
     const parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
-    const parsedMealTypes = typeof mealType === 'string' ? JSON.parse(mealType) : mealType;
+    // OPRAVA: Používáme proměnnou 'mealTypes'
+    const parsedMealTypes = typeof mealTypes === 'string' ? JSON.parse(mealTypes) : mealTypes;
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
     const fileMeta = req.file as { secure_url?: string; path?: string } | undefined;
     let finalImageUrl = fileMeta?.secure_url || fileMeta?.path || existingImageUrl || null;
