@@ -9,154 +9,32 @@ import {
   createIngredientInDB,
   updateIngredientInDB,
   deleteIngredientFromDB,
+  getAllIngredientCategories,
+  createIngredientCategory,
+  updateIngredientCategory,
+  deleteIngredientCategory
 } from "../models/recipeModel";
 
-// Převodní tabulka jednotek na gramy.
-const UNIT_CONVERSIONS: Record<string, number> = {
-  lžíce: 10,
-  lžička: 5,
-  šálek: 240,
-  hrnek: 240,
-  ks: 50,
-};
-
-function normalizeIngredientUnit(ingredient: any): { amount: number; unit: string; display: string } {
-  const rawAmount = Number(ingredient.amount);
-  const rawUnit = (ingredient.unit || "").toString().trim().toLowerCase();
-
-  if (!rawUnit || rawUnit === "g") {
-    return {
-      amount: rawAmount,
-      unit: "g",
-      display: `${rawAmount} g`,
-    };
-  }
-
-  const conversion = UNIT_CONVERSIONS[rawUnit];
-  if (!conversion || isNaN(conversion)) {
-    return {
-      amount: rawAmount,
-      unit: rawUnit,
-      display: `${rawAmount} ${rawUnit}`,
-    };
-  }
-
-  return {
-    amount: rawAmount * conversion,
-    unit: "g",
-    display: `${rawAmount} ${rawUnit}`,
-  };
-}
-
+// --- Pomocné funkce ---
 function processIngredients(rawIngredients: any): any[] {
-  let parsed: any[];
-
   if (typeof rawIngredients === "string") {
     try {
-      parsed = JSON.parse(rawIngredients);
+      return JSON.parse(rawIngredients);
     } catch {
       throw new Error("Chybný formát ingrediencí (nevalidní JSON)");
     }
   } else if (Array.isArray(rawIngredients)) {
-    parsed = rawIngredients;
-  } else {
-    throw new Error("Ingredience nejsou ve správném formátu");
+    return rawIngredients;
   }
-
-  return parsed.map((ing: any) => {
-    const { amount, unit, calories_per_gram, name } = ing;
-
-    if (typeof ing.display === "string" && ing.display.trim() !== "") {
-      return {
-        name,
-        amount: Number(amount),
-        unit,
-        calories_per_gram: Number(calories_per_gram),
-        display: ing.display.trim(),
-      };
-    }
-
-    const norm = normalizeIngredientUnit(ing);
-    return {
-      name,
-      amount: norm.amount,
-      unit: norm.unit,
-      calories_per_gram: Number(calories_per_gram),
-      display: norm.display,
-    };
-  });
+  throw new Error("Ingredience nejsou ve správném formátu");
 }
 
-// ✅ Recepty
-export const addFullRecipe = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { title, notes, ingredients, categories, mealType, steps, calories } = req.body;
-
-    if (!title || !ingredients || !categories || !mealType || !steps) {
-      res.status(400).json({ error: "Chybí povinná pole." });
-      return;
-    }
-
-    const parsedIngredients = processIngredients(ingredients);
-    const parsedCategories = JSON.parse(categories);
-    const parsedMealTypes = JSON.parse(mealType);
-    const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
-    const parsedCalories = calories ? Number(calories) : null;
-
-    const fileMeta = req.file as { secure_url?: string; path?: string };
-    const imagePath = fileMeta?.secure_url || fileMeta?.path || "";
-
-    const recipeId = await createFullRecipe(title, notes, imagePath, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps, parsedCalories);
-
-    res.status(201).json({ message: "Recept uložen", id: recipeId });
-  } catch (error) {
-    console.error("❌ Chyba při ukládání receptu:", error);
-    res.status(500).json({ error: "Nepodařilo se uložit recept.", detail: (error as Error).message });
-  }
-};
-
-export const updateRecipe = async (req: Request, res: Response): Promise<void> => {
-  const id = Number(req.params.id);
-  if (isNaN(id)) {
-    res.status(400).json({ error: "Neplatné ID receptu." });
-    return;
-  }
-
-  try {
-    const { title, notes, ingredients, categories, mealType, steps, calories, existingImageUrl } = req.body;
-
-    if (!title || !ingredients || !categories || !mealType || !steps) {
-      res.status(400).json({ error: "Chybí povinná pole." });
-      return;
-    }
-
-    const parsedIngredients = processIngredients(ingredients);
-    const parsedCategories = JSON.parse(categories);
-    const parsedMealTypes = JSON.parse(mealType);
-    const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
-    const parsedCalories = calories ? Number(calories) : null;
-
-    const fileMeta = req.file as { secure_url?: string; path?: string } | undefined;
-    let finalImageUrl = fileMeta?.secure_url || fileMeta?.path || existingImageUrl || null;
-    if (typeof finalImageUrl === "string" && (!finalImageUrl.trim() || finalImageUrl === "null")) {
-      finalImageUrl = null;
-    }
-
-    await updateRecipeInDB(id, title, notes, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps, parsedCalories);
-
-    res.status(200).json({ message: "Recept úspěšně upraven." });
-  } catch (error) {
-    console.error("❌ Chyba při update receptu:", error);
-    res.status(500).json({ error: "Nepodařilo se upravit recept.", detail: (error as Error).message });
-  }
-};
-
+// --- CONTROLLERY PRO RECEPTY ---
 export const getRecipes = async (_req: Request, res: Response): Promise<void> => {
   try {
     const recipes = await getAllRecipes();
     res.status(200).json(recipes);
   } catch (error) {
-    console.error("❌ Chyba při načítání receptů:", error);
     res.status(500).json({ error: "Chyba při načítání receptů" });
   }
 };
@@ -167,67 +45,103 @@ export const getRecipeById = async (req: Request, res: Response): Promise<void> 
     res.status(400).json({ error: "Neplatné ID receptu." });
     return;
   }
-
   try {
     const recipe = await getRecipeByIdFromDB(id);
     if (!recipe) {
       res.status(404).json({ error: "Recept nenalezen." });
       return;
     }
-
     res.status(200).json(recipe);
   } catch (error) {
-    console.error("❌ Chyba při načítání detailu receptu:", error);
     res.status(500).json({ error: "Chyba serveru při načítání receptu." });
   }
 };
 
-export const deleteRecipe = async (req: Request, res: Response): Promise<void> => {
+export const addRecipe = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { title, notes, ingredients, categories, mealType, steps } = req.body;
+    if (!title || !ingredients || !categories || !mealType || !steps) {
+      res.status(400).json({ error: "Chybí povinná pole." });
+      return;
+    }
+    const parsedIngredients = processIngredients(ingredients);
+    const parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
+    const parsedMealTypes = typeof mealType === 'string' ? JSON.parse(mealType) : mealType;
+    const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
+    const fileMeta = req.file as { secure_url?: string; path?: string };
+    const imagePath = fileMeta?.secure_url || fileMeta?.path || "";
+    const recipeId = await createFullRecipe(title, notes, imagePath, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
+    res.status(201).json({ message: "Recept uložen", id: recipeId });
+  } catch (error) {
+    res.status(500).json({ error: "Nepodařilo se uložit recept.", detail: (error as Error).message });
+  }
+};
+
+export const updateRecipe = async (req: Request, res: Response): Promise<void> => {
   const id = Number(req.params.id);
   if (isNaN(id)) {
     res.status(400).json({ error: "Neplatné ID receptu." });
     return;
   }
-
   try {
-    await deleteRecipeFromDB(id);
-    res.status(200).json({ message: "Recept smazán." });
+    const { title, notes, ingredients, categories, mealType, steps, existingImageUrl } = req.body;
+    if (!title || !ingredients || !categories || !mealType || !steps) {
+      res.status(400).json({ error: "Chybí povinná pole." });
+      return;
+    }
+    const parsedIngredients = processIngredients(ingredients);
+    const parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
+    const parsedMealTypes = typeof mealType === 'string' ? JSON.parse(mealType) : mealType;
+    const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
+    const fileMeta = req.file as { secure_url?: string; path?: string } | undefined;
+    let finalImageUrl = fileMeta?.secure_url || fileMeta?.path || existingImageUrl || null;
+    await updateRecipeInDB(id, title, notes, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
+    res.status(200).json({ message: "Recept úspěšně upraven." });
   } catch (error) {
-    console.error("❌ Chyba při mazání receptu:", error);
-    res.status(500).json({ error: "Nepodařilo se smazat recept." });
+    res.status(500).json({ error: "Nepodařilo se upravit recept.", detail: (error as Error).message });
   }
 };
 
-// ✅ Ingredience
+export const deleteRecipe = async (req: Request, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+        res.status(400).json({ error: "Neplatné ID." });
+        return;
+    }
+    try {
+        await deleteRecipeFromDB(id);
+        res.status(200).json({ message: "Recept smazán." });
+    } catch (error) {
+        res.status(500).json({ error: "Nepodařilo se smazat recept." });
+    }
+};
+
+// --- CONTROLLERY PRO SUROVINY ---
 export const getAllIngredients = async (_req: Request, res: Response): Promise<void> => {
   try {
     const ingredients = await getAllIngredientsFromDB();
     res.status(200).json(ingredients);
   } catch (error) {
-    console.error("❌ Chyba při načítání surovin:", error);
     res.status(500).json({ error: "Chyba serveru při načítání surovin" });
   }
 };
 
 export const createIngredient = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, calories_per_gram, category_id, default_grams, unit_name } = req.body;
-
-    if (!name || !category_id || calories_per_gram === undefined) {
-      res.status(400).json({ error: "Chybí povinné údaje pro surovinu." });
+    const { name, category_id, calories_per_gram, default_grams, unit_name } = req.body;
+    if (!name || category_id === undefined || calories_per_gram === undefined) {
+      res.status(400).json({ error: "Chybí povinné údaje." });
       return;
     }
-
-    const created = await createIngredientInDB(
-      name,
+    const newIngredient = await createIngredientInDB(
+      name.trim(),
       Number(calories_per_gram),
       Number(category_id),
       default_grams ? Number(default_grams) : undefined,
       unit_name || undefined
     );
-    res.status(201).json(created);
+    res.status(201).json(newIngredient);
   } catch (error) {
-    console.error("❌ Chyba při přidávání suroviny:", error);
     res.status(500).json({ error: "Nepodařilo se přidat surovinu." });
   }
 };
@@ -238,39 +152,95 @@ export const updateIngredient = async (req: Request, res: Response): Promise<voi
     res.status(400).json({ error: "Neplatné ID suroviny." });
     return;
   }
-
   try {
-    const { name, calories_per_gram, category_id, default_grams, unit_name } = req.body;
-
-    if (!name || !category_id || calories_per_gram === undefined) {
-      res.status(400).json({ error: "Chybí povinné údaje pro úpravu suroviny." });
+    const { name, category_id, calories_per_gram, default_grams, unit_name } = req.body;
+    if (name === undefined || category_id === undefined || calories_per_gram === undefined) {
+      res.status(400).json({ error: "Chybí povinné údaje." });
       return;
     }
-
-    const parsedDefaultGrams = default_grams === "" || default_grams === undefined ? null : Number(default_grams);
-
-    const parsedUnitName = unit_name === "" || unit_name === undefined ? null : unit_name;
-
-    await updateIngredientInDB(id, name, Number(calories_per_gram), Number(category_id), parsedDefaultGrams, parsedUnitName);
-    res.status(200).json({ message: "Surovina upravena." });
+    const parsedDefaultGrams = (default_grams === "" || default_grams === undefined) ? null : Number(default_grams);
+    const parsedUnitName = (unit_name === "" || unit_name === undefined) ? null : unit_name;
+    await updateIngredientInDB(
+      id,
+      name.trim(),
+      Number(calories_per_gram),
+      Number(category_id),
+      parsedDefaultGrams,
+      parsedUnitName
+    );
+    res.status(200).json({ message: "Surovina byla úspěšně aktualizována." });
   } catch (error) {
-    console.error("❌ Chyba při úpravě suroviny:", error);
     res.status(500).json({ error: "Nepodařilo se upravit surovinu." });
   }
 };
 
 export const deleteIngredient = async (req: Request, res: Response): Promise<void> => {
-  const id = Number(req.params.id);
-  if (isNaN(id)) {
-    res.status(400).json({ error: "Neplatné ID suroviny." });
-    return;
-  }
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+        res.status(400).json({ error: "Neplatné ID." });
+        return;
+    }
+    try {
+        await deleteIngredientFromDB(id);
+        res.status(200).json({ message: "Surovina smazána." });
+    } catch (error) {
+        res.status(500).json({ error: "Nepodařilo se smazat surovinu." });
+    }
+};
 
-  try {
-    await deleteIngredientFromDB(id);
-    res.status(200).json({ message: "Surovina smazána." });
-  } catch (error) {
-    console.error("❌ Chyba při mazání suroviny:", error);
-    res.status(500).json({ error: "Nepodařilo se smazat surovinu." });
-  }
+// --- CONTROLLERY PRO KATEGORIE ---
+export const getAllCategories = async (_req: Request, res: Response): Promise<void> => {
+    try {
+        const categories = await getAllIngredientCategories();
+        res.status(200).json(categories);
+    } catch (error) {
+        res.status(500).json({ error: "Chyba při načítání kategorií." });
+    }
+};
+
+export const createCategory = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { name } = req.body;
+        if (!name || typeof name !== 'string') {
+            res.status(400).json({ error: "Název kategorie je povinný." });
+            return;
+        }
+        const newCategory = await createIngredientCategory(name);
+        res.status(201).json(newCategory);
+    } catch (error) {
+        res.status(500).json({ error: "Nepodařilo se vytvořit kategorii." });
+    }
+};
+
+export const updateCategory = async (req: Request, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+        res.status(400).json({ error: "Neplatné ID." });
+        return;
+    }
+    try {
+        const { name } = req.body;
+        if (!name || typeof name !== 'string') {
+            res.status(400).json({ error: "Název kategorie je povinný." });
+            return;
+        }
+        await updateIngredientCategory(id, name);
+        res.status(200).json({ message: "Kategorie upravena." });
+    } catch (error) {
+        res.status(500).json({ error: "Nepodařilo se upravit kategorii." });
+    }
+};
+
+export const deleteCategory = async (req: Request, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+        res.status(400).json({ error: "Neplatné ID." });
+        return;
+    }
+    try {
+        await deleteIngredientCategory(id);
+        res.status(200).json({ message: "Kategorie smazána." });
+    } catch (error) {
+        res.status(500).json({ error: "Nepodařilo se smazat kategorii." });
+    }
 };

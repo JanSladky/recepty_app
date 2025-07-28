@@ -10,8 +10,8 @@ export type Ingredient = {
   name: string;
   calories_per_gram: number;
   category_id: number;
-  default_grams?: number;
-  unit_name?: string;
+  default_grams?: number | null; // Povolujeme i null
+  unit_name?: string | null;
 };
 
 export type Category = {
@@ -37,15 +37,25 @@ export default function IngredientAdminPage() {
 
   useEffect(() => {
     const fetchIngredients = async () => {
-      const res = await fetch(`${API_URL}/api/ingredients`);
-      const data = await res.json();
-      setIngredients(data);
+      try {
+        const res = await fetch(`${API_URL}/api/ingredients`);
+        if (!res.ok) throw new Error("Nepodařilo se načíst suroviny");
+        const data = await res.json();
+        setIngredients(data);
+      } catch (error) {
+        console.error(error);
+      }
     };
 
     const fetchCategories = async () => {
-      const res = await fetch(`${API_URL}/api/ingredients/categories`);
-      const data = await res.json();
-      setCategories(data);
+      try {
+        const res = await fetch(`${API_URL}/api/ingredients/categories`);
+        if (!res.ok) throw new Error("Nepodařilo se načíst kategorie");
+        const data = await res.json();
+        setCategories(data);
+      } catch (error) {
+        console.error(error);
+      }
     };
 
     fetchIngredients();
@@ -60,43 +70,82 @@ export default function IngredientAdminPage() {
       ...prev,
       [id]: {
         ...prev[id],
-        [field]: ["calories_per_gram", "category_id", "default_grams"].includes(field) ? Number(value) : value,
+        [field]: value,
       },
     }));
   };
 
   const handleSave = async (id: number) => {
     const current = ingredients.find((i) => i.id === id);
-    if (!current) return;
+    if (!current) {
+      alert("Chyba: Surovina nebyla nalezena.");
+      return;
+    }
 
-    const updated = {
-      name: edited[id]?.name ?? current.name,
-      calories_per_gram: Number(edited[id]?.calories_per_gram ?? current.calories_per_gram),
-      category_id: Number(edited[id]?.category_id ?? current.category_id),
-      default_grams: Number(edited[id]?.default_grams ?? current.default_grams),
-      unit_name: edited[id]?.unit_name ?? current.unit_name,
+    const editedData = edited[id] || {};
+    
+    // 1. Zkombinujeme původní a upravená data
+    const mergedData = { ...current, ...editedData };
+
+    // 2. Pečlivě převedeme hodnoty na správné typy pro backend
+    const finalPayload = {
+      ...mergedData,
+      calories_per_gram: Number(mergedData.calories_per_gram),
+      category_id: Number(mergedData.category_id),
+      // OPRAVA: Použijeme 'as any' pro potlačení chyby a '== null' pro kontrolu null i undefined
+      default_grams: ((mergedData.default_grams as any) === "" || mergedData.default_grams == null) 
+        ? null 
+        : Number(mergedData.default_grams),
+      unit_name: (mergedData.unit_name === "" || mergedData.unit_name == null) ? null : mergedData.unit_name,
     };
 
-    const res = await fetch(`${API_URL}/api/ingredients/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updated),
-    });
+    // 3. Klientská validace
+    if (!finalPayload.category_id) {
+      alert("Chyba: Kategorie je povinný údaj.");
+      return;
+    }
 
-    if (res.ok) {
-      setIngredients((prev) => prev.map((i) => (i.id === id ? { ...i, ...updated } : i)));
-      const copy = { ...edited };
-      delete copy[id];
-      setEdited(copy);
+    console.log("DATA ODESÍLANÁ NA SERVER:", finalPayload);
+
+    try {
+      const res = await fetch(`${API_URL}/api/ingredients/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(finalPayload),
+      });
+
+      if (res.ok) {
+        alert("Surovina úspěšně uložena!");
+        // Aktualizujeme stav s finálními, správně otypovanými daty
+        setIngredients((prev) =>
+          prev.map((ing) => (ing.id === id ? finalPayload : ing))
+        );
+        setEdited((prev) => {
+          const copy = { ...prev };
+          delete copy[id];
+          return copy;
+        });
+      } else {
+        const errorData = await res.json();
+        alert(`Chyba při ukládání: ${errorData.error || "Neznámá chyba serveru."}`);
+      }
+    } catch (error) {
+      console.error("Chyba při komunikaci se serverem:", error);
+      alert("Chyba: Nepodařilo se spojit se serverem.");
     }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm("Opravdu chceš smazat surovinu?")) return;
-
-    const res = await fetch(`${API_URL}/api/ingredients/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      setIngredients((prev) => prev.filter((i) => i.id !== id));
+    try {
+      const res = await fetch(`${API_URL}/api/ingredients/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setIngredients((prev) => prev.filter((i) => i.id !== id));
+      } else {
+        alert("Smazání se nezdařilo.");
+      }
+    } catch (error) {
+      alert("Chyba při komunikaci se serverem.");
     }
   };
 
@@ -106,63 +155,93 @@ export default function IngredientAdminPage() {
 
   const handleCreate = async () => {
     const { name, calories_per_gram, category_id, default_grams, unit_name } = newIngredient;
-    const res = await fetch(`${API_URL}/api/ingredients`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        category_id: Number(category_id),
-        calories_per_gram: Number(calories_per_gram),
-        default_grams: Number(default_grams) || undefined,
-        unit_name: unit_name || undefined,
-      }),
-    });
+    if (!name || !calories_per_gram || !category_id) {
+        alert("Vyplňte prosím název, kalorie a kategorii.");
+        return;
+    }
+    try {
+        const res = await fetch(`${API_URL}/api/ingredients`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            name,
+            category_id: Number(category_id),
+            calories_per_gram: Number(calories_per_gram),
+            default_grams: default_grams ? Number(default_grams) : undefined,
+            unit_name: unit_name || undefined,
+        }),
+        });
 
-    if (res.ok) {
-      const created = await res.json();
-      setIngredients((prev) => [...prev, created]);
-      setNewIngredient({ name: "", calories_per_gram: "", category_id: "", default_grams: "", unit_name: "" });
+        if (res.ok) {
+        const created = await res.json();
+        setIngredients((prev) => [...prev, created]);
+        setNewIngredient({ name: "", calories_per_gram: "", category_id: "", default_grams: "", unit_name: "" });
+        } else {
+            const errorData = await res.json();
+            alert(`Chyba při vytváření: ${errorData.error || "Neznámá chyba"}`);
+        }
+    } catch(error) {
+        alert("Chyba při komunikaci se serverem.");
     }
   };
 
   const handleCategoryUpdate = async (id: number) => {
     const name = editedCategories[id];
     if (!name) return;
-
-    const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-
-    if (res.ok) {
-      setCategories((prev) => prev.map((cat) => (cat.id === id ? { ...cat, name } : cat)));
-      const copy = { ...editedCategories };
-      delete copy[id];
-      setEditedCategories(copy);
+    try {
+        const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+        });
+        if (res.ok) {
+        setCategories((prev) => prev.map((cat) => (cat.id === id ? { ...cat, name } : cat)));
+        const copy = { ...editedCategories };
+        delete copy[id];
+        setEditedCategories(copy);
+        } else {
+            alert("Úprava kategorie se nezdařila.");
+        }
+    } catch(error) {
+        alert("Chyba při komunikaci se serverem.");
     }
   };
 
   const handleCategoryDelete = async (id: number) => {
     if (!confirm("Opravdu chceš smazat tuto kategorii?")) return;
-
-    const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      setCategories((prev) => prev.filter((c) => c.id !== id));
+    try {
+        const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, { method: "DELETE" });
+        if (res.ok) {
+        setCategories((prev) => prev.filter((c) => c.id !== id));
+        } else {
+            alert("Smazání kategorie se nezdařilo.");
+        }
+    } catch(error) {
+        alert("Chyba při komunikaci se serverem.");
     }
   };
 
   const handleCategoryCreate = async () => {
-    const res = await fetch(`${API_URL}/api/ingredients/categories`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newCategory }),
-    });
+    if (!newCategory.trim()) {
+        alert("Název kategorie nemůže být prázdný.");
+        return;
+    }
+    try {
+        const res = await fetch(`${API_URL}/api/ingredients/categories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCategory }),
+        });
 
-    if (res.ok) {
-      const created = await res.json();
-      setCategories((prev) => [...prev, created]);
-      setNewCategory("");
+        if (res.ok) {
+        const created = await res.json();
+        setCategories((prev) => [...prev, created]);
+        setNewCategory("");
+        } else {
+            alert("Vytvoření kategorie se nezdařilo.");
+        }
+    } catch(error) {
+        alert("Chyba při komunikaci se serverem.");
     }
   };
 
@@ -232,18 +311,18 @@ export default function IngredientAdminPage() {
                 type="text"
                 value={editedItem.name ?? ingredient.name}
                 onChange={(e) => handleInputChange(ingredient.id, "name", e.target.value)}
-                className="border rounded p-2 w-full sm:w-1/6"
+                className="border rounded p-2 w-full sm:w-auto flex-grow"
               />
               <input
                 type="number"
                 value={editedItem.calories_per_gram ?? ingredient.calories_per_gram ?? ""}
                 onChange={(e) => handleInputChange(ingredient.id, "calories_per_gram", e.target.value)}
-                className="border rounded p-2 w-full sm:w-1/6"
+                className="border rounded p-2 w-full sm:w-auto"
               />
               <select
                 value={editedItem.category_id ?? ingredient.category_id ?? ""}
                 onChange={(e) => handleInputChange(ingredient.id, "category_id", e.target.value)}
-                className="border rounded p-2 w-full sm:w-1/6"
+                className="border rounded p-2 w-full sm:w-auto flex-grow"
               >
                 <option value="">Vyber kategorii</option>
                 {categories.map((cat) => (
@@ -257,12 +336,12 @@ export default function IngredientAdminPage() {
                 placeholder="Gramy"
                 value={editedItem.default_grams ?? ingredient.default_grams ?? ""}
                 onChange={(e) => handleInputChange(ingredient.id, "default_grams", e.target.value)}
-                className="border rounded p-2 w-full sm:w-1/6"
+                className="border rounded p-2 w-full sm:w-auto"
               />
               <select
                 value={editedItem.unit_name ?? ingredient.unit_name ?? ""}
                 onChange={(e) => handleInputChange(ingredient.id, "unit_name", e.target.value)}
-                className="border rounded p-2 w-full sm:w-1/6"
+                className="border rounded p-2 w-full sm:w-auto"
               >
                 <option value="">Vyber jednotku</option>
                 {["g", "ml", "ks", "lžíce", "lžička", "šálek", "hrnek"].map((unit) => (

@@ -3,12 +3,12 @@ import multer from "multer";
 import { storage } from "../utils/cloudinary";
 import {
   getRecipes,
-  getAllIngredients,
   getRecipeById,
-  addFullRecipe,
+  addRecipe,        // <-- ZMĚNA ZDE (původně addFullRecipe)
   updateRecipe,
   deleteRecipe,
 } from "../controllers/recipeController";
+// Poznámka: getAllIngredients se přesunulo do vlastního routeru pro suroviny
 import { verifyAdmin } from "../middleware/auth";
 
 const router = Router();
@@ -18,11 +18,11 @@ const upload = multer({ storage });
 
 // ✅ Veřejné GET routy
 router.get("/", getRecipes);
-router.get("/ingredients", getAllIngredients);
 router.get("/:id", getRecipeById);
 
 // ✅ Admin pouze pro POST/PUT/DELETE
-router.post("/", verifyAdmin, upload.single("image"), addFullRecipe);
+// Používáme opravený název funkce 'addRecipe'
+router.post("/", verifyAdmin, upload.single("image"), addRecipe); // <-- ZMĚNA ZDE
 router.put("/:id", verifyAdmin, upload.single("image"), updateRecipe);
 router.delete("/:id", verifyAdmin, deleteRecipe);
 
