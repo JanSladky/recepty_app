@@ -16,7 +16,7 @@ export type Ingredient = {
 
 export type Category = {
   id: number;
-  name: string;
+  name:string;
 };
 
 export default function IngredientAdminPage() {
@@ -86,7 +86,7 @@ export default function IngredientAdminPage() {
     const mergedData = { ...current, ...editedData };
 
     // Robustní převod na správné typy pro backend
-    const valueOrNull = (val: any) => (val === "" || val == null ? null : Number(val));
+    const valueOrNull = (val: string | number | null | undefined) => (val === "" || val == null ? null : Number(val));
     
     const finalPayload = {
       ...mergedData,
