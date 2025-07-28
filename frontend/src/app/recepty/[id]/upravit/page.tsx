@@ -56,29 +56,24 @@ export default function EditPage() {
 
   const handleSubmit = async (formData: FormData) => {
     try {
-      const userEmail = localStorage.getItem("userEmail");
-      
-      // --- FINÁLNÍ OPRAVA ---
-      // 1. Zkontrolujeme, jestli máme email, než cokoliv pošleme.
-      if (!userEmail) {
-        alert("Chyba: Vypadá to, že nejste přihlášen. Přihlaste se prosím a zkuste to znovu.");
-        return; 
-      }
-      
-      // 2. Vytvoříme hlavičky pomocí new Headers() pro lepší kompatibilitu.
-      const headers = new Headers();
-      headers.append("x-user-email", userEmail);
-      // Content-Type NENASTAVUJEME, prohlížeč to udělá za nás.
-
+      // Email se nyní přidává do formData uvnitř komponenty RecipeForm.
+      // Zde NESMÍME nastavovat ŽÁDNÉ hlavičky, aby si je prohlížeč mohl
+      // nastavit automaticky pro správné nahrání souboru.
       const res = await fetch(`${API_URL}/api/recipes/${id}`, {
         method: "PUT",
-        headers: headers, // Použijeme nově vytvořené hlavičky
-        body: formData,
+        body: formData, // Žádný 'headers' objekt!
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Neznámá chyba serveru");
+        // Zkusíme přečíst odpověď jako JSON pro detailnější chybu
+        try {
+            const errorData = await res.json();
+            throw new Error(errorData.error || "Neznámá chyba serveru");
+        } catch (jsonError) {
+            // Pokud odpověď není JSON, vypíšeme ji jako text
+            const errorText = await res.text();
+            throw new Error(errorText || `Chyba serveru: ${res.status}`);
+        }
       }
 
       alert("✅ Recept upraven!");

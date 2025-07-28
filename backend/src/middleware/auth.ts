@@ -3,19 +3,21 @@ import db from "../utils/db";
 
 export const verifyAdmin = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const email = req.header("x-user-email");
-    if (!email) {
-      res.status(401).json({ error: "Chybí e-mail v hlavičce." });
+    const { userEmail } = req.body;
+
+    if (!userEmail) {
+      res.status(401).json({ error: "Chybí e-mail pro ověření administrátora." });
       return;
     }
 
-    const result = await db.query("SELECT is_admin FROM users WHERE email = $1", [email]);
+    const result = await db.query("SELECT is_admin FROM users WHERE email = $1", [userEmail]);
+
     if (result.rows.length === 0 || result.rows[0].is_admin !== true) {
       res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
       return;
     }
 
-    next(); // ✅ pokračuj, pokud je admin
+    next();
   } catch (err) {
     console.error("Chyba při ověřování administrátora:", err);
     res.status(500).json({ error: "Interní chyba serveru." });
