@@ -79,7 +79,6 @@ export default function RecipeForm({
 
           let grams = amount;
           if (unit !== "g" && unit !== "ml") {
-             // Jednoduchý fallback, ideálně by zde byla konverzní logika
             grams = defaultGrams ? amount * defaultGrams : 0;
           }
 
@@ -87,7 +86,8 @@ export default function RecipeForm({
         }, 0);
         setCalories(Math.round(total));
       } catch (err) {
-        // Tichá chyba, aby neotravovala uživatele
+        // OPRAVA: Použijeme proměnnou 'err', aby linter nehlásil chybu.
+        console.error("Chyba při výpočtu kalorií:", err);
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -118,11 +118,7 @@ export default function RecipeForm({
     }
     formData.append("ingredients", JSON.stringify(ingredients));
     formData.append("categories", JSON.stringify(categories));
-    
-    // --- ZDE JE KLÍČOVÁ OPRAVA ---
-    // Přejmenováno z "mealType" na "mealTypes", aby to odpovídalo backendu
-    formData.append("mealTypes", JSON.stringify(mealTypes)); 
-    
+    formData.append("mealTypes", JSON.stringify(mealTypes));
     formData.append("steps", JSON.stringify(steps));
     if (Number.isFinite(calories)) {
       formData.append("calories", calories.toString());
