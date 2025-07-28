@@ -10,7 +10,7 @@ export type Ingredient = {
   name: string;
   calories_per_gram: number;
   category_id: number;
-  default_grams?: number | null; // Povolujeme i null
+  default_grams?: number | null;
   unit_name?: string | null;
 };
 
@@ -43,7 +43,7 @@ export default function IngredientAdminPage() {
         const data = await res.json();
         setIngredients(data);
       } catch (error) {
-        console.error(error);
+        console.error("Chyba při načítání surovin:", error);
       }
     };
 
@@ -54,7 +54,7 @@ export default function IngredientAdminPage() {
         const data = await res.json();
         setCategories(data);
       } catch (error) {
-        console.error(error);
+        console.error("Chyba při načítání kategorií:", error);
       }
     };
 
@@ -83,23 +83,19 @@ export default function IngredientAdminPage() {
     }
 
     const editedData = edited[id] || {};
-    
-    // 1. Zkombinujeme původní a upravená data
     const mergedData = { ...current, ...editedData };
 
-    // 2. Pečlivě převedeme hodnoty na správné typy pro backend
+    // Robustní převod na správné typy pro backend
+    const valueOrNull = (val: any) => (val === "" || val == null ? null : Number(val));
+    
     const finalPayload = {
       ...mergedData,
       calories_per_gram: Number(mergedData.calories_per_gram),
       category_id: Number(mergedData.category_id),
-      // OPRAVA: Použijeme 'as any' pro potlačení chyby a '== null' pro kontrolu null i undefined
-      default_grams: ((mergedData.default_grams as any) === "" || mergedData.default_grams == null) 
-        ? null 
-        : Number(mergedData.default_grams),
+      default_grams: valueOrNull(mergedData.default_grams),
       unit_name: (mergedData.unit_name === "" || mergedData.unit_name == null) ? null : mergedData.unit_name,
     };
 
-    // 3. Klientská validace
     if (!finalPayload.category_id) {
       alert("Chyba: Kategorie je povinný údaj.");
       return;
@@ -116,7 +112,6 @@ export default function IngredientAdminPage() {
 
       if (res.ok) {
         alert("Surovina úspěšně uložena!");
-        // Aktualizujeme stav s finálními, správně otypovanými daty
         setIngredients((prev) =>
           prev.map((ing) => (ing.id === id ? finalPayload : ing))
         );
@@ -145,6 +140,7 @@ export default function IngredientAdminPage() {
         alert("Smazání se nezdařilo.");
       }
     } catch (error) {
+      console.error("Chyba při mazání:", error);
       alert("Chyba při komunikaci se serverem.");
     }
   };
@@ -181,6 +177,7 @@ export default function IngredientAdminPage() {
             alert(`Chyba při vytváření: ${errorData.error || "Neznámá chyba"}`);
         }
     } catch(error) {
+        console.error("Chyba při vytváření:", error);
         alert("Chyba při komunikaci se serverem.");
     }
   };
@@ -203,6 +200,7 @@ export default function IngredientAdminPage() {
             alert("Úprava kategorie se nezdařila.");
         }
     } catch(error) {
+        console.error("Chyba při úpravě kategorie:", error);
         alert("Chyba při komunikaci se serverem.");
     }
   };
@@ -217,6 +215,7 @@ export default function IngredientAdminPage() {
             alert("Smazání kategorie se nezdařilo.");
         }
     } catch(error) {
+        console.error("Chyba při mazání kategorie:", error);
         alert("Chyba při komunikaci se serverem.");
     }
   };
@@ -241,6 +240,7 @@ export default function IngredientAdminPage() {
             alert("Vytvoření kategorie se nezdařilo.");
         }
     } catch(error) {
+        console.error("Chyba při vytváření kategorie:", error);
         alert("Chyba při komunikaci se serverem.");
     }
   };
