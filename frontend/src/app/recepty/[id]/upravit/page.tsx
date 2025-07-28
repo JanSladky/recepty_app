@@ -62,13 +62,16 @@ export default function EditPage() {
       });
 
       if (!res.ok) {
+        // OPRAVA: Vytvoříme si "kopii" odpovědi, abychom ji mohli bezpečně číst vícekrát.
+        const resClone = res.clone();
         try {
+            // Zkusíme přečíst jako JSON
             const errorData = await res.json();
             throw new Error(errorData.error || "Neznámá chyba serveru");
         } catch (jsonError) {
-            // OPRAVA: Použijeme proměnnou 'jsonError', aby linter nehlásil chybu
-            console.error("Chyba parsování JSON odpovědi:", jsonError);
-            const errorText = await res.text();
+            // Pokud to selže, použijeme kopii a přečteme ji jako text
+            console.error("Odpověď není platný JSON, zkouším číst jako text:", jsonError);
+            const errorText = await resClone.text();
             throw new Error(errorText || `Chyba serveru: ${res.status}`);
         }
       }
