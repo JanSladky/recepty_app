@@ -65,11 +65,16 @@ export default function ReceptyPage() {
                             className="object-cover transition-transform duration-300 group-hover:scale-110"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                        {recipe.meal_types && recipe.meal_types.length > 0 && (
-                            <span className="absolute top-2 right-2 bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded-full">
-                                {recipe.meal_types[0]}
+                        
+                        {/* --- OPRAVENÁ ČÁST PRO ZOBRAZENÍ VŠECH ZNAČEK --- */}
+                        <div className="absolute top-2 right-2 flex flex-wrap gap-1">
+                          {recipe.meal_types?.map((type) => (
+                            <span key={type} className="bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded-full">
+                                {type}
                             </span>
-                        )}
+                          ))}
+                        </div>
+
                         </div>
                         <div className="p-4">
                         <h2 className="text-lg font-bold text-gray-800 truncate group-hover:text-green-600 transition-colors">{recipe.title}</h2>
