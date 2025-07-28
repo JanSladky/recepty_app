@@ -56,21 +56,18 @@ export default function EditPage() {
 
   const handleSubmit = async (formData: FormData) => {
     try {
-      // Email se nyní přidává do formData uvnitř komponenty RecipeForm.
-      // Zde NESMÍME nastavovat ŽÁDNÉ hlavičky, aby si je prohlížeč mohl
-      // nastavit automaticky pro správné nahrání souboru.
       const res = await fetch(`${API_URL}/api/recipes/${id}`, {
         method: "PUT",
-        body: formData, // Žádný 'headers' objekt!
+        body: formData,
       });
 
       if (!res.ok) {
-        // Zkusíme přečíst odpověď jako JSON pro detailnější chybu
         try {
             const errorData = await res.json();
             throw new Error(errorData.error || "Neznámá chyba serveru");
         } catch (jsonError) {
-            // Pokud odpověď není JSON, vypíšeme ji jako text
+            // OPRAVA: Použijeme proměnnou 'jsonError', aby linter nehlásil chybu
+            console.error("Chyba parsování JSON odpovědi:", jsonError);
             const errorText = await res.text();
             throw new Error(errorText || `Chyba serveru: ${res.status}`);
         }
@@ -78,7 +75,7 @@ export default function EditPage() {
 
       alert("✅ Recept upraven!");
       router.push(`/recepty/${id}`);
-      router.refresh(); // Zajistí znovunačtení dat na stránce s detailem
+      router.refresh();
     } catch (err) {
       console.error("❌ Chyba při úpravě:", err);
       alert(`❌ Chyba při úpravě: ${(err as Error).message}`);
