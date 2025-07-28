@@ -58,13 +58,17 @@ export default function EditPage() {
     try {
       const userEmail = localStorage.getItem("userEmail");
       
-      // --- ZDE JE KLÍČOVÁ OPRAVA ---
-      // Vytvoříme hlavičky, ale nastavíme jen tu pro email.
-      // Prohlížeč si pak sám doplní správnou Content-Type pro FormData.
-      const headers: HeadersInit = {};
-      if (userEmail) {
-        headers["x-user-email"] = userEmail;
+      // --- FINÁLNÍ OPRAVA ---
+      // 1. Zkontrolujeme, jestli máme email, než cokoliv pošleme.
+      if (!userEmail) {
+        alert("Chyba: Vypadá to, že nejste přihlášen. Přihlaste se prosím a zkuste to znovu.");
+        return; 
       }
+      
+      // 2. Vytvoříme hlavičky pomocí new Headers() pro lepší kompatibilitu.
+      const headers = new Headers();
+      headers.append("x-user-email", userEmail);
+      // Content-Type NENASTAVUJEME, prohlížeč to udělá za nás.
 
       const res = await fetch(`${API_URL}/api/recipes/${id}`, {
         method: "PUT",
