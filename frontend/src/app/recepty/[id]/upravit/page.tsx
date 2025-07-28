@@ -56,10 +56,19 @@ export default function EditPage() {
 
   const handleSubmit = async (formData: FormData) => {
     try {
-      // --- ZDE JE KLÍČOVÁ ZMĚNA ---
-      // Odstranili jsme 'headers', aby je prohlížeč mohl nastavit automaticky
+      const userEmail = localStorage.getItem("userEmail");
+      
+      // --- ZDE JE KLÍČOVÁ OPRAVA ---
+      // Vytvoříme hlavičky, ale nastavíme jen tu pro email.
+      // Prohlížeč si pak sám doplní správnou Content-Type pro FormData.
+      const headers: HeadersInit = {};
+      if (userEmail) {
+        headers["x-user-email"] = userEmail;
+      }
+
       const res = await fetch(`${API_URL}/api/recipes/${id}`, {
         method: "PUT",
+        headers: headers, // Použijeme nově vytvořené hlavičky
         body: formData,
       });
 
