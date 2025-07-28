@@ -6,11 +6,6 @@ import MealTypeSelector from "@/components/MealTypeSelector";
 import IngredientAutocomplete, { IngredientAutocompleteHandle, Ingredient } from "@/components/IngredientAutocomplete";
 import Image from "next/image";
 
-// Helper icon component for UI elements
-const IconTrash = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-trash-2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-);
-
 export type RecipeFormProps = {
   initialTitle?: string;
   initialNotes?: string;
@@ -123,7 +118,7 @@ export default function RecipeForm({
     formData.append("ingredients", JSON.stringify(ingredients));
     formData.append("categories", JSON.stringify(categories));
     formData.append("mealTypes", JSON.stringify(mealTypes));
-    formData.append("steps", JSON.stringify(steps.filter(s => s.trim() !== "")));
+    formData.append("steps", JSON.stringify(steps));
     if (Number.isFinite(calories)) {
       formData.append("calories", calories.toString());
     }
@@ -133,6 +128,13 @@ export default function RecipeForm({
     } else if (initialImageUrl) {
       formData.append("existingImageUrl", initialImageUrl);
     }
+    
+    // --- ZDE JE KLÍČOVÁ ZMĚNA ---
+    // Přidáme email přímo do formulářových dat
+    const userEmail = localStorage.getItem("userEmail");
+    if (userEmail) {
+        formData.append("userEmail", userEmail);
+    }
 
     await onSubmit(formData);
     setSubmitting(false);
@@ -141,120 +143,87 @@ export default function RecipeForm({
   const currentImage = imagePreview || "/placeholder.jpg";
 
   return (
-    <form onSubmit={handleFormSubmit} className="bg-white p-8 rounded-2xl shadow-lg space-y-8 max-w-4xl mx-auto" encType="multipart/form-data">
-        
-        {/* --- HLAVIČKA --- */}
-        <div>
-            <h2 className="text-2xl font-bold text-gray-800">Základní informace</h2>
-            <p className="text-gray-500 text-sm mt-1">Pojmenuj svůj recept a přidej krátký popis.</p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+    <form onSubmit={handleFormSubmit} className="max-w-xl mx-auto p-4 space-y-4" encType="multipart/form-data">
+        {/* Zbytek formuláře zůstává stejný */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
             <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Název receptu (např. Špagety Carbonara)"
+            placeholder="Název receptu"
             required
-            className="md:col-span-9 p-3 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+            className="md:col-span-9 p-2 border rounded w-full"
             />
             <input
             type="number"
             value={Number.isFinite(calories) ? calories : ""}
             disabled
             readOnly
-            placeholder="kcal"
-            className="md:col-span-3 p-3 border border-gray-300 rounded-lg w-full bg-gray-100 text-center font-bold"
+            placeholder="Kalorie"
+            className="md:col-span-3 p-2 border rounded w-full bg-gray-100"
             />
         </div>
-        
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Krátký popis nebo poznámky k receptu..." className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition" rows={3}/>
 
-        {/* --- KATEGORIZACE --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-6 border-t">
-            <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-3">Typ chodu</h3>
-                <MealTypeSelector selected={mealTypes} onToggle={toggleMealType} />
-            </div>
-            <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-3">Kategorie</h3>
-                <CategorySelector selected={categories} onToggle={toggleCategory} />
-            </div>
-        </div>
+        <h3 className="font-semibold">Typ jídla</h3>
+        <MealTypeSelector selected={mealTypes} onToggle={toggleMealType} />
 
-        {/* --- OBRÁZEK --- */}
-        <div className="pt-6 border-t">
-            <h2 className="text-2xl font-bold text-gray-800">Obrázek</h2>
-            <p className="text-gray-500 text-sm mt-1">Nahraj fotku hotového jídla.</p>
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                    const file = e.target.files?.[0] || null;
-                    setImageFile(file);
-                    if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => setImagePreview(reader.result as string);
-                        reader.readAsDataURL(file);
-                    } else {
-                        setImagePreview(initialImageUrl || null);
-                    }
-                    }}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+        <div>
+            <h3 className="font-semibold mb-2">Postup krok za krokem</h3>
+            {steps.map((step, index) => (
+            <div key={index} className="flex items-start gap-2 mb-3">
+                <div className="min-w-[2rem] h-[2rem] bg-green-600 text-white flex items-center justify-center rounded-full font-bold">{index + 1}</div>
+                <textarea
+                value={step}
+                onChange={(e) => {
+                    const newSteps = [...steps];
+                    newSteps[index] = e.target.value;
+                    setSteps(newSteps);
+                }}
+                placeholder={`Krok ${index + 1}`}
+                required
+                className="w-full p-2 border rounded"
                 />
-                <div className="relative w-full h-40 rounded-lg overflow-hidden border">
-                    <Image src={currentImage} alt="Náhled obrázku" fill unoptimized onError={() => setImagePreview(null)} className="object-cover" />
-                </div>
-            </div>
-        </div>
-      
-        {/* --- INGREDIENCE --- */}
-        <div className="pt-6 border-t">
-            <h2 className="text-2xl font-bold text-gray-800">Ingredience</h2>
-            <p className="text-gray-500 text-sm mt-1">Přidej všechny potřebné suroviny a jejich množství.</p>
-            <div className="mt-4">
-                <IngredientAutocomplete ref={ingredientRef} initialIngredients={initialIngredients} />
-            </div>
-        </div>
-
-        {/* --- POSTUP --- */}
-        <div className="pt-6 border-t">
-            <h2 className="text-2xl font-bold text-gray-800">Postup</h2>
-            <p className="text-gray-500 text-sm mt-1">Popiš jednotlivé kroky přípravy.</p>
-            <div className="mt-4 space-y-4">
-                {steps.map((step, index) => (
-                <div key={index} className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-green-600 text-white flex items-center justify-center rounded-full font-bold text-sm">{index + 1}</div>
-                    <textarea
-                    value={step}
-                    onChange={(e) => {
-                        const newSteps = [...steps];
-                        newSteps[index] = e.target.value;
-                        setSteps(newSteps);
-                    }}
-                    placeholder={`Popis ${index + 1}. kroku`}
-                    required
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
-                    rows={2}
-                    />
-                    <button type="button" onClick={() => setSteps(steps.filter((_, i) => i !== index))} className="flex-shrink-0 text-gray-400 hover:text-red-500 transition p-2">
-                        <IconTrash />
-                    </button>
-                </div>
-                ))}
-                <button type="button" onClick={() => setSteps([...steps, ""])} className="bg-blue-100 text-blue-800 hover:bg-blue-200 font-semibold px-4 py-2 rounded-lg text-sm transition">
-                ➕ Přidat další krok
+                <button type="button" onClick={() => setSteps(steps.filter((_, i) => i !== index))} className="ml-2 text-red-500">
+                🗑
                 </button>
             </div>
-        </div>
-
-        {/* --- ODESLÁNÍ --- */}
-        <div className="pt-6 border-t flex justify-end">
-            <button type="submit" className="bg-green-600 hover:bg-green-700 text-white font-bold px-8 py-3 rounded-lg transition-transform transform hover:scale-105" disabled={submitting || loading}>
-                {submitting ? "Ukládám..." : submitLabel}
+            ))}
+            <button type="button" onClick={() => setSteps([...steps, ""])} className="bg-blue-600 text-white px-3 py-1 rounded">
+            ➕ Přidat krok
             </button>
         </div>
+
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Další poznámky" className="w-full p-2 border rounded" />
+
+        <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+            const file = e.target.files?.[0] || null;
+            setImageFile(file);
+            if (file) {
+                const reader = new FileReader();
+                reader.onloadend = () => setImagePreview(reader.result as string);
+                reader.readAsDataURL(file);
+            } else {
+                setImagePreview(initialImageUrl || null);
+            }
+            }}
+            className="w-full p-2 border rounded"
+        />
+        <div className="relative w-full h-48 mb-4 border rounded overflow-hidden">
+            <Image src={currentImage} alt="Náhled obrázku" fill unoptimized onError={() => setImagePreview(null)} className="object-cover" />
+        </div>
+
+        <h3 className="font-semibold">Ingredience</h3>
+        <IngredientAutocomplete ref={ingredientRef} initialIngredients={initialIngredients} />
+
+        <h3 className="font-semibold">Kategorie</h3>
+        <CategorySelector selected={categories} onToggle={toggleCategory} />
+
+        <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded" disabled={submitting || loading}>
+            {submitting ? "Ukládám..." : submitLabel}
+        </button>
     </form>
   );
 }

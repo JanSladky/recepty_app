@@ -29,8 +29,6 @@ export default function EditPage() {
         if (!res.ok) throw new Error("Chyba při načítání receptu");
         const data = await res.json();
 
-        console.log("Loaded recipe:", data);
-
         setInitialData({
           title: data.title,
           notes: data.notes,
@@ -57,47 +55,25 @@ export default function EditPage() {
   }, [id]);
 
   const handleSubmit = async (formData: FormData) => {
-    const userEmail = localStorage.getItem("userEmail");
-
     try {
+      // --- ZDE JE KLÍČOVÁ ZMĚNA ---
+      // Odstranili jsme 'headers', aby je prohlížeč mohl nastavit automaticky
       const res = await fetch(`${API_URL}/api/recipes/${id}`, {
         method: "PUT",
-        headers: userEmail ? { "x-user-email": userEmail } : undefined,
         body: formData,
       });
 
-      // DEBUG – výpis stavu a hlaviček
-      console.log("Status:", res.status);
-      console.log("Headers:", Array.from(res.headers.entries()));
-
-      const responseText = await res.text();
-      console.log("Response Text:", responseText);
-
       if (!res.ok) {
-        let errorMessage = "Neznámá chyba";
-
-        try {
-          const contentType = res.headers.get("Content-Type") || "";
-          if (contentType.includes("application/json")) {
-            const errorJson = JSON.parse(responseText);
-            errorMessage = errorJson?.error || errorJson?.message || JSON.stringify(errorJson);
-          } else {
-            errorMessage = responseText;
-          }
-        } catch (parseErr) {
-          console.error("❌ Chyba při parsování odpovědi:", parseErr);
-        }
-
-        console.error("❌ Chyba při úpravě:", errorMessage);
-        alert(`❌ Chyba při úpravě: ${errorMessage}`);
-        return;
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Neznámá chyba serveru");
       }
 
       alert("✅ Recept upraven!");
       router.push(`/recepty/${id}`);
+      router.refresh(); // Zajistí znovunačtení dat na stránce s detailem
     } catch (err) {
-      console.error("❌ Chyba při komunikaci:", err);
-      alert("❌ Chyba při komunikaci se serverem.");
+      console.error("❌ Chyba při úpravě:", err);
+      alert(`❌ Chyba při úpravě: ${(err as Error).message}`);
     }
   };
 
