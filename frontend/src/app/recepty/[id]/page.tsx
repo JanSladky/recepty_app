@@ -51,7 +51,6 @@ export default function DetailPage() {
           return setErrorMsg(`❌ Chyba ${res.status}: ${text}`);
         }
         const data: Recipe = await res.json();
-        console.log("📦 Načtený recept:", data);
         setRecipe(data);
       } catch {
         setErrorMsg("❌ Nepodařilo se načíst recept.");
@@ -84,21 +83,26 @@ export default function DetailPage() {
 
   const handleEdit = () => router.push(`/recepty/${recipe?.id}/upravit`);
 
+  const getFractionLabel = (amount: number) => {
+    if (Math.abs(amount - 0.5) < 0.01) return "polovina";
+    if (Math.abs(amount - 1 / 3) < 0.01) return "třetina";
+    if (Math.abs(amount - 0.25) < 0.01) return "čtvrtina";
+    return null;
+  };
+
   if (loading) return <p>Načítání...</p>;
   if (errorMsg) return <p className="text-red-600">{errorMsg}</p>;
   if (!recipe) return <p>Recept nenalezen.</p>;
+
   const totalCalories =
     recipe.ingredients?.reduce((sum, ing) => {
       const unit = ing.unit ?? "g";
       const amount = Number(ing.amount) || 0;
       const caloriesPerGram = Number(ing.calories_per_gram) || 0;
-
       const grams = unit === "ks" && ing.default_grams ? amount * ing.default_grams : amount;
-
       return sum + Math.round(grams * caloriesPerGram);
     }, 0) || 0;
 
-  console.log("Kontrola recipe.calories:", recipe.calories, typeof recipe.calories);
   const imageUrl = recipe.image_url?.startsWith("http") ? recipe.image_url : recipe.image_url ? `${API_URL}${recipe.image_url}` : "/placeholder.jpg";
 
   return (
@@ -118,16 +122,21 @@ export default function DetailPage() {
               const unit = ing.unit ?? "g";
               const amount = Number(ing.amount) || 0;
               const caloriesPerGram = Number(ing.calories_per_gram) || 0;
-
               const grams = unit === "ks" && ing.default_grams ? amount * ing.default_grams : amount;
               const kcal = Math.round(grams * caloriesPerGram);
 
+              const fractionLabel = unit === "ks" ? getFractionLabel(amount) : null;
+
+              const label =
+                unit === "ks"
+                  ? fractionLabel
+                    ? `${fractionLabel} ${ing.name} (${Math.round(grams)} g)`
+                    : `${amount} ks ${ing.name} (${Math.round(grams)} g)`
+                  : `${amount} ${unit} ${ing.name}`;
+
               return (
                 <li key={i} className="flex items-center mb-1">
-                  <span>
-                    {ing.name} – {amount} {unit}
-                    {unit === "ks" && ing.default_grams ? ` (${Math.round(grams)} g)` : ""} /
-                  </span>
+                  <span>{label} /</span>
                   <span className="ml-2 bg-yellow-100 text-gray-800 text-sm px-2 py-1 rounded">{kcal} kcal</span>
                 </li>
               );

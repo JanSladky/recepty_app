@@ -38,7 +38,7 @@ export async function createIngredientInDB(
   unit_name?: string
 ): Promise<Ingredient> {
   const res = await db.query(
-    `INSERT INTO ingredients (name, calories_per_gram, category_id,clien default_grams, unit_name)
+    `INSERT INTO ingredients (name, calories_per_gram, category_id, default_grams, unit_name)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING id, name, calories_per_gram, category_id, default_grams, unit_name`,
     [name, calories, category_id ?? null, default_grams ?? null, unit_name ?? null]
@@ -287,10 +287,18 @@ async function insertRelations(client: any, recipeId: number, mealTypes: string[
       ingredientId = insert.rows[0].id;
     }
 
+    let displayText = ing.display ?? null;
+
+    if (ing.unit === "ks") {
+      if (ing.amount === 0.5) displayText = `polovina ${ing.name}`;
+      else if (ing.amount === 1 / 3) displayText = `třetina ${ing.name}`;
+      else if (ing.amount === 0.25) displayText = `čtvrtina ${ing.name}`;
+    }
+
     await client.query(
       `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, amount, unit, display)
        VALUES ($1, $2, $3, $4, $5)`,
-      [recipeId, ingredientId, ing.amount, ing.unit, ing.display ?? null]
+      [recipeId, ingredientId, ing.amount, ing.unit, displayText]
     );
   }
 

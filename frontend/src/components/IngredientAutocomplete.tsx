@@ -87,10 +87,10 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
   const handleInputChange = (index: number, field: keyof Ingredient, value: string) => {
     const updated = [...ingredients];
 
-    if (field === "amount" || field === "calories_per_gram") {
+    if (field === "amount" || field === "calories_per_gram" || field === "default_grams") {
       updated[index] = {
         ...updated[index],
-        [field]: parseFloat(value) || 0,
+        [field]: parseFloat(value) || undefined, // Zde použijeme undefined pro prázdné pole
       };
     } else if (field === "unit") {
       updated[index] = {
@@ -134,7 +134,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
   };
 
   const addIngredient = () => {
-    setIngredients([...ingredients, { name: "", amount: 0, unit: "g", calories_per_gram: 0 }]);
+    setIngredients([...ingredients, { name: "", amount: 0, unit: "g", calories_per_gram: 0, default_grams: undefined }]);
   };
 
   const removeIngredient = (index: number) => {
@@ -142,33 +142,65 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
   };
 
   const handleNewChange = (field: keyof NewIngredient, value: string | number) => {
+    let processedValue = value;
+    if (field === "category_id") {
+      // Pokud je hodnota prázdný řetězec, ponech ji tak. Jinak ji převeď na číslo.
+      processedValue = value === "" ? "" : parseInt(value as string, 10);
+    }
     setNewIngredient({
       ...newIngredient,
-      [field]: field === "category_id" ? parseInt(value as string) : value,
+      [field]: processedValue,
     });
   };
 
   const handleCreate = async () => {
+    // 1. Validace vstupů od uživatele
     if (!newIngredient.name.trim() || !newIngredient.category_id || !newIngredient.calories_per_gram) {
       alert("Vyplň prosím název, kategorii a kalorie.");
       return;
     }
+
     try {
+      // 2. Příprava dat (payload) pro odeslání na server
+      const payload = {
+        name: newIngredient.name,
+        calories_per_gram: parseFloat(newIngredient.calories_per_gram.toString()) || 0, // <-- ZMĚNA ZPĚT ZDE
+        category_id: newIngredient.category_id,
+        default_grams: newIngredient.default_grams ? parseFloat(newIngredient.default_grams.toString()) : null,
+        unit_name: newIngredient.unit_name || null,
+      };
+
+      // 3. Odeslání dat na server pomocí fetch
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ingredients`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...newIngredient,
-          calories_per_gram: parseFloat(newIngredient.calories_per_gram.toString()),
-          default_grams: newIngredient.default_grams ? parseFloat(newIngredient.default_grams.toString()) : undefined,
-        }),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error(await res.text() || "Nepodařilo se přidat ingredienci");
+
+      // 4. Zpracování odpovědi ze serveru
+      if (!res.ok) {
+        // Pokud server vrátí chybu, zobrazíme ji a ukončíme funkci
+        const errorResponse = await res.text();
+        throw new Error(errorResponse || "Nepodařilo se přidat ingredienci");
+      }
+
+      // 5. Zpracování úspěšné odpovědi
       const createdIngredient = await res.json();
-      setIngredients((prev) => [...prev, { name: createdIngredient.name, amount: 0, unit: createdIngredient.unit_name || "g", calories_per_gram: createdIngredient.calories_per_gram }]);
-      alert("Ingredience přidána.");
+      setIngredients((prev) => [
+        ...prev,
+        {
+          name: createdIngredient.name,
+          amount: 0,
+          unit: createdIngredient.unit_name || "g",
+          calories_per_gram: createdIngredient.calories_per_gram,
+        },
+      ]);
+
+      alert("Ingredience úspěšně přidána.");
+      // Vyčištění formuláře pro novou surovinu
       setNewIngredient({ name: "", calories_per_gram: 0, category_id: "", default_grams: undefined, unit_name: "" });
     } catch (err) {
+      // 6. Zachycení jakékoliv chyby (síťové nebo z bodu 4) a její zobrazení
       console.error("Chyba při přidání ingredience:", err);
       alert("Nepodařilo se přidat ingredienci.");
     }
@@ -181,55 +213,129 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
         const showFractions = ingredient.unit === "ks" && ingredient.amount === 1 && ingredient.default_grams;
 
         return (
-          <div key={index} className="relative grid grid-cols-1 sm:grid-cols-5 gap-2 items-center border rounded p-3 bg-gray-50">
+          <div key={index} className="relative grid grid-cols-1 sm:grid-cols-6 gap-2 items-center border rounded p-3 bg-gray-50">
             <div className="relative col-span-2">
-              <input type="text" value={ingredient.name} onChange={(e) => handleInputChange(index, "name", e.target.value)} onFocus={() => setFocusedInputIndex(index)} onBlur={() => setTimeout(() => setFocusedInputIndex(null), 200)} placeholder="Název suroviny" className="border p-2 rounded w-full" required />
+              <input
+                type="text"
+                value={ingredient.name}
+                onChange={(e) => handleInputChange(index, "name", e.target.value)}
+                onFocus={() => setFocusedInputIndex(index)}
+                onBlur={() => setTimeout(() => setFocusedInputIndex(null), 200)}
+                placeholder="Název suroviny"
+                className="border p-2 rounded w-full"
+                required
+              />
               {focusedInputIndex === index && filtered.length > 0 && (
                 <div className="absolute bg-white border rounded shadow max-h-40 overflow-y-auto w-full z-10">
                   {filtered.map((s) => (
-                    <div key={s.name} onClick={() => selectSuggestion(index, s)} className="p-2 hover:bg-gray-100 cursor-pointer">{s.name}</div>
+                    <div key={s.name} onClick={() => selectSuggestion(index, s)} className="p-2 hover:bg-gray-100 cursor-pointer">
+                      {s.name}
+                    </div>
                   ))}
                 </div>
               )}
             </div>
-            <input type="number" value={ingredient.amount} onChange={(e) => handleInputChange(index, "amount", e.target.value)} placeholder="Množství" className="border p-2 rounded w-full" required />
+            <input
+              type="number"
+              value={ingredient.amount}
+              onChange={(e) => handleInputChange(index, "amount", e.target.value)}
+              placeholder="Množství"
+              className="border p-2 rounded w-full"
+              required
+            />
             <select value={ingredient.unit || "g"} onChange={(e) => handleInputChange(index, "unit", e.target.value)} className="border p-2 rounded w-full">
               {units.map((unit) => (
-                <option key={unit} value={unit}>{unit}</option>
+                <option key={unit} value={unit}>
+                  {unit}
+                </option>
               ))}
             </select>
-            <input type="number" value={ingredient.calories_per_gram} onChange={(e) => handleInputChange(index, "calories_per_gram", e.target.value)} placeholder="Kalorie / gram" className="border p-2 rounded w-full" required />
+            <input
+              type="number"
+              value={ingredient.calories_per_gram}
+              onChange={(e) => handleInputChange(index, "calories_per_gram", e.target.value)}
+              placeholder="Kalorie / gram"
+              className="border p-2 rounded w-full"
+              required
+            />
+            <input
+              type="number"
+              value={ingredient.default_grams || ""}
+              onChange={(e) => handleInputChange(index, "default_grams", e.target.value)}
+              placeholder="Průměrná váha (g)"
+              title="Průměrná váha kusu v gramech"
+              className="border p-2 rounded w-full"
+            />
             {showFractions && (
               <div className="flex gap-2 flex-wrap col-span-full">
                 {fractions.map((fraction) => (
-                  <button key={fraction.label} type="button" onClick={() => applyFraction(index, fraction.value)} className="px-3 py-1 rounded border bg-white border-gray-300 hover:bg-yellow-100">{fraction.label}</button>
+                  <button
+                    key={fraction.label}
+                    type="button"
+                    onClick={() => applyFraction(index, fraction.value)}
+                    className="px-3 py-1 rounded border bg-white border-gray-300 hover:bg-yellow-100"
+                  >
+                    {fraction.label}
+                  </button>
                 ))}
               </div>
             )}
-            <button type="button" onClick={() => removeIngredient(index)} className="text-red-500 text-lg hover:text-red-700 transition-colors sm:col-span-full">🗑</button>
+            <button
+              type="button"
+              onClick={() => removeIngredient(index)}
+              className="text-red-500 text-lg hover:text-red-700 transition-colors sm:col-span-full"
+            >
+              🗑
+            </button>
           </div>
         );
       })}
-      <button type="button" onClick={addIngredient} className="bg-green-600 text-white px-4 py-1 rounded">➕ Přidat surovinu</button>
+      <button type="button" onClick={addIngredient} className="bg-green-600 text-white px-4 py-1 rounded">
+        ➕ Přidat surovinu
+      </button>
       <div className="mt-6">
         <h4 className="font-semibold mb-4">Přidat novou ingredienci do databáze:</h4>
         <div className="flex flex-wrap gap-3 mb-4">
-          <input type="text" placeholder="Název" value={newIngredient.name} onChange={(e) => handleNewChange("name", e.target.value)} className="border p-2 rounded w-full sm:w-[150px] flex-1 min-w-[120px]" />
-          <input type="number" placeholder="Kalorie / 1g" value={newIngredient.calories_per_gram} onChange={(e) => handleNewChange("calories_per_gram", e.target.value)} className="border p-2 rounded w-32" />
+          <input
+            type="text"
+            placeholder="Název"
+            value={newIngredient.name}
+            onChange={(e) => handleNewChange("name", e.target.value)}
+            className="border p-2 rounded w-full sm:w-[150px] flex-1 min-w-[120px]"
+          />
+          <input
+            type="number"
+            placeholder="Kalorie / 1g"
+            value={newIngredient.calories_per_gram}
+            onChange={(e) => handleNewChange("calories_per_gram", e.target.value)}
+            className="border p-2 rounded w-32"
+          />
           <select value={newIngredient.category_id} onChange={(e) => handleNewChange("category_id", e.target.value)} className="border p-2 rounded w-48">
             <option value="">Vyber kategorii</option>
             {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
             ))}
           </select>
-          <input type="number" placeholder="Default gramy" value={newIngredient.default_grams || ""} onChange={(e) => handleNewChange("default_grams", e.target.value)} className="border p-2 rounded w-32" />
+          <input
+            type="number"
+            placeholder="Default gramy"
+            value={newIngredient.default_grams || ""}
+            onChange={(e) => handleNewChange("default_grams", e.target.value)}
+            className="border p-2 rounded w-32"
+          />
           <select value={newIngredient.unit_name || ""} onChange={(e) => handleNewChange("unit_name", e.target.value)} className="border p-2 rounded w-32">
             <option value="">Jednotka</option>
             {units.map((unit) => (
-              <option key={unit} value={unit}>{unit}</option>
+              <option key={unit} value={unit}>
+                {unit}
+              </option>
             ))}
           </select>
-          <button type="button" onClick={handleCreate} className="bg-blue-600 text-white rounded px-4 py-2">➕ Přidat</button>
+          <button type="button" onClick={handleCreate} className="bg-blue-600 text-white rounded px-4 py-2">
+            ➕ Přidat
+          </button>
         </div>
       </div>
     </div>
