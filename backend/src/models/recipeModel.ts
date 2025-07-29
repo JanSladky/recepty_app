@@ -17,6 +17,7 @@ export type IngredientInput = {
   unit: string;
   calories_per_gram: number;
   display?: string;
+  default_grams?: number; // Přidáno pro nákupní seznam
 };
 
 // --- SUROVINY ---
@@ -105,12 +106,10 @@ function calculateTotalCalories(ingredients: (IngredientInput & { default_grams?
   }, 0);
 }
 
-// FINÁLNÍ OPRAVENÁ VERZE TÉTO FUNKCE
 export async function getAllRecipes(): Promise<any[]> {
   const res = await db.query("SELECT id, title, notes, image_url, steps FROM recipes ORDER BY title ASC");
   const recipes = res.rows;
 
-  // Pro každý recept donačteme jeho kategorie a druhy jídla, aby je filtr mohl najít
   for (const recipe of recipes) {
     const [mealRes, catRes] = await Promise.all([
         db.query(
@@ -290,4 +289,46 @@ export async function deleteRecipeFromDB(id: number): Promise<void> {
     } finally {
         client.release();
     }
+}
+
+// --- OBLÍBENÉ RECEPTY ---
+// Získá pole IDček všech oblíbených receptů pro daného uživatele
+export async function getFavoriteRecipeIdsForUser(userId: number): Promise<number[]> {
+  const res = await db.query(
+    `SELECT recipe_id FROM user_favorites WHERE user_id = $1`,
+    [userId]
+  );
+  return res.rows.map((row: { recipe_id: number }) => row.recipe_id);
+}
+
+// Přidá recept do oblíbených pro daného uživatele
+export async function addFavoriteInDB(userId: number, recipeId: number): Promise<void> {
+  // "ON CONFLICT DO NOTHING" zajistí, že se nestane chyba, pokud už je recept v oblíbených
+  await db.query(
+    `INSERT INTO user_favorites (user_id, recipe_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+    [userId, recipeId]
+  );
+}
+
+// Odebere recept z oblíbených pro daného uživatele
+export async function removeFavoriteInDB(userId: number, recipeId: number): Promise<void> {
+  await db.query(
+    `DELETE FROM user_favorites WHERE user_id = $1 AND recipe_id = $2`,
+    [userId, recipeId]
+  );
+}
+
+// Získá všechny suroviny pro zadaná ID receptů (pro nákupní seznam)
+export async function getIngredientsForRecipes(recipeIds: number[]): Promise<IngredientInput[]> {
+    if (recipeIds.length === 0) {
+        return [];
+    }
+    const query = `
+        SELECT i.name, ri.amount, ri.unit, i.calories_per_gram, i.default_grams
+        FROM recipe_ingredients ri
+        JOIN ingredients i ON ri.ingredient_id = i.id
+        WHERE ri.recipe_id = ANY($1::int[])
+    `;
+    const res = await db.query(query, [recipeIds]);
+    return res.rows;
 }
