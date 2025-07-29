@@ -1,17 +1,21 @@
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 
-// Odstranili jsme import a volání `dotenv`, protože na produkčním serveru
-// (Railway) se proměnné načítají automaticky z nastavení.
+// --- FINÁLNÍ OPRAVA ---
+// Načteme .env soubor, POUZE pokud nejsme v produkčním prostředí (na serveru)
+if (process.env.NODE_ENV !== "production") {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const dotenv = require("dotenv");
+  dotenv.config();
+}
 
-// Tato kontrola je v pořádku, nyní bude číst proměnné přímo od Railway.
+// Tato kontrola je nyní univerzální pro lokální i produkční prostředí
 if (
   !process.env.CLOUDINARY_CLOUD_NAME ||
   !process.env.CLOUDINARY_API_KEY ||
   !process.env.CLOUDINARY_API_SECRET
 ) {
-  // Tato chyba se nyní správně zobrazí, pokud proměnné na Railway opravdu chybí.
-  throw new Error("❌ Chybí Cloudinary environment proměnné na serveru.");
+  throw new Error("❌ Chybí Cloudinary environment proměnné. Zkontroluj .env soubor (lokálně) nebo nastavení na serveru (produkce).");
 }
 
 cloudinary.config({
