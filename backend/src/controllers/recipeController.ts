@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import db from "../utils/db"; // Důležitý import pro ověření
 import {
   getAllRecipes,
   getRecipeByIdFromDB,
@@ -14,6 +15,17 @@ import {
   updateIngredientCategory,
   deleteIngredientCategory
 } from "../models/recipeModel";
+
+// --- Pomocná funkce pro ověření admina ---
+const checkAdminPermissions = async (email: string): Promise<boolean> => {
+    if (!email) return false;
+    try {
+        const result = await db.query("SELECT is_admin FROM users WHERE email = $1", [email]);
+        return result.rows.length > 0 && result.rows[0].is_admin === true;
+    } catch {
+        return false;
+    }
+};
 
 // --- Pomocné funkce ---
 function processIngredients(rawIngredients: any): any[] {
@@ -59,7 +71,13 @@ export const getRecipeById = async (req: Request, res: Response): Promise<void> 
 
 export const addRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
-    // OPRAVA: Očekáváme 'mealTypes' (množné číslo) z formuláře
+    // ZDE JE ZMĚNA: Ověření admina se provádí zde, až po načtení dat.
+    const isAdmin = await checkAdminPermissions(req.body.userEmail);
+    if (!isAdmin) {
+        res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
+        return;
+    }
+
     const { title, notes, ingredients, categories, mealTypes, steps } = req.body;
     if (!title || !ingredients || !categories || !mealTypes || !steps) {
       res.status(400).json({ error: "Chybí povinná pole." });
@@ -67,7 +85,6 @@ export const addRecipe = async (req: Request, res: Response): Promise<void> => {
     }
     const parsedIngredients = processIngredients(ingredients);
     const parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
-    // OPRAVA: Používáme proměnnou 'mealTypes'
     const parsedMealTypes = typeof mealTypes === 'string' ? JSON.parse(mealTypes) : mealTypes;
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
     const fileMeta = req.file as { secure_url?: string; path?: string };
@@ -86,7 +103,13 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     return;
   }
   try {
-    // OPRAVA: Očekáváme 'mealTypes' (množné číslo) z formuláře
+    // ZDE JE ZMĚNA: Ověření admina se provádí zde, až po načtení dat.
+    const isAdmin = await checkAdminPermissions(req.body.userEmail);
+    if (!isAdmin) {
+        res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
+        return;
+    }
+
     const { title, notes, ingredients, categories, mealTypes, steps, existingImageUrl } = req.body;
     if (!title || !ingredients || !categories || !mealTypes || !steps) {
       res.status(400).json({ error: "Chybí povinná pole." });
@@ -94,7 +117,6 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     }
     const parsedIngredients = processIngredients(ingredients);
     const parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
-    // OPRAVA: Používáme proměnnou 'mealTypes'
     const parsedMealTypes = typeof mealTypes === 'string' ? JSON.parse(mealTypes) : mealTypes;
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
     const fileMeta = req.file as { secure_url?: string; path?: string } | undefined;
@@ -120,7 +142,7 @@ export const deleteRecipe = async (req: Request, res: Response): Promise<void> =
     }
 };
 
-// --- CONTROLLERY PRO SUROVINY ---
+// --- CONTROLLERY PRO SUROVINY (beze změny) ---
 export const getAllIngredients = async (_req: Request, res: Response): Promise<void> => {
   try {
     const ingredients = await getAllIngredientsFromDB();
@@ -192,7 +214,7 @@ export const deleteIngredient = async (req: Request, res: Response): Promise<voi
     }
 };
 
-// --- CONTROLLERY PRO KATEGORIE ---
+// --- CONTROLLERY PRO KATEGORIE (beze změny) ---
 export const getAllCategories = async (_req: Request, res: Response): Promise<void> => {
     try {
         const categories = await getAllIngredientCategories();
