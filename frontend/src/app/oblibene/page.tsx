@@ -53,18 +53,16 @@ export default function FavoritesPage() {
     const handleRemoveFavorite = async (recipeId: number) => {
         if (!userEmail) return;
 
-        // Okamžitá vizuální odezva - odebereme recept ze seznamu
         const originalRecipes = [...favoriteRecipes];
         setFavoriteRecipes(prev => prev.filter(recipe => recipe.id !== recipeId));
 
         try {
             await fetch(`${API_URL}/api/user/favorites/${recipeId}`, {
-                method: 'POST', // Náš backend toggle endpoint
+                method: 'POST',
                 headers: { "x-user-email": userEmail },
             });
         } catch (error) {
             console.error("Chyba při odebírání z oblíbených:", error);
-            // V případě chyby vrátíme recept zpět do seznamu
             setFavoriteRecipes(originalRecipes);
             alert("Odebrání se nezdařilo, zkuste to prosím znovu.");
         }
@@ -104,11 +102,9 @@ export default function FavoritesPage() {
                                     </div>
                                     <h3 className="text-lg font-bold text-gray-800 mt-4 truncate">{recipe.title}</h3>
                                 </Link>
-                                {/* --- ZDE JE OPRAVA --- */}
-                                {/* Tlačítko pro odebrání je nyní samostatné a zabraňuje navigaci */}
                                 <button
                                     onClick={(e) => {
-                                        e.preventDefault(); // Zabrání přechodu na detail
+                                        e.preventDefault();
                                         handleRemoveFavorite(recipe.id);
                                     }}
                                     className="absolute top-2 right-2 bg-white/80 backdrop-blur-sm p-2 rounded-full hover:bg-white transition z-10"
