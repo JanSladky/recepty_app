@@ -4,8 +4,9 @@ import dotenv from "dotenv";
 
 // 📦 Import rout
 import recipeRoutes from "./routes/recipes";
-import userRoutes from "./routes/users";
-import ingredientRoutes from "./routes/ingredients"; // ✅ Suroviny + kategorie
+// ZMĚNA ZDE: Původně './routes/users', nyní správně odkazuje na náš nový soubor
+import userRoutes from "./routes/userRoutes"; 
+import ingredientRoutes from "./routes/ingredients";
 
 dotenv.config(); // 🔑 Načti .env proměnné
 
@@ -55,8 +56,9 @@ app.get("/", (_req, res) => {
 
 // 📚 Různé routy
 app.use("/api/recipes", recipeRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/ingredients", ingredientRoutes); // ✅ Připojeno správně
+// ZMĚNA ZDE: Původně '/api/users', nyní správně '/api/user', aby to odpovídalo našemu plánu
+app.use("/api/user", userRoutes); 
+app.use("/api/ingredients", ingredientRoutes);
 
 // ⚠️ Globální error handler – musí být až *po* všech routách!
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
