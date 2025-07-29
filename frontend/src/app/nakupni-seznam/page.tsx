@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import SearchBar from "@/components/SearchBar";
-import Image from "next/image";
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-type Ingredient = { name: string; [key: string]: any };
+type Ingredient = { name: string; [key: string]: unknown };
 type Recipe = { id: number; title: string; image_url: string; ingredients: Ingredient[] };
 
 export default function ShoppingListPage() {
