@@ -8,24 +8,25 @@ import {
   updateRecipe,
   deleteRecipe,
 } from "../controllers/recipeController";
-import { verifyAdmin } from "../middleware/auth"; // Tento import zůstává pro mazání
+import { verifyAdmin } from "../middleware/auth";
 
 const router = Router();
 
+// Správné vytvoření Multer instance
 const upload = multer({ storage });
 
-// --- Veřejné GET routy (beze změny) ---
+// --- Veřejné GET routy (bez ověření) ---
 router.get("/", getRecipes);
 router.get("/:id", getRecipeById);
 
 // --- Routy chráněné pro administrátory ---
 
-// ZDE JE ZMĚNA: 'verifyAdmin' je ODSTRANĚNO z cest pro přidání a úpravu.
-// Ověření jsme přesunuli přímo do controlleru, aby se předešlo chybám.
-router.post("/", upload.single("image"), addRecipe);
-router.put("/:id", upload.single("image"), updateRecipe);
+// FINÁLNÍ OPRAVA: Middleware 'upload' musí být PŘED 'verifyAdmin'.
+// Tím zajistíme, že 'req.body' bude existovat, když ho 'verifyAdmin' bude číst.
+router.post("/", upload.single("image"), verifyAdmin, addRecipe);
+router.put("/:id", upload.single("image"), verifyAdmin, updateRecipe);
 
-// 'verifyAdmin' zde ZŮSTÁVÁ, protože mazání nepoužívá obrázky a funguje správně.
+// U mazání obrázek není, takže pořadí je jedno, ale pro konzistenci ho necháme.
 router.delete("/:id", verifyAdmin, deleteRecipe);
 
 export default router;
