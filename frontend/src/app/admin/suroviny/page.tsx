@@ -89,7 +89,8 @@ export default function IngredientAdminPage() {
 
     const editedData = edited[id] || {};
     const mergedData = { ...current, ...editedData };
-    const valueOrNull = (val: any) => (val === "" || val == null ? null : Number(val));
+    // OPRAVA: Nahradili jsme 'any' za specifické typy, abychom prošli kontrolou ESLint.
+    const valueOrNull = (val: string | number | null | undefined) => (val === "" || val == null ? null : Number(val));
     
     const finalPayload = {
       ...mergedData,
