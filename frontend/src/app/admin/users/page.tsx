@@ -58,7 +58,7 @@ export default function AdminUserPage() {
           </tr>
         </thead>
         <tbody>
-          {users.map((u: any) => (
+          {users.map((u: User) => (
             <tr key={u.id} className="border-b">
               <td>{u.name}</td>
               <td>{u.email}</td>
