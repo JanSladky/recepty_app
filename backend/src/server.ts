@@ -53,6 +53,7 @@ app.use("/api/recipes", recipeRoutes);
 app.use("/api/user", userRoutes); // obsahuje /login, /favorites, ...
 app.use("/api/users", usersRoute); // obsahuje /email?email=...
 app.use("/api/ingredients", ingredientRoutes);
+app.use("/api/admin", adminRoutes);
 
 // ⚠️ Globální error handler – musí být až *po* všech routách!
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -63,7 +64,7 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
 
   res.status(status).json({ error: "Serverová chyba", detail: errorMessage });
 });
-app.use("/api/admin", adminRoutes);
+
 
 // 🚀 Spuštění serveru
 app.listen(PORT, () => {

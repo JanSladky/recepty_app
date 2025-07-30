@@ -10,12 +10,15 @@ type User = {
   is_admin: boolean;
 };
 
+// ✅ Načtení URL backendu z .env
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 export default function AdminUserPage() {
   const [users, setUsers] = useState<User[]>([]);
 
   const fetchUsers = async () => {
     const token = localStorage.getItem("token");
-    const { data } = await axios.get<User[]>("/api/admin/users", {
+    const { data } = await axios.get<User[]>(`${API_URL}/api/admin/users`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setUsers(data);
@@ -24,7 +27,7 @@ export default function AdminUserPage() {
   const toggleRole = async (id: number, current: boolean) => {
     const token = localStorage.getItem("token");
     await axios.put(
-      `/api/admin/users/${id}/role`,
+      `${API_URL}/api/admin/users/${id}/role`,
       { is_admin: !current },
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -35,7 +38,7 @@ export default function AdminUserPage() {
 
   const deleteUser = async (id: number) => {
     const token = localStorage.getItem("token");
-    await axios.delete(`/api/admin/users/${id}`, {
+    await axios.delete(`${API_URL}/api/admin/users/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     fetchUsers();

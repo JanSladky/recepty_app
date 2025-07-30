@@ -1,41 +1,41 @@
 import { Request, Response } from "express";
 import db from "../utils/db";
+import type { AuthRequest } from "../middleware/auth";
 
-// ✅ Získání všech uživatelů
-export const getAllUsers = async (_req: Request, res: Response) => {
+// ✅ Seznam všech uživatelů
+export const getAllUsers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { rows } = await db.query("SELECT id, name, email, is_admin FROM users ORDER BY id ASC");
-    res.json(rows);
-  } catch (err) {
-    console.error("❌ Chyba při načítání uživatelů:", err);
-    res.status(500).json({ error: "Chyba serveru" });
+    const result = await db.query("SELECT id, name, email, is_admin FROM users ORDER BY id");
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Chyba při načítání uživatelů:", error);
+    res.status(500).json({ error: "Serverová chyba." });
   }
 };
 
 // ✅ Smazání uživatele
-export const deleteUser = async (req: Request, res: Response) => {
-  const userId = req.params.id;
+export const deleteUser = async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = parseInt(req.params.id);
+
   try {
-    const result = await db.query("DELETE FROM users WHERE id = $1", [userId]);
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Uživatel nenalezen" });
-    }
-    res.json({ message: "Uživatel úspěšně smazán" });
-  } catch (err) {
-    console.error("❌ Chyba při mazání uživatele:", err);
-    res.status(500).json({ error: "Chyba serveru" });
+    await db.query("DELETE FROM users WHERE id = $1", [userId]);
+    res.status(200).json({ message: "Uživatel smazán." });
+  } catch (error) {
+    console.error("Chyba při mazání uživatele:", error);
+    res.status(500).json({ error: "Serverová chyba." });
   }
 };
 
-// ✅ Změna role
-export const toggleAdmin = async (req: Request, res: Response) => {
-  const userId = req.params.id;
+// ✅ Změna role uživatele
+export const updateUserRole = async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = parseInt(req.params.id);
   const { is_admin } = req.body;
+
   try {
     await db.query("UPDATE users SET is_admin = $1 WHERE id = $2", [is_admin, userId]);
-    res.json({ message: "Role upravena" });
-  } catch (err) {
-    console.error("❌ Chyba při změně role:", err);
-    res.status(500).json({ error: "Chyba serveru" });
+    res.status(200).json({ message: "Role uživatele změněna." });
+  } catch (error) {
+    console.error("Chyba při změně role:", error);
+    res.status(500).json({ error: "Serverová chyba." });
   }
 };
