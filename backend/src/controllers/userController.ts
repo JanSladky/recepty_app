@@ -26,11 +26,7 @@ export const loginUser = async (req: AuthRequest, res: Response): Promise<void> 
       return;
     }
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, is_admin: user.is_admin },
-      JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+    const token = jwt.sign({ id: user.id, email: user.email, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: "1d" });
 
     res.status(200).json({
       token,
@@ -55,10 +51,7 @@ export const resetPassword = async (req: AuthRequest, res: Response): Promise<vo
     const salt = await bcrypt.genSalt(10);
     const hashed = await bcrypt.hash(newPassword, salt);
 
-    const result = await db.query(
-      "UPDATE users SET password = $1 WHERE email = $2",
-      [hashed, email]
-    );
+    const result = await db.query("UPDATE users SET password = $1 WHERE email = $2", [hashed, email]);
 
     if (result.rowCount === 0) {
       res.status(404).json({ message: "Uživatel s tímto e-mailem neexistuje." });
@@ -112,25 +105,16 @@ export const toggleFavorite = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    const existing = await db.query(
-      "SELECT * FROM favorites WHERE user_id = $1 AND recipe_id = $2",
-      [userId, recipeId]
-    );
+    const existing = await db.query("SELECT * FROM favorites WHERE user_id = $1 AND recipe_id = $2", [userId, recipeId]);
 
     console.log("📦 existující záznam:", existing.rows);
 
     if (existing.rows.length > 0) {
-      await db.query(
-        "DELETE FROM favorites WHERE user_id = $1 AND recipe_id = $2",
-        [userId, recipeId]
-      );
+      await db.query("DELETE FROM favorites WHERE user_id = $1 AND recipe_id = $2", [userId, recipeId]);
       console.log("🗑️ Recept odebrán z oblíbených");
       res.status(200).json({ message: "Recept odebrán z oblíbených." });
     } else {
-      await db.query(
-        "INSERT INTO favorites (user_id, recipe_id) VALUES ($1, $2)",
-        [userId, recipeId]
-      );
+      await db.query("INSERT INTO favorites (user_id, recipe_id) VALUES ($1, $2)", [userId, recipeId]);
       console.log("⭐ Recept přidán do oblíbených");
       res.status(200).json({ message: "Recept přidán do oblíbených." });
     }
@@ -164,5 +148,39 @@ export const generateShoppingList = async (req: AuthRequest, res: Response): Pro
   } catch (error) {
     console.error("Chyba při generování nákupního seznamu:", error);
     res.status(500).json({ error: "Chyba serveru." });
+  }
+};
+// ✅ Generování nákupního seznamu ze všech receptů v plánu vaření
+export const generateShoppingListFromPlan = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ message: "Neautorizovaný přístup." });
+      return;
+    }
+
+    const planResult = await db.query(`SELECT recipe_id FROM cooking_plan WHERE user_id = $1`, [userId]);
+
+    const recipeIds = planResult.rows.map((row) => row.recipe_id);
+    if (recipeIds.length === 0) {
+      res.status(200).json([]);
+      return; // ukončí funkci bez návratu hodnoty
+    }
+
+    const result = await db.query(
+      `SELECT i.name, SUM(ri.quantity) AS total_quantity, ri.unit
+       FROM recipe_ingredients ri
+       JOIN ingredients i ON ri.ingredient_id = i.id
+       WHERE ri.recipe_id = ANY($1)
+       GROUP BY i.name, ri.unit
+       ORDER BY i.name`,
+      [recipeIds]
+    );
+
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("❌ Chyba při generování seznamu z plánu:", error);
+    res.status(500).json({ error: "Chyba serveru při generování nákupního seznamu." });
   }
 };

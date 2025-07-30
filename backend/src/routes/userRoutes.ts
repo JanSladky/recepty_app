@@ -1,12 +1,6 @@
 // 📁 backend/src/routes/userRoutes.ts
 import express from "express";
-import {
-  loginUser,
-  resetPassword,
-  getMyFavorites,
-  toggleFavorite,
-  generateShoppingList,
-} from "../controllers/userController";
+import { loginUser, resetPassword, getMyFavorites, toggleFavorite, generateShoppingList, generateShoppingListFromPlan } from "../controllers/userController";
 import { authenticateToken } from "../middleware/auth";
 
 const router = express.Router();
@@ -25,5 +19,7 @@ router.post("/favorites/:id/toggle", authenticateToken, toggleFavorite);
 
 // ✅ Vygeneruj nákupní seznam z oblíbených receptů
 router.get("/favorites/shopping-list", authenticateToken, generateShoppingList);
+
+router.post("/shopping-list", authenticateToken, generateShoppingListFromPlan);
 
 export default router;
