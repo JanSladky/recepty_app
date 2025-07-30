@@ -91,6 +91,11 @@ export default function LoginPage() {
       >
         {loading ? "Přihlašuji..." : "Přihlásit se"}
       </button>
+      <p className="text-sm mt-2">
+  <a href="/reset-hesla" className="text-blue-600 hover:underline">
+    Zapomněl/a jste heslo?
+  </a>
+</p>
     </main>
   );
 }
