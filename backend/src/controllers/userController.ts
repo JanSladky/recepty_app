@@ -163,3 +163,21 @@ export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<v
   }
   res.status(200).json(req.user);
 };
+// ✅ Nákupní seznam z plánovaného týdne – placeholder
+export const generateShoppingListFromPlan = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ message: "Neautorizovaný přístup." });
+      return;
+    }
+
+    // Tady později můžeš načíst plánované recepty podle datumu nebo týdne (např. z tabulky meal_plan)
+
+    res.status(200).json({ message: "Funkce nákupního seznamu z plánu zatím není implementována." });
+  } catch (error) {
+    console.error("Chyba při generování nákupního seznamu z plánu:", error);
+    res.status(500).json({ error: "Chyba serveru." });
+  }
+};
