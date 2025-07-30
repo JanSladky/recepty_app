@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import useAdmin from "@/hooks/useAdmin";
 
@@ -17,7 +17,7 @@ const DashboardTile = ({ href, title, description, icon }: { href: string; title
 export default function DashboardPage() {
   const router = useRouter();
   const { isAdmin, loading } = useAdmin();
-  
+
   useEffect(() => {
     const email = localStorage.getItem("userEmail");
     if (!email || (!loading && isAdmin === false)) {
