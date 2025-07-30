@@ -1,11 +1,11 @@
-import { Router } from "express";
+// 📁 backend/src/routes/adminRoutes.ts
 
+import { Router } from "express";
 import {
   getAllUsers,
   deleteUser,
   updateUserRole,
 } from "../controllers/adminController";
-
 import {
   authenticateToken,
   verifyAdmin,
@@ -13,16 +13,11 @@ import {
 
 const router = Router();
 
-// 🔐 Kombinovaný middleware pro adminy
+// 🔐 Kombinovaný middleware
 const adminOnly = [authenticateToken, verifyAdmin];
 
-// ✅ Získání všech uživatelů
 router.get("/users", adminOnly, getAllUsers);
-
-// ✅ Smazání uživatele dle ID
 router.delete("/users/:id", adminOnly, deleteUser);
-
-// ✅ Změna role uživatele (admin <-> user)
 router.put("/users/:id/role", adminOnly, updateUserRole);
 
 export default router;
