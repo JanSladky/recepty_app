@@ -1,87 +1,146 @@
 import { Request, Response } from "express";
-import { AuthRequest } from "../middleware/auth";
-import { 
-    getAllRecipes,
-    getFavoriteRecipeIdsForUser, 
-    addFavoriteInDB, 
-    removeFavoriteInDB,
-    getIngredientsForRecipes
-} from "../models/recipeModel";
-import type { IngredientInput } from "../models/recipeModel";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import db from "../utils/db";
 
-// Získá všechny oblíbené recepty a IDčka pro přihlášeného uživatele
-export const getMyFavorites = async (req: AuthRequest, res: Response): Promise<void> => {
-    if (!req.user) {
-        res.status(401).json({ error: "Neautorizovaný přístup" });
-        return;
+const JWT_SECRET = process.env.JWT_SECRET || "tajny_klic";
+
+// ✅ Přihlášení uživatele
+export const loginUser = async (req: Request, res: Response): Promise<void> => {
+  const { email, password } = req.body;
+
+  try {
+    const result = await db.query("SELECT * FROM users WHERE email = $1", [email]);
+    const user = result.rows[0];
+
+    if (!user) {
+      res.status(401).json({ message: "Neplatné přihlašovací údaje." });
+      return;
     }
-    try {
-        const allRecipes = await getAllRecipes();
-        const favoriteIds = await getFavoriteRecipeIdsForUser(req.user.id);
-        const favoriteRecipes = allRecipes.filter(recipe => favoriteIds.includes(recipe.id));
-        
-        res.status(200).json({ favorites: favoriteRecipes, favoriteIds });
-    } catch (error) {
-        res.status(500).json({ error: "Chyba při načítání oblíbených receptů" });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      res.status(401).json({ message: "Neplatné přihlašovací údaje." });
+      return;
     }
+
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
+      expiresIn: "1d",
+    });
+
+    res.status(200).json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        is_admin: user.is_admin,
+      },
+    });
+  } catch (error) {
+    console.error("Chyba při přihlášení:", error);
+    res.status(500).json({ error: "Chyba serveru při přihlášení." });
+  }
 };
 
-// Přepne stav oblíbenosti (přidá/odebere)
-export const toggleFavorite = async (req: AuthRequest, res: Response): Promise<void> => {
-    if (!req.user) {
-        res.status(401).json({ error: "Neautorizovaný přístup" });
-        return;
+// ✅ Reset hesla pro zadaný e-mail (např. dočasné řešení)
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  const { email, newPassword } = req.body;
+
+  try {
+    const salt = await bcrypt.genSalt(10);
+    const hashed = await bcrypt.hash(newPassword, salt);
+
+    const result = await db.query("UPDATE users SET password = $1 WHERE email = $2", [
+      hashed,
+      email,
+    ]);
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: "Uživatel s tímto e-mailem neexistuje." });
+      return;
     }
-    const recipeId = Number(req.params.id);
-    try {
-        const favoriteIds = await getFavoriteRecipeIdsForUser(req.user.id);
-        if (favoriteIds.includes(recipeId)) {
-            await removeFavoriteInDB(req.user.id, recipeId);
-            res.status(200).json({ message: "Recept odebrán z oblíbených", isFavorite: false });
-        } else {
-            await addFavoriteInDB(req.user.id, recipeId);
-            res.status(200).json({ message: "Recept přidán do oblíbených", isFavorite: true });
-        }
-    } catch (error) {
-        res.status(500).json({ error: "Chyba při změně stavu oblíbenosti" });
-    }
+
+    res.status(200).json({ message: "Heslo bylo úspěšně změněno." });
+  } catch (error) {
+    console.error("Chyba při resetování hesla:", error);
+    res.status(500).json({ error: "Chyba serveru při resetu hesla." });
+  }
 };
 
-// Vygeneruje nákupní seznam
+// ✅ Získání oblíbených receptů přihlášeného uživatele
+export const getMyFavorites = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.body.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ message: "Neautorizovaný přístup." });
+      return;
+    }
+
+    const result = await db.query(
+      `SELECT r.* FROM recipes r
+       JOIN favorites f ON r.id = f.recipe_id
+       WHERE f.user_id = $1`,
+      [userId]
+    );
+
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Chyba při načítání oblíbených receptů:", error);
+    res.status(500).json({ error: "Chyba serveru." });
+  }
+};
+
+// ✅ Přidání nebo odebrání receptu z oblíbených
+export const toggleFavorite = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.body.user?.id;
+    const recipeId = parseInt(req.params.id);
+
+    const existing = await db.query(
+      "SELECT * FROM favorites WHERE user_id = $1 AND recipe_id = $2",
+      [userId, recipeId]
+    );
+
+    if (existing.rows.length > 0) {
+      await db.query("DELETE FROM favorites WHERE user_id = $1 AND recipe_id = $2", [
+        userId,
+        recipeId,
+      ]);
+      res.status(200).json({ message: "Recept odebrán z oblíbených." });
+    } else {
+      await db.query("INSERT INTO favorites (user_id, recipe_id) VALUES ($1, $2)", [
+        userId,
+        recipeId,
+      ]);
+      res.status(200).json({ message: "Recept přidán do oblíbených." });
+    }
+  } catch (error) {
+    console.error("Chyba při úpravě oblíbených:", error);
+    res.status(500).json({ error: "Chyba serveru." });
+  }
+};
+
+// ✅ Generování nákupního seznamu z oblíbených receptů
 export const generateShoppingList = async (req: Request, res: Response): Promise<void> => {
-    // OPRAVA: Explicitně říkáme TypeScriptu, jaký typ má req.body
-    const { recipeIds } = req.body as { recipeIds: number[] };
-    
-    if (!Array.isArray(recipeIds) || recipeIds.length === 0) {
-        res.status(400).json({ error: "Chybí ID receptů" });
-        return;
-    }
-    try {
-        const ingredients = await getIngredientsForRecipes(recipeIds);
-        
-        const shoppingList: { [key: string]: { amount: number; unit: string } } = {};
-        
-        ingredients.forEach(ing => {
-            const key = `${ing.name.toLowerCase()}_${ing.unit.toLowerCase()}`;
-            if (shoppingList[key]) {
-                shoppingList[key].amount += ing.amount;
-            } else {
-                shoppingList[key] = { amount: ing.amount, unit: ing.unit };
-            }
-        });
+  try {
+    const userId = req.body.user?.id;
 
-        const formattedList = Object.values(shoppingList).map(value => {
-            const key = Object.keys(shoppingList).find(k => shoppingList[k] === value) || '';
-            const name = key.split('_')[0];
-            return {
-                name: name.charAt(0).toUpperCase() + name.slice(1),
-                amount: value.amount,
-                unit: value.unit
-            };
-        });
+    const result = await db.query(
+      `SELECT i.name, ri.quantity, ri.unit
+       FROM recipes r
+       JOIN favorites f ON f.recipe_id = r.id
+       JOIN recipe_ingredients ri ON ri.recipe_id = r.id
+       JOIN ingredients i ON i.id = ri.ingredient_id
+       WHERE f.user_id = $1`,
+      [userId]
+    );
 
-        res.status(200).json(formattedList);
-    } catch (error) {
-        res.status(500).json({ error: "Chyba při generování nákupního seznamu" });
-    }
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Chyba při generování nákupního seznamu:", error);
+    res.status(500).json({ error: "Chyba serveru." });
+  }
 };

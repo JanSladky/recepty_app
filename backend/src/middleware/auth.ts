@@ -1,58 +1,64 @@
 import type { Request, Response, NextFunction } from "express";
-import db from "../utils/db";
+import jwt from "jsonwebtoken";
 
-// Rozšíříme si typ Request, aby mohl obsahovat informace o uživateli
-export interface AuthRequest extends Request {
-    user?: {
-        id: number;
-        email: string;
-    }
+// Získáme typ pro JWT payload
+interface JwtPayload {
+  id: number;
+  email: string;
+  is_admin: boolean;
 }
 
-// Nový middleware pro ověření jakéhokoliv přihlášeného uživatele
-export const verifyUser = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    // FINÁLNÍ OPRAVA: Bezpečně zkontrolujeme, zda req.body existuje, než se z něj pokusíme číst.
-    const email = (req.body && req.body.userEmail) || req.header("x-user-email");
-    
-    if (!email) {
-      res.status(401).json({ error: "Chybí e-mail pro ověření." });
-      return;
-    }
+// Rozšířený typ Request s uživatelem
+export interface AuthRequest extends Request {
+  user?: JwtPayload;
+}
 
-    const result = await db.query("SELECT id, email FROM users WHERE email = $1", [email]);
-    if (result.rows.length === 0) {
-      res.status(403).json({ error: "Uživatel nenalezen." });
-      return;
-    }
-    
-    req.user = result.rows[0]; // Připojíme info o uživateli k požadavku
+const JWT_SECRET = process.env.JWT_SECRET || "tajny_klic";
+
+// Middleware pro ověření přihlášeného uživatele
+export const verifyUser = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Chybí nebo neplatný autorizační token." });
+    return;
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    req.user = decoded;
     next();
   } catch (err) {
-    console.error("🔥 Kritická chyba v middleware 'verifyUser':", err);
-    res.status(500).json({ error: "Interní chyba serveru při ověřování.", detail: (err as Error).message });
+    console.error("❌ Chyba při ověření tokenu:", err);
+    res.status(401).json({ error: "Neplatný nebo expirovaný token." });
   }
 };
 
-// Tvoje stávající funkce pro ověření admina (zůstává)
-export const verifyAdmin = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-    // FINÁLNÍ OPRAVA: Stejnou bezpečnou kontrolu přidáme i sem pro konzistenci.
-    const email = (req.body && req.body.userEmail) || req.header("x-user-email");
+// Middleware pro ověření administrátora
+export const verifyAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  const authHeader = req.headers.authorization;
 
-    if (!email) {
-      res.status(401).json({ error: "Chybí e-mail pro ověření." });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Chybí nebo neplatný autorizační token." });
+    return;
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+
+    if (!decoded.is_admin) {
+      res.status(403).json({ error: "Přístup zakázán. Musíš být administrátor." });
       return;
     }
-    try {
-        const result = await db.query("SELECT id, email, is_admin FROM users WHERE email = $1", [email]);
-        if (result.rows.length === 0 || !result.rows[0].is_admin) {
-            res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
-            return;
-        }
-        req.user = result.rows[0];
-        next();
-    } catch (err) {
-        console.error("🔥 Kritická chyba v middleware 'verifyAdmin':", err);
-        res.status(500).json({ error: "Interní chyba serveru při ověřování.", detail: (err as Error).message });
-    }
+
+    req.user = decoded;
+    next();
+  } catch (err) {
+    console.error("❌ Chyba při ověření admina:", err);
+    res.status(401).json({ error: "Neplatný nebo expirovaný token." });
+  }
 };
