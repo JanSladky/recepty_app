@@ -26,7 +26,11 @@ export const loginUser = async (req: AuthRequest, res: Response): Promise<void> 
       return;
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: "1d" });
+    const token = jwt.sign(
+      { id: user.id, email: user.email, is_admin: user.is_admin },
+      JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
     res.status(200).json({
       token,
@@ -95,36 +99,36 @@ export const toggleFavorite = async (req: AuthRequest, res: Response): Promise<v
     const userId = req.user?.id;
     const recipeId = parseInt(req.params.id);
 
-    console.log("🔁 toggleFavorite");
-    console.log("➡️ userId:", userId);
-    console.log("➡️ recipeId:", recipeId);
-
     if (!userId || isNaN(recipeId)) {
-      console.log("❌ Neplatné ID!");
       res.status(400).json({ message: "Neplatné ID uživatele nebo receptu." });
       return;
     }
 
-    const existing = await db.query("SELECT * FROM favorites WHERE user_id = $1 AND recipe_id = $2", [userId, recipeId]);
-
-    console.log("📦 existující záznam:", existing.rows);
+    const existing = await db.query(
+      "SELECT * FROM favorites WHERE user_id = $1 AND recipe_id = $2",
+      [userId, recipeId]
+    );
 
     if (existing.rows.length > 0) {
-      await db.query("DELETE FROM favorites WHERE user_id = $1 AND recipe_id = $2", [userId, recipeId]);
-      console.log("🗑️ Recept odebrán z oblíbených");
+      await db.query(
+        "DELETE FROM favorites WHERE user_id = $1 AND recipe_id = $2",
+        [userId, recipeId]
+      );
       res.status(200).json({ message: "Recept odebrán z oblíbených." });
     } else {
-      await db.query("INSERT INTO favorites (user_id, recipe_id) VALUES ($1, $2)", [userId, recipeId]);
-      console.log("⭐ Recept přidán do oblíbených");
+      await db.query(
+        "INSERT INTO favorites (user_id, recipe_id) VALUES ($1, $2)",
+        [userId, recipeId]
+      );
       res.status(200).json({ message: "Recept přidán do oblíbených." });
     }
   } catch (error) {
-    console.error("❌ Chyba při úpravě oblíbených:", error);
+    console.error("Chyba při úpravě oblíbených:", error);
     res.status(500).json({ error: "Chyba serveru." });
   }
 };
 
-// ✅ Generování nákupního seznamu z oblíbených receptů
+// ✅ Nákupní seznam z oblíbených receptů
 export const generateShoppingList = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -150,37 +154,12 @@ export const generateShoppingList = async (req: AuthRequest, res: Response): Pro
     res.status(500).json({ error: "Chyba serveru." });
   }
 };
-// ✅ Generování nákupního seznamu ze všech receptů v plánu vaření
-export const generateShoppingListFromPlan = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.user?.id;
 
-    if (!userId) {
-      res.status(401).json({ message: "Neautorizovaný přístup." });
-      return;
-    }
-
-    const planResult = await db.query(`SELECT recipe_id FROM cooking_plan WHERE user_id = $1`, [userId]);
-
-    const recipeIds = planResult.rows.map((row) => row.recipe_id);
-    if (recipeIds.length === 0) {
-      res.status(200).json([]);
-      return; // ukončí funkci bez návratu hodnoty
-    }
-
-    const result = await db.query(
-      `SELECT i.name, SUM(ri.quantity) AS total_quantity, ri.unit
-       FROM recipe_ingredients ri
-       JOIN ingredients i ON ri.ingredient_id = i.id
-       WHERE ri.recipe_id = ANY($1)
-       GROUP BY i.name, ri.unit
-       ORDER BY i.name`,
-      [recipeIds]
-    );
-
-    res.status(200).json(result.rows);
-  } catch (error) {
-    console.error("❌ Chyba při generování seznamu z plánu:", error);
-    res.status(500).json({ error: "Chyba serveru při generování nákupního seznamu." });
+// ✅ Volitelně: Získání tokenu uživatele – pro frontend `/me`
+export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ message: "Neautorizovaný přístup." });
+    return;
   }
+  res.status(200).json(req.user);
 };

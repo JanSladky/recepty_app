@@ -52,7 +52,7 @@ export default function LoginPage() {
 
       alert("✅ Přihlášení úspěšné.");
       window.location.href = "/";
-    } catch (err: unknown) {
+    } catch (err) {
       if (err instanceof Error) {
         console.error("❌ Chyba při přihlašování:", err);
         alert("❌ Nastala chyba: " + err.message);
@@ -94,6 +94,12 @@ export default function LoginPage() {
       >
         {loading ? "Přihlašuji..." : "Přihlásit se"}
       </button>
+      <p className="text-sm mt-2">
+        Nemáte účet?{" "}
+        <a href="/register" className="text-blue-500 underline">
+          Zaregistrovat se
+        </a>
+      </p>
       <p className="text-sm mt-2">
         <a href="/reset-hesla" className="text-blue-600 hover:underline">
           Zapomněl/a jste heslo?
