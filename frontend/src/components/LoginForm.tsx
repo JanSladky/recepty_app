@@ -15,7 +15,7 @@ const LoginForm = () => {
     e.preventDefault();
 
     try {
-      const res = await fetch(`${API_URL}/api/auth/login`, {
+      const res = await fetch(`${API_URL}/api/user/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -29,7 +29,7 @@ const LoginForm = () => {
 
       setMessage("✅ Přihlášení úspěšné");
       window.location.href = "/";
-    } catch (err: unknown) {
+    } catch (err) {
       if (err instanceof Error) {
         setMessage("❌ " + err.message);
       } else {
@@ -42,22 +42,8 @@ const LoginForm = () => {
     <form onSubmit={handleLogin} className="space-y-4">
       <h2 className="text-xl font-bold">Přihlášení</h2>
 
-      <input
-        type="email"
-        placeholder="E-mail"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="border p-2 w-full"
-        required
-      />
-      <input
-        type="password"
-        placeholder="Heslo"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="border p-2 w-full"
-        required
-      />
+      <input type="email" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} className="border p-2 w-full" required />
+      <input type="password" placeholder="Heslo" value={password} onChange={(e) => setPassword(e.target.value)} className="border p-2 w-full" required />
       <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded">
         Přihlásit se
       </button>
