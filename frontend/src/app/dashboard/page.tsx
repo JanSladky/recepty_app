@@ -17,17 +17,13 @@ const DashboardTile = ({ href, title, description, icon }: { href: string; title
 export default function DashboardPage() {
   const router = useRouter();
   const { isAdmin, loading } = useAdmin();
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-
+  
   useEffect(() => {
     const email = localStorage.getItem("userEmail");
-    setUserEmail(email);
-
-    // ⛔️ Přesměrování pokud uživatel není přihlášen nebo není admin
     if (!email || (!loading && isAdmin === false)) {
       router.push("/login");
     }
-  }, [loading, isAdmin]);
+  }, [loading, isAdmin, router]);
 
   // ⏳ Načítání
   if (loading || isAdmin === null) {
