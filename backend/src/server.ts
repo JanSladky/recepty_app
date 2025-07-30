@@ -10,7 +10,7 @@ import userRoutes from "./routes/userRoutes"; // Obsahuje: přihlášení, oblí
 import usersRoute from "./routes/users"; // Obsahuje: vyhledávání uživatele podle emailu
 import ingredientRoutes from "./routes/ingredients";
 
-dotenv.config(); // 🔑 Načti .env proměnné
+dotenv.config(); // 🔑 Načti .env proměnné.
 
 const app = express();
 const PORT = process.env.PORT || 8080;
