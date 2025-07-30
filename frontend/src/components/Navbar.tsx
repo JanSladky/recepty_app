@@ -34,21 +34,24 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop navigace */}
+        {/* Desktop navigace */}
         <div className="hidden md:flex gap-6 items-center">
           <Link href="/" className="hover:underline">
             Domů
           </Link>
-          <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
+          <Link href="/dashboard" className="hover:underline">
             Dashboard
           </Link>
           <Link href="/recepty" className="hover:underline">
             Recepty
           </Link>
-          <Link href="/admin/users" className="hover:underline">
-  Správa uživatelů
-</Link>
+
+          {/* ✅ Oprava: Zobrazit jen adminovi */}
           {!loading && isAdmin && (
             <>
+              <Link href="/admin/users" className="hover:underline">
+                Správa uživatelů
+              </Link>
               <Link href="/pridat-recept" className="hover:underline">
                 Přidat recept
               </Link>
@@ -57,6 +60,7 @@ export default function Navbar() {
               </Link>
             </>
           )}
+
           {!loading && isLoggedIn ? (
             <button onClick={handleLogout} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400 transition">
               Odhlásit se
@@ -90,8 +94,13 @@ export default function Navbar() {
           <Link href="/recepty" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
             Recepty
           </Link>
+
+          {/* ✅ Oprava: jen pro adminy */}
           {!loading && isAdmin && (
             <>
+              <Link href="/admin/users" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
+                Správa uživatelů
+              </Link>
               <Link href="/pridat-recept" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
                 Přidat recept
               </Link>
@@ -100,6 +109,7 @@ export default function Navbar() {
               </Link>
             </>
           )}
+
           {!loading && isLoggedIn ? (
             <button
               onClick={() => {

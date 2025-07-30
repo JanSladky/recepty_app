@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function LoginPage() {
+   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+ 
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -51,7 +54,7 @@ export default function LoginPage() {
       localStorage.setItem("isAdmin", user.is_admin ? "true" : "false");
 
       alert("✅ Přihlášení úspěšné.");
-      window.location.href = "/";
+      router.push("/dashboard");
     } catch (err) {
       if (err instanceof Error) {
         console.error("❌ Chyba při přihlašování:", err);

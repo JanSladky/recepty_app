@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import useAdmin from "@/hooks/useAdmin";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import useAdmin from "@/hooks/useAdmin";
 
 // --- Komponenta pro dlaždici ---
 const DashboardTile = ({ href, title, description, icon }: { href: string; title: string; description: string; icon: string }) => (
@@ -14,25 +15,23 @@ const DashboardTile = ({ href, title, description, icon }: { href: string; title
 );
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { isAdmin, loading } = useAdmin();
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    setUserEmail(localStorage.getItem("userEmail"));
-  }, []);
+    const email = localStorage.getItem("userEmail");
+    setUserEmail(email);
 
-  if (loading) return <p className="text-center p-10">Načítání...</p>;
+    // ⛔️ Přesměrování pokud uživatel není přihlášen nebo není admin
+    if (!email || (!loading && isAdmin === false)) {
+      router.push("/login");
+    }
+  }, [loading, isAdmin]);
 
-  if (!userEmail) {
-    return (
-      <div className="text-center p-10">
-        <h1 className="text-2xl font-bold text-gray-800">Přístup odepřen</h1>
-        <p className="text-gray-500 mt-2">Pro zobrazení této stránky se musíte přihlásit.</p>
-        <Link href="/login" className="mt-4 inline-block bg-green-600 text-white px-6 py-2 rounded-lg font-semibold">
-          Přejít na přihlášení
-        </Link>
-      </div>
-    );
+  // ⏳ Načítání
+  if (loading || isAdmin === null) {
+    return <p className="text-center p-10">Načítání...</p>;
   }
 
   return (
@@ -49,15 +48,9 @@ export default function DashboardPage() {
           <DashboardTile href="/nakupni-seznam" title="Nákupní seznam" description="Naplánuj si vaření a vytvoř si seznam." icon="🛒" />
 
           {/* Dlaždice pouze pro adminy */}
-          {!loading && isAdmin && (
+          {isAdmin && (
             <>
               <DashboardTile href="/pridat-recept" title="Přidat nový recept" description="Vytvoř a sdílej nový recept s ostatními." icon="➕" />
-              <DashboardTile
-                href="/vytvorit-recept"
-                title="Vytvořit recept"
-                description="Otevři prázdný formulář a zapiš vlastní recept od začátku."
-                icon="✏️"
-              />
               <DashboardTile href="/admin/suroviny" title="Správa surovin" description="Upravuj suroviny a jejich kategorie." icon="🥕" />
               <DashboardTile href="/admin/users" title="Správa uživatelů" description="Prohlížej, upravuj nebo mazej uživatele aplikace." icon="🧑‍💼" />
             </>
