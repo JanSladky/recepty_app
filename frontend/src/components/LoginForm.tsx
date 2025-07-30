@@ -1,12 +1,12 @@
-// 📁 frontend/src/components/LoginForm.tsx
-
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const LoginForm = () => {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -15,8 +15,6 @@ const LoginForm = () => {
     e.preventDefault();
 
     const loginUrl = `${API_URL}/api/user/login`;
-    console.log("🌍 API_URL:", API_URL);
-    console.log("📡 Fetching:", loginUrl);
 
     try {
       const res = await fetch(loginUrl, {
@@ -28,18 +26,20 @@ const LoginForm = () => {
       const data = await res.json();
 
       if (!res.ok) {
-        console.error("❌ Chyba odpovědi:", data);
         throw new Error(data.error || "Přihlášení selhalo");
       }
 
+      // 🔐 Uložení dat do localStorage
       localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("userEmail", data.user.email);
+      localStorage.setItem("isAdmin", data.user.is_admin ? "true" : "false");
 
       setMessage("✅ Přihlášení úspěšné");
-      window.location.href = "/";
+
+      // ✅ Přesměrování na dashboard
+      router.push("/dashboard");
     } catch (err) {
       if (err instanceof Error) {
-        console.error("❌ Chyba při přihlášení:", err.message);
         setMessage("❌ " + err.message);
       } else {
         setMessage("❌ Neznámá chyba při přihlášení.");
