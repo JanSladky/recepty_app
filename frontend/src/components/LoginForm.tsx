@@ -13,7 +13,7 @@ const LoginForm = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    console.log("API URL:", process.env.NEXT_PUBLIC_API_URL);
     try {
       const res = await fetch(`${API_URL}/api/user/login`, {
         method: "POST",
