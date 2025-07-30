@@ -1,28 +1,29 @@
-import { Router } from "express";
-import { verifyUser } from "../middleware/auth";
+// 📁 backend/src/routes/userRoutes.ts
+import express from "express";
 import {
   loginUser,
+  resetPassword,
   getMyFavorites,
   toggleFavorite,
   generateShoppingList,
-  resetPassword, // ✅ nový import
 } from "../controllers/userController";
+import { authenticateToken } from "../middleware/auth";
 
-const router = Router();
+const router = express.Router();
 
-// ✅ Přihlášení uživatele
+// ✅ Přihlášení
 router.post("/login", loginUser);
 
-// ✅ Reset hesla pro uživatele podle e-mailu
-router.post("/reset-password", resetPassword); // ✅ nový endpoint
+// ✅ Reset hesla
+router.post("/reset-password", resetPassword);
 
-// ✅ Získá všechny oblíbené recepty přihlášeného uživatele
-router.get("/favorites", verifyUser, getMyFavorites);
+// ✅ Načti oblíbené recepty přihlášeného uživatele
+router.get("/favorites", authenticateToken, getMyFavorites);
 
-// ✅ Přidá nebo odebere recept z oblíbených (uživatel musí být přihlášen)
-router.post("/favorites/:id", verifyUser, toggleFavorite);
+// ✅ Přepnout oblíbený recept (přidat nebo odebrat)
+router.post("/favorites/:id/toggle", authenticateToken, toggleFavorite);
 
-// ✅ Vygeneruje nákupní seznam – ověřený uživatel
-router.post("/shopping-list", verifyUser, generateShoppingList);
+// ✅ Vygeneruj nákupní seznam z oblíbených receptů
+router.get("/favorites/shopping-list", authenticateToken, generateShoppingList);
 
 export default router;

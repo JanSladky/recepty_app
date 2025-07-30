@@ -1,12 +1,13 @@
-import { Request, Response } from "express";
+import type { Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import db from "../utils/db";
+import type { AuthRequest } from "../middleware/auth";
 
 const JWT_SECRET = process.env.JWT_SECRET || "tajny_klic";
 
 // ✅ Přihlášení uživatele
-export const loginUser = async (req: Request, res: Response): Promise<void> => {
+export const loginUser = async (req: AuthRequest, res: Response): Promise<void> => {
   const { email, password } = req.body;
 
   try {
@@ -25,9 +26,11 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
-      expiresIn: "1d",
-    });
+    const token = jwt.sign(
+      { id: user.id, email: user.email, is_admin: user.is_admin },
+      JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
     res.status(200).json({
       token,
@@ -44,18 +47,18 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-// ✅ Reset hesla pro zadaný e-mail (např. dočasné řešení)
-export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+// ✅ Reset hesla pro uživatele podle e-mailu
+export const resetPassword = async (req: AuthRequest, res: Response): Promise<void> => {
   const { email, newPassword } = req.body;
 
   try {
     const salt = await bcrypt.genSalt(10);
     const hashed = await bcrypt.hash(newPassword, salt);
 
-    const result = await db.query("UPDATE users SET password = $1 WHERE email = $2", [
-      hashed,
-      email,
-    ]);
+    const result = await db.query(
+      "UPDATE users SET password = $1 WHERE email = $2",
+      [hashed, email]
+    );
 
     if (result.rowCount === 0) {
       res.status(404).json({ message: "Uživatel s tímto e-mailem neexistuje." });
@@ -70,9 +73,9 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
 };
 
 // ✅ Získání oblíbených receptů přihlášeného uživatele
-export const getMyFavorites = async (req: Request, res: Response): Promise<void> => {
+export const getMyFavorites = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const userId = req.body.user?.id;
+    const userId = req.user?.id;
 
     if (!userId) {
       res.status(401).json({ message: "Neautorizovaný přístup." });
@@ -94,39 +97,58 @@ export const getMyFavorites = async (req: Request, res: Response): Promise<void>
 };
 
 // ✅ Přidání nebo odebrání receptu z oblíbených
-export const toggleFavorite = async (req: Request, res: Response): Promise<void> => {
+export const toggleFavorite = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const userId = req.body.user?.id;
+    const userId = req.user?.id;
     const recipeId = parseInt(req.params.id);
+
+    console.log("🔁 toggleFavorite");
+    console.log("➡️ userId:", userId);
+    console.log("➡️ recipeId:", recipeId);
+
+    if (!userId || isNaN(recipeId)) {
+      console.log("❌ Neplatné ID!");
+      res.status(400).json({ message: "Neplatné ID uživatele nebo receptu." });
+      return;
+    }
 
     const existing = await db.query(
       "SELECT * FROM favorites WHERE user_id = $1 AND recipe_id = $2",
       [userId, recipeId]
     );
 
+    console.log("📦 existující záznam:", existing.rows);
+
     if (existing.rows.length > 0) {
-      await db.query("DELETE FROM favorites WHERE user_id = $1 AND recipe_id = $2", [
-        userId,
-        recipeId,
-      ]);
+      await db.query(
+        "DELETE FROM favorites WHERE user_id = $1 AND recipe_id = $2",
+        [userId, recipeId]
+      );
+      console.log("🗑️ Recept odebrán z oblíbených");
       res.status(200).json({ message: "Recept odebrán z oblíbených." });
     } else {
-      await db.query("INSERT INTO favorites (user_id, recipe_id) VALUES ($1, $2)", [
-        userId,
-        recipeId,
-      ]);
+      await db.query(
+        "INSERT INTO favorites (user_id, recipe_id) VALUES ($1, $2)",
+        [userId, recipeId]
+      );
+      console.log("⭐ Recept přidán do oblíbených");
       res.status(200).json({ message: "Recept přidán do oblíbených." });
     }
   } catch (error) {
-    console.error("Chyba při úpravě oblíbených:", error);
+    console.error("❌ Chyba při úpravě oblíbených:", error);
     res.status(500).json({ error: "Chyba serveru." });
   }
 };
 
 // ✅ Generování nákupního seznamu z oblíbených receptů
-export const generateShoppingList = async (req: Request, res: Response): Promise<void> => {
+export const generateShoppingList = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const userId = req.body.user?.id;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ message: "Neautorizovaný přístup." });
+      return;
+    }
 
     const result = await db.query(
       `SELECT i.name, ri.quantity, ri.unit

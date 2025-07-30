@@ -1,64 +1,52 @@
+// 📁 backend/src/middleware/auth.ts
+
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-// Získáme typ pro JWT payload
+// JWT payload typ
 interface JwtPayload {
   id: number;
   email: string;
   is_admin: boolean;
 }
 
-// Rozšířený typ Request s uživatelem
+// Rozšířený Request typ
 export interface AuthRequest extends Request {
   user?: JwtPayload;
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || "tajny_klic";
 
-// Middleware pro ověření přihlášeného uživatele
-export const verifyUser = (req: AuthRequest, res: Response, next: NextFunction): void => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Chybí nebo neplatný autorizační token." });
-    return;
-  }
-
-  const token = authHeader.split(" ")[1];
-
+// ✅ Middleware: Ověření tokenu a připojení uživatele k req
+export const authenticateToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-    req.user = decoded;
-    next();
-  } catch (err) {
-    console.error("❌ Chyba při ověření tokenu:", err);
-    res.status(401).json({ error: "Neplatný nebo expirovaný token." });
-  }
-};
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
 
-// Middleware pro ověření administrátora
-export const verifyAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Chybí nebo neplatný autorizační token." });
-    return;
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-
-    if (!decoded.is_admin) {
-      res.status(403).json({ error: "Přístup zakázán. Musíš být administrátor." });
+    if (!token) {
+      res.status(401).json({ message: "Chybí token." });
       return;
     }
 
-    req.user = decoded;
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+
+    // ✅ Uložení uživatele do requestu
+    (req as AuthRequest).user = decoded;
+
     next();
-  } catch (err) {
-    console.error("❌ Chyba při ověření admina:", err);
-    res.status(401).json({ error: "Neplatný nebo expirovaný token." });
+  } catch (error) {
+    console.error("Chyba autentizace:", error);
+    res.status(403).json({ message: "Neplatný nebo expirovaný token." });
   }
 };
+
+// ✅ Middleware: Ověření admin práv
+export const verifyAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  if (!req.user?.is_admin) {
+    res.status(403).json({ message: "Přístup pouze pro administrátory." });
+    return;
+  }
+
+  next();
+};
+export const verifyUser = authenticateToken;

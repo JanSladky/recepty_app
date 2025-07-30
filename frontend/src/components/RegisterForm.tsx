@@ -28,8 +28,12 @@ const RegisterForm = () => {
       setName("");
       setEmail("");
       setPassword("");
-    } catch (err: any) {
-      setMessage("❌ " + err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setMessage("❌ " + err.message);
+      } else {
+        setMessage("❌ Neznámá chyba při registraci.");
+      }
     }
   };
 

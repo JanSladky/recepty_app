@@ -6,7 +6,8 @@ import dotenv from "dotenv";
 
 // 📦 Import rout
 import recipeRoutes from "./routes/recipes";
-import userRoutes from "./routes/userRoutes"; // ✅ Ponecháme název souboru userRoutes.ts
+import userRoutes from "./routes/userRoutes"; // Obsahuje: přihlášení, oblíbené, nákupní seznam
+import usersRoute from "./routes/users"; // Obsahuje: vyhledávání uživatele podle emailu
 import ingredientRoutes from "./routes/ingredients";
 
 dotenv.config(); // 🔑 Načti .env proměnné
@@ -55,7 +56,8 @@ app.get("/", (_req, res) => {
 
 // 📚 Různé routy
 app.use("/api/recipes", recipeRoutes);
-app.use("/api/users", userRoutes); // ✅ Opraveno zpět na množné číslo
+app.use("/api/user", userRoutes); // obsahuje /login, /favorites, ...
+app.use("/api/users", usersRoute); // obsahuje /email?email=...
 app.use("/api/ingredients", ingredientRoutes);
 
 // ⚠️ Globální error handler – musí být až *po* všech routách!

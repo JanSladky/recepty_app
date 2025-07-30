@@ -27,9 +27,14 @@ export default function ResetPasswordPage() {
       setMessage("✅ Heslo bylo úspěšně změněno.");
       setEmail("");
       setNewPassword("");
-    } catch (err: any) {
-      console.error("Chyba při změně hesla:", err);
-      setMessage("❌ Nastala chyba při změně hesla.");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error("❌ Chyba při změně hesla:", err.message);
+        setMessage("❌ " + err.message);
+      } else {
+        console.error("❌ Neznámá chyba při změně hesla:", err);
+        setMessage("❌ Nastala neznámá chyba při změně hesla.");
+      }
     }
   };
 

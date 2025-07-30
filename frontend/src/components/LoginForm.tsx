@@ -29,8 +29,12 @@ const LoginForm = () => {
 
       setMessage("✅ Přihlášení úspěšné");
       window.location.href = "/";
-    } catch (err: any) {
-      setMessage("❌ " + err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setMessage("❌ " + err.message);
+      } else {
+        setMessage("❌ Neznámá chyba při přihlášení.");
+      }
     }
   };
 

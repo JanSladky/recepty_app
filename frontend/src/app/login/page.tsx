@@ -30,7 +30,7 @@ export default function LoginPage() {
       let data;
       try {
         data = JSON.parse(text); // pokus o převod na JSON
-      } catch (err) {
+      } catch {
         throw new Error("Odpověď serveru není platný JSON.");
       }
 
@@ -51,10 +51,15 @@ export default function LoginPage() {
       localStorage.setItem("isAdmin", user.is_admin ? "true" : "false");
 
       alert("✅ Přihlášení úspěšné.");
-      window.location.href = "/"; // nebo např. /admin
-    } catch (err: any) {
-      console.error("❌ Chyba při přihlašování:", err);
-      alert("❌ Nastala chyba: " + err.message);
+      window.location.href = "/";
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error("❌ Chyba při přihlašování:", err);
+        alert("❌ Nastala chyba: " + err.message);
+      } else {
+        console.error("❌ Neznámá chyba:", err);
+        alert("❌ Neznámá chyba při přihlášení.");
+      }
     } finally {
       setLoading(false);
     }
@@ -85,17 +90,15 @@ export default function LoginPage() {
       <button
         onClick={handleLogin}
         disabled={loading}
-        className={`w-full bg-blue-600 text-white py-2 rounded transition ${
-          loading ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700"
-        }`}
+        className={`w-full bg-blue-600 text-white py-2 rounded transition ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700"}`}
       >
         {loading ? "Přihlašuji..." : "Přihlásit se"}
       </button>
       <p className="text-sm mt-2">
-  <a href="/reset-hesla" className="text-blue-600 hover:underline">
-    Zapomněl/a jste heslo?
-  </a>
-</p>
+        <a href="/reset-hesla" className="text-blue-600 hover:underline">
+          Zapomněl/a jste heslo?
+        </a>
+      </p>
     </main>
   );
 }
