@@ -18,4 +18,5 @@ router.get("/favorites", auth_1.authenticateToken, userController_1.getMyFavorit
 router.post("/favorites/:id/toggle", auth_1.authenticateToken, userController_1.toggleFavorite);
 // ✅ Vygeneruj nákupní seznam z oblíbených receptů
 router.get("/favorites/shopping-list", auth_1.authenticateToken, userController_1.generateShoppingList);
+router.post("/shopping-list", auth_1.authenticateToken, userController_1.generateShoppingListFromPlan);
 exports.default = router;

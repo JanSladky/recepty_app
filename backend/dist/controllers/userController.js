@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateShoppingList = exports.toggleFavorite = exports.getMyFavorites = exports.resetPassword = exports.loginUser = void 0;
+exports.generateShoppingListFromPlan = exports.getCurrentUser = exports.generateShoppingList = exports.toggleFavorite = exports.getMyFavorites = exports.resetPassword = exports.loginUser = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = __importDefault(require("../utils/db"));
@@ -83,34 +83,27 @@ const toggleFavorite = async (req, res) => {
     try {
         const userId = req.user?.id;
         const recipeId = parseInt(req.params.id);
-        console.log("🔁 toggleFavorite");
-        console.log("➡️ userId:", userId);
-        console.log("➡️ recipeId:", recipeId);
         if (!userId || isNaN(recipeId)) {
-            console.log("❌ Neplatné ID!");
             res.status(400).json({ message: "Neplatné ID uživatele nebo receptu." });
             return;
         }
         const existing = await db_1.default.query("SELECT * FROM favorites WHERE user_id = $1 AND recipe_id = $2", [userId, recipeId]);
-        console.log("📦 existující záznam:", existing.rows);
         if (existing.rows.length > 0) {
             await db_1.default.query("DELETE FROM favorites WHERE user_id = $1 AND recipe_id = $2", [userId, recipeId]);
-            console.log("🗑️ Recept odebrán z oblíbených");
             res.status(200).json({ message: "Recept odebrán z oblíbených." });
         }
         else {
             await db_1.default.query("INSERT INTO favorites (user_id, recipe_id) VALUES ($1, $2)", [userId, recipeId]);
-            console.log("⭐ Recept přidán do oblíbených");
             res.status(200).json({ message: "Recept přidán do oblíbených." });
         }
     }
     catch (error) {
-        console.error("❌ Chyba při úpravě oblíbených:", error);
+        console.error("Chyba při úpravě oblíbených:", error);
         res.status(500).json({ error: "Chyba serveru." });
     }
 };
 exports.toggleFavorite = toggleFavorite;
-// ✅ Generování nákupního seznamu z oblíbených receptů
+// ✅ Nákupní seznam z oblíbených receptů
 const generateShoppingList = async (req, res) => {
     try {
         const userId = req.user?.id;
@@ -132,3 +125,29 @@ const generateShoppingList = async (req, res) => {
     }
 };
 exports.generateShoppingList = generateShoppingList;
+// ✅ Volitelně: Získání tokenu uživatele – pro frontend `/me`
+const getCurrentUser = async (req, res) => {
+    if (!req.user) {
+        res.status(401).json({ message: "Neautorizovaný přístup." });
+        return;
+    }
+    res.status(200).json(req.user);
+};
+exports.getCurrentUser = getCurrentUser;
+// ✅ Nákupní seznam z plánovaného týdne – placeholder
+const generateShoppingListFromPlan = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ message: "Neautorizovaný přístup." });
+            return;
+        }
+        // Tady později můžeš načíst plánované recepty podle datumu nebo týdne (např. z tabulky meal_plan)
+        res.status(200).json({ message: "Funkce nákupního seznamu z plánu zatím není implementována." });
+    }
+    catch (error) {
+        console.error("Chyba při generování nákupního seznamu z plánu:", error);
+        res.status(500).json({ error: "Chyba serveru." });
+    }
+};
+exports.generateShoppingListFromPlan = generateShoppingListFromPlan;

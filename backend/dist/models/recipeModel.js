@@ -88,7 +88,7 @@ async function getAllRecipes() {
              WHERE rmt.recipe_id = $1`, [recipe.id]),
             db_1.default.query(`SELECT c.name FROM recipe_categories rc 
              JOIN categories c ON rc.category_id = c.id 
-             WHERE rc.recipe_id = $1`, [recipe.id])
+             WHERE rc.recipe_id = $1`, [recipe.id]),
         ]);
         recipe.meal_types = mealRes.rows.map((r) => r.name);
         recipe.categories = catRes.rows.map((r) => r.name);
@@ -179,7 +179,12 @@ async function createFullRecipe(title, notes, imageUrl, mealTypes, ingredients, 
     const client = await db_1.default.connect();
     try {
         await client.query("BEGIN");
-        const result = await client.query(`INSERT INTO recipes (title, notes, image_url, steps) VALUES ($1, $2, $3, $4::jsonb) RETURNING id`, [title, notes, imageUrl, JSON.stringify(steps)]);
+        const result = await client.query(`INSERT INTO recipes (title, notes, image_url, steps) VALUES ($1, $2, $3, $4::jsonb) RETURNING id`, [
+            title,
+            notes,
+            imageUrl,
+            JSON.stringify(steps),
+        ]);
         const recipeId = result.rows[0].id;
         await insertRelations(client, recipeId, mealTypes, ingredients, categories);
         await client.query("COMMIT");
@@ -253,6 +258,7 @@ async function removeFavoriteInDB(userId, recipeId) {
 }
 // Získá všechny suroviny pro zadaná ID receptů (pro nákupní seznam)
 async function getIngredientsForRecipes(recipeIds) {
+    console.log("recipeIds to fetch:", recipeIds);
     if (recipeIds.length === 0) {
         return [];
     }
