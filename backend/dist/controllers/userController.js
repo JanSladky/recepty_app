@@ -3,10 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateShoppingListFromPlan = exports.getCurrentUser = exports.generateShoppingList = exports.toggleFavorite = exports.getMyFavorites = exports.resetPassword = exports.loginUser = void 0;
+exports.getUserByEmail = exports.getCurrentUser = exports.generateShoppingListFromPlan = exports.generateShoppingList = exports.toggleFavorite = exports.getMyFavorites = exports.resetPassword = exports.loginUser = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = __importDefault(require("../utils/db"));
+const userModel_1 = require("../models/userModel");
 const JWT_SECRET = process.env.JWT_SECRET || "tajny_klic";
 // ✅ Přihlášení uživatele
 const loginUser = async (req, res) => {
@@ -40,7 +41,7 @@ const loginUser = async (req, res) => {
     }
 };
 exports.loginUser = loginUser;
-// ✅ Reset hesla pro uživatele podle e-mailu
+// ✅ Reset hesla
 const resetPassword = async (req, res) => {
     const { email, newPassword } = req.body;
     try {
@@ -103,7 +104,7 @@ const toggleFavorite = async (req, res) => {
     }
 };
 exports.toggleFavorite = toggleFavorite;
-// ✅ Nákupní seznam z oblíbených receptů
+// ✅ Generování nákupního seznamu z oblíbených receptů
 const generateShoppingList = async (req, res) => {
     try {
         const userId = req.user?.id;
@@ -125,7 +126,23 @@ const generateShoppingList = async (req, res) => {
     }
 };
 exports.generateShoppingList = generateShoppingList;
-// ✅ Volitelně: Získání tokenu uživatele – pro frontend `/me`
+// ✅ Placeholder – budoucí generování nákupního seznamu z plánu
+const generateShoppingListFromPlan = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ message: "Neautorizovaný přístup." });
+            return;
+        }
+        res.status(200).json({ message: "Funkce zatím není implementována." });
+    }
+    catch (error) {
+        console.error("Chyba při generování nákupního seznamu z plánu:", error);
+        res.status(500).json({ error: "Chyba serveru." });
+    }
+};
+exports.generateShoppingListFromPlan = generateShoppingListFromPlan;
+// ✅ Vrací info o přihlášeném uživateli (token)
 const getCurrentUser = async (req, res) => {
     if (!req.user) {
         res.status(401).json({ message: "Neautorizovaný přístup." });
@@ -134,20 +151,24 @@ const getCurrentUser = async (req, res) => {
     res.status(200).json(req.user);
 };
 exports.getCurrentUser = getCurrentUser;
-// ✅ Nákupní seznam z plánovaného týdne – placeholder
-const generateShoppingListFromPlan = async (req, res) => {
+// ✅ Získání uživatele podle emailu (pro `useAdmin`)
+const getUserByEmail = async (req, res) => {
+    const email = req.query.email;
+    if (!email) {
+        res.status(400).json({ error: "Chybí parametr email" });
+        return;
+    }
     try {
-        const userId = req.user?.id;
-        if (!userId) {
-            res.status(401).json({ message: "Neautorizovaný přístup." });
+        const user = await (0, userModel_1.getUserByEmailFromDB)(email);
+        if (!user) {
+            res.status(404).json({ error: "Uživatel nenalezen" });
             return;
         }
-        // Tady později můžeš načíst plánované recepty podle datumu nebo týdne (např. z tabulky meal_plan)
-        res.status(200).json({ message: "Funkce nákupního seznamu z plánu zatím není implementována." });
+        res.status(200).json(user);
     }
     catch (error) {
-        console.error("Chyba při generování nákupního seznamu z plánu:", error);
+        console.error("Chyba při získávání uživatele podle emailu:", error);
         res.status(500).json({ error: "Chyba serveru." });
     }
 };
-exports.generateShoppingListFromPlan = generateShoppingListFromPlan;
+exports.getUserByEmail = getUserByEmail;
