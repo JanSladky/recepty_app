@@ -51,27 +51,24 @@ const LoginForm = () => {
     <form onSubmit={handleLogin} className="space-y-4">
       <h2 className="text-xl font-bold">Přihlášení</h2>
 
-      <input
-        type="email"
-        placeholder="E-mail"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="border p-2 w-full"
-        required
-      />
-      <input
-        type="password"
-        placeholder="Heslo"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="border p-2 w-full"
-        required
-      />
+      <input type="email" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} className="border p-2 w-full" required />
+      <input type="password" placeholder="Heslo" value={password} onChange={(e) => setPassword(e.target.value)} className="border p-2 w-full" required />
       <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded">
         Přihlásit se
       </button>
 
       {message && <p className="mt-2 text-sm">{message}</p>}
+      <p className="text-sm mt-4">
+        Nemáte účet?{" "}
+        <a href="/register" className="text-blue-500 underline">
+          Zaregistrovat se
+        </a>
+      </p>
+      <p className="text-sm">
+        <a href="/reset-hesla" className="text-blue-600 hover:underline">
+          Zapomněl/a jste heslo?
+        </a>
+      </p>
     </form>
   );
 };
