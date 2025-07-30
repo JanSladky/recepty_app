@@ -58,7 +58,7 @@ export default function ReceptyPage() {
           if (favRes.ok) {
             const favData = await favRes.json();
             console.log("💾 Backend poslal:", favData);
-            setFavoriteIds(Array.isArray(favData) ? favData.map((r: any) => r.id) : []);
+            setFavoriteIds(Array.isArray(favData) ? favData.map((r: { id: number }) => r.id) : []);
           }
         }
       } catch (error) {
@@ -144,9 +144,7 @@ export default function ReceptyPage() {
                       </div>
                     </div>
                     <div className="p-4">
-                      <h2 className="text-lg font-bold text-gray-800 truncate group-hover:text-green-600 transition-colors">
-                        {recipe.title}
-                      </h2>
+                      <h2 className="text-lg font-bold text-gray-800 truncate group-hover:text-green-600 transition-colors">{recipe.title}</h2>
                     </div>
                   </Link>
 
