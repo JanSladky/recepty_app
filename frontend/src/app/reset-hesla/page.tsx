@@ -11,7 +11,7 @@ export default function ResetPasswordPage() {
 
   const handleResetPassword = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/users/reset-password`, {
+      const res = await fetch(`${API_URL}/api/user/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, newPassword }),
@@ -27,7 +27,7 @@ export default function ResetPasswordPage() {
       setMessage("✅ Heslo bylo úspěšně změněno.");
       setEmail("");
       setNewPassword("");
-    } catch (err: unknown) {
+    } catch (err) {
       if (err instanceof Error) {
         console.error("❌ Chyba při změně hesla:", err.message);
         setMessage("❌ " + err.message);
@@ -42,17 +42,7 @@ export default function ResetPasswordPage() {
     <main className="max-w-md mx-auto p-6">
       <h1 className="text-2xl font-bold mb-4">Reset hesla</h1>
 
-      {message && (
-        <div
-          className={`mb-4 p-2 rounded ${
-            message.startsWith("✅")
-              ? "bg-green-100 text-green-700"
-              : "bg-red-100 text-red-700"
-          }`}
-        >
-          {message}
-        </div>
-      )}
+      {message && <div className={`mb-4 p-2 rounded ${message.startsWith("✅") ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{message}</div>}
 
       <input
         type="email"
@@ -70,10 +60,7 @@ export default function ResetPasswordPage() {
         className="w-full p-2 border rounded mb-4"
         required
       />
-      <button
-        onClick={handleResetPassword}
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
-      >
+      <button onClick={handleResetPassword} className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
         Resetovat heslo
       </button>
     </main>
