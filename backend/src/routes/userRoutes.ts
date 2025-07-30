@@ -2,6 +2,7 @@
 import express from "express";
 import { loginUser, resetPassword, getMyFavorites, toggleFavorite, generateShoppingList, generateShoppingListFromPlan } from "../controllers/userController";
 import { authenticateToken } from "../middleware/auth";
+import { getUserByEmail } from "../controllers/userController";
 
 const router = express.Router();
 
@@ -21,5 +22,7 @@ router.post("/favorites/:id/toggle", authenticateToken, toggleFavorite);
 router.get("/favorites/shopping-list", authenticateToken, generateShoppingList);
 
 router.post("/shopping-list", authenticateToken, generateShoppingListFromPlan);
+// 🧩 přidej sem route
+router.get("/email", getUserByEmail);
 
 export default router;

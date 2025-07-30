@@ -8,6 +8,8 @@ export default function useAdmin() {
 
   useEffect(() => {
     const email = localStorage.getItem("userEmail");
+    console.log("📧 email:", email);
+    console.log("🌍 API_URL:", API_URL);
 
     if (!email) {
       setIsAdmin(false);
@@ -18,6 +20,7 @@ export default function useAdmin() {
     const fetchUser = async () => {
       try {
         const res = await fetch(`${API_URL}/api/user/email?email=${encodeURIComponent(email)}`);
+        
         if (!res.ok) {
           console.warn("❌ Uživatel nenalezen nebo chyba v odpovědi:", res.status);
           setIsAdmin(false);
@@ -26,6 +29,9 @@ export default function useAdmin() {
 
         const user = await res.json();
         console.log("📦 Načtený uživatel:", user);
+        console.log("✅ user.is_admin:", user.is_admin);
+        console.log("✅ Nastavuji isAdmin na:", user.is_admin === true);
+
         setIsAdmin(user.is_admin === true);
       } catch (err) {
         console.error("❌ Chyba při ověřování admina:", err);

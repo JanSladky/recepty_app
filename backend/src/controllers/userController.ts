@@ -1,8 +1,9 @@
-import type { Response } from "express";
+import type { Response, Request } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import db from "../utils/db";
 import type { AuthRequest } from "../middleware/auth";
+import { getUserByEmailFromDB } from "../models/userModel";
 
 const JWT_SECRET = process.env.JWT_SECRET || "tajny_klic";
 
@@ -20,7 +21,6 @@ export const loginUser = async (req: AuthRequest, res: Response): Promise<void> 
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
-
     if (!isMatch) {
       res.status(401).json({ message: "Neplatné přihlašovací údaje." });
       return;
@@ -47,7 +47,7 @@ export const loginUser = async (req: AuthRequest, res: Response): Promise<void> 
   }
 };
 
-// ✅ Reset hesla pro uživatele podle e-mailu
+// ✅ Reset hesla
 export const resetPassword = async (req: AuthRequest, res: Response): Promise<void> => {
   const { email, newPassword } = req.body;
 
@@ -128,7 +128,7 @@ export const toggleFavorite = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
-// ✅ Nákupní seznam z oblíbených receptů
+// ✅ Generování nákupního seznamu z oblíbených receptů
 export const generateShoppingList = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -155,15 +155,7 @@ export const generateShoppingList = async (req: AuthRequest, res: Response): Pro
   }
 };
 
-// ✅ Volitelně: Získání tokenu uživatele – pro frontend `/me`
-export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<void> => {
-  if (!req.user) {
-    res.status(401).json({ message: "Neautorizovaný přístup." });
-    return;
-  }
-  res.status(200).json(req.user);
-};
-// ✅ Nákupní seznam z plánovaného týdne – placeholder
+// ✅ Placeholder – budoucí generování nákupního seznamu z plánu
 export const generateShoppingListFromPlan = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -173,11 +165,40 @@ export const generateShoppingListFromPlan = async (req: AuthRequest, res: Respon
       return;
     }
 
-    // Tady později můžeš načíst plánované recepty podle datumu nebo týdne (např. z tabulky meal_plan)
-
-    res.status(200).json({ message: "Funkce nákupního seznamu z plánu zatím není implementována." });
+    res.status(200).json({ message: "Funkce zatím není implementována." });
   } catch (error) {
     console.error("Chyba při generování nákupního seznamu z plánu:", error);
+    res.status(500).json({ error: "Chyba serveru." });
+  }
+};
+
+// ✅ Vrací info o přihlášeném uživateli (token)
+export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ message: "Neautorizovaný přístup." });
+    return;
+  }
+  res.status(200).json(req.user);
+};
+
+// ✅ Získání uživatele podle emailu (pro `useAdmin`)
+export const getUserByEmail = async (req: Request, res: Response): Promise<void> => {
+  const email = req.query.email as string;
+
+  if (!email) {
+    res.status(400).json({ error: "Chybí parametr email" });
+    return;
+  }
+
+  try {
+    const user = await getUserByEmailFromDB(email);
+    if (!user) {
+      res.status(404).json({ error: "Uživatel nenalezen" });
+      return;
+    }
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Chyba při získávání uživatele podle emailu:", error);
     res.status(500).json({ error: "Chyba serveru." });
   }
 };

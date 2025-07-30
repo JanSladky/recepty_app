@@ -49,7 +49,7 @@ export default function DashboardPage() {
           <DashboardTile href="/nakupni-seznam" title="Nákupní seznam" description="Naplánuj si vaření a vytvoř si seznam." icon="🛒" />
 
           {/* Dlaždice pouze pro adminy */}
-          {isAdmin && (
+          {!loading && isAdmin && (
             <>
               <DashboardTile href="/pridat-recept" title="Přidat nový recept" description="Vytvoř a sdílej nový recept s ostatními." icon="➕" />
               <DashboardTile
@@ -59,6 +59,7 @@ export default function DashboardPage() {
                 icon="✏️"
               />
               <DashboardTile href="/admin/suroviny" title="Správa surovin" description="Upravuj suroviny a jejich kategorie." icon="🥕" />
+              <DashboardTile href="/admin/users" title="Správa uživatelů" description="Prohlížej, upravuj nebo mazej uživatele aplikace." icon="🧑‍💼" />
             </>
           )}
         </div>

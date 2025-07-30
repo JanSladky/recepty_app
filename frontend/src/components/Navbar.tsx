@@ -44,6 +44,9 @@ export default function Navbar() {
           <Link href="/recepty" className="hover:underline">
             Recepty
           </Link>
+          <Link href="/admin/users" className="hover:underline">
+  Správa uživatelů
+</Link>
           {!loading && isAdmin && (
             <>
               <Link href="/pridat-recept" className="hover:underline">
