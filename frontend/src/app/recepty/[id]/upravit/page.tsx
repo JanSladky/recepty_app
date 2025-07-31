@@ -92,8 +92,7 @@ export default function EditPage() {
         const resClone = res.clone();
         try {
           const errorData = await res.json();
-          throw new Error(errorData.message || errorData.error || "Neznámá chyba serveru");
-        } catch (jsonError) {
+        } catch {
           const errorText = await resClone.text();
           throw new Error(errorText || `Chyba serveru: ${res.status}`);
         }
