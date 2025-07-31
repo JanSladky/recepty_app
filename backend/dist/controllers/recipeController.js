@@ -66,7 +66,8 @@ exports.getRecipeById = getRecipeById;
 const addRecipe = async (req, res) => {
     try {
         // ZDE JE ZMĚNA: Ověření admina se provádí zde, až po načtení dat.
-        const isAdmin = await checkAdminPermissions(req.body.userEmail);
+        const email = req.body.email; // NEBO req.body.get("email") pokud používáš FormData parser ručně
+        const isAdmin = await checkAdminPermissions(email);
         if (!isAdmin) {
             res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
             return;
@@ -77,8 +78,8 @@ const addRecipe = async (req, res) => {
             return;
         }
         const parsedIngredients = processIngredients(ingredients);
-        const parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
-        const parsedMealTypes = typeof mealTypes === 'string' ? JSON.parse(mealTypes) : mealTypes;
+        const parsedCategories = typeof categories === "string" ? JSON.parse(categories) : categories;
+        const parsedMealTypes = typeof mealTypes === "string" ? JSON.parse(mealTypes) : mealTypes;
         const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
         const fileMeta = req.file;
         const imagePath = fileMeta?.secure_url || fileMeta?.path || "";
@@ -97,8 +98,9 @@ const updateRecipe = async (req, res) => {
         return;
     }
     try {
-        // ZDE JE ZMĚNA: Ověření admina se provádí zde, až po načtení dat.
-        const isAdmin = await checkAdminPermissions(req.body.userEmail);
+        // ✅ Ověření administrátora pomocí hlavičky
+        const email = req.headers.authorization;
+        const isAdmin = await checkAdminPermissions(email);
         if (!isAdmin) {
             res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
             return;
@@ -109,8 +111,8 @@ const updateRecipe = async (req, res) => {
             return;
         }
         const parsedIngredients = processIngredients(ingredients);
-        const parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
-        const parsedMealTypes = typeof mealTypes === 'string' ? JSON.parse(mealTypes) : mealTypes;
+        const parsedCategories = typeof categories === "string" ? JSON.parse(categories) : categories;
+        const parsedMealTypes = typeof mealTypes === "string" ? JSON.parse(mealTypes) : mealTypes;
         const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
         const fileMeta = req.file;
         let finalImageUrl = fileMeta?.secure_url || fileMeta?.path || existingImageUrl || null;
@@ -175,8 +177,8 @@ const updateIngredient = async (req, res) => {
             res.status(400).json({ error: "Chybí povinné údaje." });
             return;
         }
-        const parsedDefaultGrams = (default_grams === "" || default_grams === undefined) ? null : Number(default_grams);
-        const parsedUnitName = (unit_name === "" || unit_name === undefined) ? null : unit_name;
+        const parsedDefaultGrams = default_grams === "" || default_grams === undefined ? null : Number(default_grams);
+        const parsedUnitName = unit_name === "" || unit_name === undefined ? null : unit_name;
         await (0, recipeModel_1.updateIngredientInDB)(id, name.trim(), Number(calories_per_gram), Number(category_id), parsedDefaultGrams, parsedUnitName);
         res.status(200).json({ message: "Surovina byla úspěšně aktualizována." });
     }
@@ -214,7 +216,7 @@ exports.getAllCategories = getAllCategories;
 const createCategory = async (req, res) => {
     try {
         const { name } = req.body;
-        if (!name || typeof name !== 'string') {
+        if (!name || typeof name !== "string") {
             res.status(400).json({ error: "Název kategorie je povinný." });
             return;
         }
@@ -234,7 +236,7 @@ const updateCategory = async (req, res) => {
     }
     try {
         const { name } = req.body;
-        if (!name || typeof name !== 'string') {
+        if (!name || typeof name !== "string") {
             res.status(400).json({ error: "Název kategorie je povinný." });
             return;
         }

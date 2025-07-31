@@ -33,10 +33,16 @@ export default function EditPage() {
           title: data.title,
           notes: data.notes,
           image_url: data.image_url,
-          ingredients: data.ingredients.map((i: Ingredient) => ({
-            ...i,
-            unit: i.unit,
+          ingredients: data.ingredients.map((i: any) => ({
+            id: i.id,
+            name: i.name,
+            amount: i.amount,
+            unit: i.unit || "",
+            calories_per_gram: i.calories_per_gram,
+            category_id: i.category_id,
+            category_name: i.category_name,
             default_grams: i.default_grams,
+            display: i.display,
           })),
           categories: data.categories,
           meal_types: data.meal_types ?? [],
@@ -56,23 +62,28 @@ export default function EditPage() {
 
   const handleSubmit = async (formData: FormData) => {
     try {
+      const userEmail = localStorage.getItem("userEmail");
+      if (userEmail) {
+        formData.append("email", userEmail);
+      }
+      console.log("📦 userEmail před fetch:", userEmail);
+      const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/api/recipes/${id}`, {
         method: "PUT",
         body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!res.ok) {
-        // OPRAVA: Vytvoříme si "kopii" odpovědi, abychom ji mohli bezpečně číst vícekrát.
         const resClone = res.clone();
         try {
-            // Zkusíme přečíst jako JSON
-            const errorData = await res.json();
-            throw new Error(errorData.error || "Neznámá chyba serveru");
+          const errorData = await res.json();
+          throw new Error(errorData.message || errorData.error || "Neznámá chyba serveru");
         } catch (jsonError) {
-            // Pokud to selže, použijeme kopii a přečteme ji jako text
-            console.error("Odpověď není platný JSON, zkouším číst jako text:", jsonError);
-            const errorText = await resClone.text();
-            throw new Error(errorText || `Chyba serveru: ${res.status}`);
+          const errorText = await resClone.text();
+          throw new Error(errorText || `Chyba serveru: ${res.status}`);
         }
       }
 

@@ -13,18 +13,18 @@ import {
   getAllIngredientCategories,
   createIngredientCategory,
   updateIngredientCategory,
-  deleteIngredientCategory
+  deleteIngredientCategory,
 } from "../models/recipeModel";
 
 // --- Pomocná funkce pro ověření admina ---
 const checkAdminPermissions = async (email: string): Promise<boolean> => {
-    if (!email) return false;
-    try {
-        const result = await db.query("SELECT is_admin FROM users WHERE email = $1", [email]);
-        return result.rows.length > 0 && result.rows[0].is_admin === true;
-    } catch {
-        return false;
-    }
+  if (!email) return false;
+  try {
+    const result = await db.query("SELECT is_admin FROM users WHERE email = $1", [email]);
+    return result.rows.length > 0 && result.rows[0].is_admin === true;
+  } catch {
+    return false;
+  }
 };
 
 // --- Pomocné funkce ---
@@ -71,11 +71,11 @@ export const getRecipeById = async (req: Request, res: Response): Promise<void> 
 
 export const addRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
-    // ZDE JE ZMĚNA: Ověření admina se provádí zde, až po načtení dat.
-    const isAdmin = await checkAdminPermissions(req.body.userEmail);
+    const email = req.body.email;
+    const isAdmin = await checkAdminPermissions(email as string);
     if (!isAdmin) {
-        res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
-        return;
+      res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
+      return;
     }
 
     const { title, notes, ingredients, categories, mealTypes, steps } = req.body;
@@ -84,8 +84,8 @@ export const addRecipe = async (req: Request, res: Response): Promise<void> => {
       return;
     }
     const parsedIngredients = processIngredients(ingredients);
-    const parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
-    const parsedMealTypes = typeof mealTypes === 'string' ? JSON.parse(mealTypes) : mealTypes;
+    const parsedCategories = typeof categories === "string" ? JSON.parse(categories) : categories;
+    const parsedMealTypes = typeof mealTypes === "string" ? JSON.parse(mealTypes) : mealTypes;
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
     const fileMeta = req.file as { secure_url?: string; path?: string };
     const imagePath = fileMeta?.secure_url || fileMeta?.path || "";
@@ -102,12 +102,16 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     res.status(400).json({ error: "Neplatné ID receptu." });
     return;
   }
+
   try {
-    // ZDE JE ZMĚNA: Ověření admina se provádí zde, až po načtení dat.
-    const isAdmin = await checkAdminPermissions(req.body.userEmail);
+    // ✅ ZÍSKÁNÍ EMAILU Z req.user
+    const email = (req as any).user?.email;
+    console.log("📬 Ověřovací e-mail:", email);
+
+    const isAdmin = await checkAdminPermissions(email);
     if (!isAdmin) {
-        res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
-        return;
+      res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
+      return;
     }
 
     const { title, notes, ingredients, categories, mealTypes, steps, existingImageUrl } = req.body;
@@ -115,31 +119,34 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
       res.status(400).json({ error: "Chybí povinná pole." });
       return;
     }
+
     const parsedIngredients = processIngredients(ingredients);
-    const parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
-    const parsedMealTypes = typeof mealTypes === 'string' ? JSON.parse(mealTypes) : mealTypes;
+    const parsedCategories = typeof categories === "string" ? JSON.parse(categories) : categories;
+    const parsedMealTypes = typeof mealTypes === "string" ? JSON.parse(mealTypes) : mealTypes;
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
     const fileMeta = req.file as { secure_url?: string; path?: string } | undefined;
     let finalImageUrl = fileMeta?.secure_url || fileMeta?.path || existingImageUrl || null;
+
     await updateRecipeInDB(id, title, notes, finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
     res.status(200).json({ message: "Recept úspěšně upraven." });
   } catch (error) {
+    console.error("❌ Chyba v updateRecipe:", error);
     res.status(500).json({ error: "Nepodařilo se upravit recept.", detail: (error as Error).message });
   }
 };
 
 export const deleteRecipe = async (req: Request, res: Response): Promise<void> => {
-    const id = Number(req.params.id);
-    if (isNaN(id)) {
-        res.status(400).json({ error: "Neplatné ID." });
-        return;
-    }
-    try {
-        await deleteRecipeFromDB(id);
-        res.status(200).json({ message: "Recept smazán." });
-    } catch (error) {
-        res.status(500).json({ error: "Nepodařilo se smazat recept." });
-    }
+  const id = Number(req.params.id);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID." });
+    return;
+  }
+  try {
+    await deleteRecipeFromDB(id);
+    res.status(200).json({ message: "Recept smazán." });
+  } catch (error) {
+    res.status(500).json({ error: "Nepodařilo se smazat recept." });
+  }
 };
 
 // --- CONTROLLERY PRO SUROVINY (beze změny) ---
@@ -156,7 +163,7 @@ export const createIngredient = async (req: Request, res: Response): Promise<voi
   try {
     const { name, category_id, calories_per_gram, default_grams, unit_name } = req.body;
     if (!name || category_id === undefined || calories_per_gram === undefined) {
-      res.status(400).json({ error: "Chybí povinné údaje." });
+      res.status(400).json({ error: "Chybí povinné údeje." });
       return;
     }
     const newIngredient = await createIngredientInDB(
@@ -181,92 +188,85 @@ export const updateIngredient = async (req: Request, res: Response): Promise<voi
   try {
     const { name, category_id, calories_per_gram, default_grams, unit_name } = req.body;
     if (name === undefined || category_id === undefined || calories_per_gram === undefined) {
-      res.status(400).json({ error: "Chybí povinné údaje." });
+      res.status(400).json({ error: "Chybí povinné údeje." });
       return;
     }
-    const parsedDefaultGrams = (default_grams === "" || default_grams === undefined) ? null : Number(default_grams);
-    const parsedUnitName = (unit_name === "" || unit_name === undefined) ? null : unit_name;
-    await updateIngredientInDB(
-      id,
-      name.trim(),
-      Number(calories_per_gram),
-      Number(category_id),
-      parsedDefaultGrams,
-      parsedUnitName
-    );
-    res.status(200).json({ message: "Surovina byla úspěšně aktualizována." });
+    const parsedDefaultGrams = default_grams === "" || default_grams === undefined ? null : Number(default_grams);
+    const parsedUnitName = unit_name === "" || unit_name === undefined ? null : unit_name;
+    await updateIngredientInDB(id, name.trim(), Number(calories_per_gram), Number(category_id), parsedDefaultGrams, parsedUnitName);
+    res.status(200).json({ message: "Surovina byla ústěšně aktualizována." });
   } catch (error) {
     res.status(500).json({ error: "Nepodařilo se upravit surovinu." });
   }
 };
 
 export const deleteIngredient = async (req: Request, res: Response): Promise<void> => {
-    const id = Number(req.params.id);
-    if (isNaN(id)) {
-        res.status(400).json({ error: "Neplatné ID." });
-        return;
-    }
-    try {
-        await deleteIngredientFromDB(id);
-        res.status(200).json({ message: "Surovina smazána." });
-    } catch (error) {
-        res.status(500).json({ error: "Nepodařilo se smazat surovinu." });
-    }
+  const id = Number(req.params.id);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID." });
+    return;
+  }
+  try {
+    await deleteIngredientFromDB(id);
+    res.status(200).json({ message: "Surovina smazána." });
+  } catch (error) {
+    res.status(500).json({ error: "Nepodařilo se smazat surovinu." });
+  }
 };
 
 // --- CONTROLLERY PRO KATEGORIE (beze změny) ---
 export const getAllCategories = async (_req: Request, res: Response): Promise<void> => {
-    try {
-        const categories = await getAllIngredientCategories();
-        res.status(200).json(categories);
-    } catch (error) {
-        res.status(500).json({ error: "Chyba při načítání kategorií." });
-    }
+  try {
+    const categories = await getAllIngredientCategories();
+    res.status(200).json(categories);
+  } catch (error) {
+    res.status(500).json({ error: "Chyba při načítání kategorií." });
+  }
 };
 
 export const createCategory = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const { name } = req.body;
-        if (!name || typeof name !== 'string') {
-            res.status(400).json({ error: "Název kategorie je povinný." });
-            return;
-        }
-        const newCategory = await createIngredientCategory(name);
-        res.status(201).json(newCategory);
-    } catch (error) {
-        res.status(500).json({ error: "Nepodařilo se vytvořit kategorii." });
+  try {
+    const { name } = req.body;
+    if (!name || typeof name !== "string") {
+      res.status(400).json({ error: "Název kategorie je povinný." });
+      return;
     }
+    const newCategory = await createIngredientCategory(name);
+    res.status(201).json(newCategory);
+  } catch (error) {
+    res.status(500).json({ error: "Nepodařilo se vytvořit kategorii." });
+  }
 };
 
 export const updateCategory = async (req: Request, res: Response): Promise<void> => {
-    const id = Number(req.params.id);
-    if (isNaN(id)) {
-        res.status(400).json({ error: "Neplatné ID." });
-        return;
+  const id = Number(req.params.id);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID." });
+    return;
+  }
+  try {
+    const { name } = req.body;
+    if (!name || typeof name !== "string") {
+      res.status(400).json({ error: "Název kategorie je povinný." });
+      return;
     }
-    try {
-        const { name } = req.body;
-        if (!name || typeof name !== 'string') {
-            res.status(400).json({ error: "Název kategorie je povinný." });
-            return;
-        }
-        await updateIngredientCategory(id, name);
-        res.status(200).json({ message: "Kategorie upravena." });
-    } catch (error) {
-        res.status(500).json({ error: "Nepodařilo se upravit kategorii." });
-    }
+    await updateIngredientCategory(id, name);
+    res.status(200).json({ message: "Kategorie upravena." });
+  } catch (error) {
+    res.status(500).json({ error: "Nepodařilo se upravit kategorii." });
+  }
 };
 
 export const deleteCategory = async (req: Request, res: Response): Promise<void> => {
-    const id = Number(req.params.id);
-    if (isNaN(id)) {
-        res.status(400).json({ error: "Neplatné ID." });
-        return;
-    }
-    try {
-        await deleteIngredientCategory(id);
-        res.status(200).json({ message: "Kategorie smazána." });
-    } catch (error) {
-        res.status(500).json({ error: "Nepodařilo se smazat kategorii." });
-    }
+  const id = Number(req.params.id);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID." });
+    return;
+  }
+  try {
+    await deleteIngredientCategory(id);
+    res.status(200).json({ message: "Kategorie smazána." });
+  } catch (error) {
+    res.status(500).json({ error: "Nepodařilo se smazat kategorii." });
+  }
 };
