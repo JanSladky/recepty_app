@@ -71,8 +71,10 @@ export const getRecipeById = async (req: Request, res: Response): Promise<void> 
 
 export const addRecipe = async (req: Request, res: Response): Promise<void> => {
   try {
-    const email = req.body.email;
-    const isAdmin = await checkAdminPermissions(email as string);
+    const email = (req as any).user?.email;
+    console.log("📬 Ověřovací e-mail:", email);
+
+    const isAdmin = await checkAdminPermissions(email);
     if (!isAdmin) {
       res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
       return;
@@ -83,16 +85,23 @@ export const addRecipe = async (req: Request, res: Response): Promise<void> => {
       res.status(400).json({ error: "Chybí povinná pole." });
       return;
     }
+
     const parsedIngredients = processIngredients(ingredients);
     const parsedCategories = typeof categories === "string" ? JSON.parse(categories) : categories;
     const parsedMealTypes = typeof mealTypes === "string" ? JSON.parse(mealTypes) : mealTypes;
     const parsedSteps = Array.isArray(steps) ? steps : JSON.parse(steps || "[]");
+
     const fileMeta = req.file as { secure_url?: string; path?: string };
     const imagePath = fileMeta?.secure_url || fileMeta?.path || "";
+
     const recipeId = await createFullRecipe(title, notes, imagePath, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
+
     res.status(201).json({ message: "Recept uložen", id: recipeId });
   } catch (error) {
-    res.status(500).json({ error: "Nepodařilo se uložit recept.", detail: (error as Error).message });
+    res.status(500).json({
+      error: "Nepodařilo se uložit recept.",
+      detail: (error as Error).message,
+    });
   }
 };
 

@@ -7,30 +7,42 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 export default function AddRecipePage() {
   const handleSubmit = async (formData: FormData) => {
     try {
+      // Získání tokenu a e-mailu z localStorage
+      const userEmail = localStorage.getItem("userEmail");
+      const token = localStorage.getItem("token");
+
+      if (userEmail) {
+        formData.append("email", userEmail); // ✅ nutné pro backend
+      }
+
+      console.log("📦 Přidávám recept jako:", userEmail);
+
       const res = await fetch(`${API_URL}/api/recipes`, {
         method: "POST",
-        headers: {
-          "x-user-email": localStorage.getItem("userEmail") || "",
-          // ❗️Nepřidávej `Content-Type`, protože FormData si nastaví vlastní
-        },
         body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`, // ✅ potřebné pro admin přístup
+          // Poznámka: FormData sám nastaví Content-Type včetně boundary
+        },
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        alert("✅ Recept přidán!" + (data.image_url ? ` Obrázek: ${data.image_url}` : ""));
-      } else {
-        const errorText = await res.text();
-        console.error("❌ Chyba při ukládání:", errorText);
-        alert("❌ Chyba při ukládání: " + errorText);
+      if (!res.ok) {
+        const resClone = res.clone(); // Umožní přečíst response dvakrát
+
+        try {
+          const errorData = await res.json();
+          throw new Error(errorData.message || errorData.error || "Neznámá chyba serveru");
+        } catch (jsonError) {
+          const errorText = await resClone.text();
+          throw new Error(errorText || `Chyba serveru: ${res.status}`);
+        }
       }
+
+      const data = await res.json();
+      alert("✅ Recept přidán!" + (data.image_url ? ` Obrázek: ${data.image_url}` : ""));
     } catch (err) {
-      if (err instanceof Error) {
-        console.error("❌ Neznámá chyba:", err.message);
-      } else {
-        console.error("❌ Neznámá chyba:", err);
-      }
-      alert("❌ Nastala neznámá chyba při ukládání receptu.");
+      console.error("❌ Chyba při ukládání:", err);
+      alert("❌ Chyba při ukládání: " + (err as Error).message);
     }
   };
 
