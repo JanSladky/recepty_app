@@ -7,6 +7,18 @@ import type { Ingredient } from "@/components/IngredientAutocomplete";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+interface FullIngredient {
+  id: number;
+  name: string;
+  amount: number;
+  unit: string;
+  calories_per_gram: number;
+  category_id: number;
+  category_name: string;
+  default_grams?: number;
+  display?: string;
+}
+
 export default function EditPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -33,7 +45,7 @@ export default function EditPage() {
           title: data.title,
           notes: data.notes,
           image_url: data.image_url,
-          ingredients: data.ingredients.map((i: any) => ({
+          ingredients: data.ingredients.map((i: FullIngredient) => ({
             id: i.id,
             name: i.name,
             amount: i.amount,
