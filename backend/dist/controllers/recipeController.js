@@ -65,8 +65,8 @@ const getRecipeById = async (req, res) => {
 exports.getRecipeById = getRecipeById;
 const addRecipe = async (req, res) => {
     try {
-        // ZDE JE ZMĚNA: Ověření admina se provádí zde, až po načtení dat.
-        const email = req.body.email; // NEBO req.body.get("email") pokud používáš FormData parser ručně
+        const email = req.user?.email;
+        console.log("📬 Ověřovací e-mail:", email);
         const isAdmin = await checkAdminPermissions(email);
         if (!isAdmin) {
             res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
@@ -87,7 +87,10 @@ const addRecipe = async (req, res) => {
         res.status(201).json({ message: "Recept uložen", id: recipeId });
     }
     catch (error) {
-        res.status(500).json({ error: "Nepodařilo se uložit recept.", detail: error.message });
+        res.status(500).json({
+            error: "Nepodařilo se uložit recept.",
+            detail: error.message,
+        });
     }
 };
 exports.addRecipe = addRecipe;
@@ -98,8 +101,9 @@ const updateRecipe = async (req, res) => {
         return;
     }
     try {
-        // ✅ Ověření administrátora pomocí hlavičky
-        const email = req.headers.authorization;
+        // ✅ ZÍSKÁNÍ EMAILU Z req.user
+        const email = req.user?.email;
+        console.log("📬 Ověřovací e-mail:", email);
         const isAdmin = await checkAdminPermissions(email);
         if (!isAdmin) {
             res.status(403).json({ error: "Přístup zamítnut. Musíš být administrátor." });
@@ -120,6 +124,7 @@ const updateRecipe = async (req, res) => {
         res.status(200).json({ message: "Recept úspěšně upraven." });
     }
     catch (error) {
+        console.error("❌ Chyba v updateRecipe:", error);
         res.status(500).json({ error: "Nepodařilo se upravit recept.", detail: error.message });
     }
 };
@@ -154,7 +159,7 @@ const createIngredient = async (req, res) => {
     try {
         const { name, category_id, calories_per_gram, default_grams, unit_name } = req.body;
         if (!name || category_id === undefined || calories_per_gram === undefined) {
-            res.status(400).json({ error: "Chybí povinné údaje." });
+            res.status(400).json({ error: "Chybí povinné údeje." });
             return;
         }
         const newIngredient = await (0, recipeModel_1.createIngredientInDB)(name.trim(), Number(calories_per_gram), Number(category_id), default_grams ? Number(default_grams) : undefined, unit_name || undefined);
@@ -174,13 +179,13 @@ const updateIngredient = async (req, res) => {
     try {
         const { name, category_id, calories_per_gram, default_grams, unit_name } = req.body;
         if (name === undefined || category_id === undefined || calories_per_gram === undefined) {
-            res.status(400).json({ error: "Chybí povinné údaje." });
+            res.status(400).json({ error: "Chybí povinné údeje." });
             return;
         }
         const parsedDefaultGrams = default_grams === "" || default_grams === undefined ? null : Number(default_grams);
         const parsedUnitName = unit_name === "" || unit_name === undefined ? null : unit_name;
         await (0, recipeModel_1.updateIngredientInDB)(id, name.trim(), Number(calories_per_gram), Number(category_id), parsedDefaultGrams, parsedUnitName);
-        res.status(200).json({ message: "Surovina byla úspěšně aktualizována." });
+        res.status(200).json({ message: "Surovina byla ústěšně aktualizována." });
     }
     catch (error) {
         res.status(500).json({ error: "Nepodařilo se upravit surovinu." });
