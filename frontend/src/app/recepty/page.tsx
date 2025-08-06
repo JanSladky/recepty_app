@@ -34,6 +34,7 @@ export default function ReceptyPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -112,58 +113,77 @@ export default function ReceptyPage() {
         {loading ? (
           <p className="text-center text-gray-500">Načítám recepty...</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {recipes.map((recipe) => {
-              const isFavorite = favoriteIds.includes(recipe.id);
-              return (
-                <div
-                  key={recipe.id}
-                  className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden block transform hover:-translate-y-1 relative"
-                >
-                  <Link href={`/recepty/${recipe.id}`}>
-                    <div className="relative w-full h-48">
-                      <Image
-                        src={
-                          recipe.image_url && recipe.image_url.startsWith("http")
-                            ? recipe.image_url
-                            : recipe.image_url
-                            ? `${API_URL ?? ""}${recipe.image_url}`
-                            : "/placeholder.jpg"
-                        }
-                        alt={recipe.title}
-                        fill
-                        className="object-cover transition-transform duration-300 group-hover:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                      <div className="absolute top-2 right-2 flex flex-wrap-reverse gap-1">
-                        {recipe.meal_types?.map((type) => (
-                          <span key={type} className="bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded-full">
-                            {type}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="p-4">
-                      <h2 className="text-lg font-bold text-gray-800 truncate group-hover:text-green-600 transition-colors">{recipe.title}</h2>
-                    </div>
-                  </Link>
+          <>
+            {/* Přepínač Všechny / Oblíbené */}
+            <div className="flex justify-center mb-6">
+              <button
+                onClick={() => setShowFavoritesOnly(false)}
+                className={`px-4 py-2 rounded-l-full border ${!showFavoritesOnly ? "bg-green-600 text-white" : "bg-white text-gray-800"}`}
+              >
+                Všechny
+              </button>
+              <button
+                onClick={() => setShowFavoritesOnly(true)}
+                className={`px-4 py-2 rounded-r-full border ${showFavoritesOnly ? "bg-green-600 text-white" : "bg-white text-gray-800"}`}
+              >
+                Oblíbené
+              </button>
+            </div>
 
-                  {localStorage.getItem("token") && (
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleToggleFavorite(recipe.id);
-                      }}
-                      className="absolute top-2 left-2 bg-black/30 backdrop-blur-sm p-2 rounded-full hover:bg-black/50 transition z-10"
-                      aria-label="Přidat do oblíbených"
-                    >
-                      <IconHeart isFavorite={isFavorite} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+            {/* Výpis receptů */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {(showFavoritesOnly ? recipes.filter((r) => favoriteIds.includes(r.id)) : recipes).map((recipe) => {
+                const isFavorite = favoriteIds.includes(recipe.id);
+                return (
+                  <div
+                    key={recipe.id}
+                    className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden block transform hover:-translate-y-1 relative"
+                  >
+                    <Link href={`/recepty/${recipe.id}`}>
+                      <div className="relative w-full h-48">
+                        <Image
+                          src={
+                            recipe.image_url && recipe.image_url.startsWith("http")
+                              ? recipe.image_url
+                              : recipe.image_url
+                              ? `${API_URL ?? ""}${recipe.image_url}`
+                              : "/placeholder.jpg"
+                          }
+                          alt={recipe.title}
+                          fill
+                          className="object-cover transition-transform duration-300 group-hover:scale-110"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                        <div className="absolute top-2 right-2 flex flex-wrap-reverse gap-1">
+                          {recipe.meal_types?.map((type) => (
+                            <span key={type} className="bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded-full">
+                              {type}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <h2 className="text-lg font-bold text-gray-800 truncate group-hover:text-green-600 transition-colors">{recipe.title}</h2>
+                      </div>
+                    </Link>
+
+                    {localStorage.getItem("token") && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleToggleFavorite(recipe.id);
+                        }}
+                        className="absolute top-2 left-2 bg-black/30 backdrop-blur-sm p-2 rounded-full hover:bg-black/50 transition z-10"
+                        aria-label="Přidat do oblíbených"
+                      >
+                        <IconHeart isFavorite={isFavorite} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </main>
     </div>
