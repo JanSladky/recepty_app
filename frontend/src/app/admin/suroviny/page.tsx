@@ -75,6 +75,7 @@ export default function IngredientAdminPage() {
   useEffect(() => {
     const fetchIngredients = async () => {
       try {
+        const token = localStorage.getItem("token");
         const res = await fetch(`${API_URL}/api/ingredients`);
         if (!res.ok) throw new Error("Nepodařilo se načíst suroviny");
         const data = await res.json();
@@ -86,6 +87,7 @@ export default function IngredientAdminPage() {
 
     const fetchCategories = async () => {
       try {
+        const token = localStorage.getItem("token");
         const res = await fetch(`${API_URL}/api/ingredients/categories`);
         if (!res.ok) throw new Error("Nepodařilo se načíst kategorie");
         const data = await res.json();
@@ -138,9 +140,14 @@ export default function IngredientAdminPage() {
     }
 
     try {
+      const token = localStorage.getItem("token");
+
       const res = await fetch(`${API_URL}/api/ingredients/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // ✅ zde přidáno
+        },
         body: JSON.stringify(finalPayload),
       });
 
@@ -168,6 +175,7 @@ export default function IngredientAdminPage() {
     const token = localStorage.getItem("token"); // ✅ načti token z localStorage
 
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/api/ingredients/${id}`, {
         method: "DELETE",
         headers: {
@@ -197,9 +205,13 @@ export default function IngredientAdminPage() {
       return;
     }
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/api/ingredients`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // ✅ zde přidáno
+        },
         body: JSON.stringify({
           name,
           category_id: Number(category_id),
@@ -227,9 +239,13 @@ export default function IngredientAdminPage() {
     const name = editedCategories[id];
     if (!name) return;
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // ✅ zde přidáno
+        },
         body: JSON.stringify({ name }),
       });
       if (res.ok) {
@@ -249,7 +265,13 @@ export default function IngredientAdminPage() {
   const handleCategoryDelete = async (id: number) => {
     if (!confirm("Opravdu chceš smazat tuto kategorii?")) return;
     try {
-      const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, { method: "DELETE" });
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`, // ✅ zde přidáno
+        },
+      });
       if (res.ok) {
         setCategories((prev) => prev.filter((c) => c.id !== id));
       } else {
@@ -267,9 +289,13 @@ export default function IngredientAdminPage() {
       return;
     }
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/api/ingredients/categories`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // ✅ zde přidáno
+        },
         body: JSON.stringify({ name: newCategory }),
       });
 
