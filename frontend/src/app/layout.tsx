@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar"; // 👈 klasický import
+import Navbar from "@/components/Navbar";
+import { AuthProvider } from "@/context/AuthContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,17 +19,18 @@ export const metadata: Metadata = {
   description: "Vyhledávej, ukládej a tvoř vlastní recepty",
 };
 
-export default function RootLayout({
+export default function RootLayout({ 
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
     <html lang="cs" className="light">
-      {/* Koment */}
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-100 text-gray-900`}>
-        <Navbar />
-        <main className="p-4">{children}</main>
+        <AuthProvider>
+          <Navbar />
+          <main className="p-4">{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );
