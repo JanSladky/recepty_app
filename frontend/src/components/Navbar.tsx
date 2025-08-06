@@ -1,6 +1,6 @@
 "use client";
 
-import { User } from "lucide-react";
+import { User, Heart, ShoppingCart, Settings } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useAdmin from "@/hooks/useAdmin";
@@ -25,6 +25,7 @@ export default function Navbar() {
     <nav className="bg-white shadow p-4">
       <div className="max-w-6xl mx-auto flex justify-between items-center">
         {/* Logo */}
+
         <Link href="/" className="font-bold text-green-600 text-xl">
           🍽 Recepty
         </Link>
@@ -40,19 +41,36 @@ export default function Navbar() {
           <Link href="/recepty" className="hover:underline">
             Recepty
           </Link>
+          {/* Ikony srdce a košíku */}
+          <Link href="/oblibene" title="Oblíbené recepty">
+            <Heart className="text-red-500 hover:scale-110 transition" />
+          </Link>
+          <Link href="/nakupni-seznam" title="Nákupní seznam">
+            <ShoppingCart className="text-green-600 hover:scale-110 transition" />
+          </Link>
 
           {!loading && isAdmin && (
-            <>
-              <Link href="/admin/users" className="hover:underline">
-                Správa uživatelů
-              </Link>
-              <Link href="/pridat-recept" className="hover:underline">
-                Přidat recept
-              </Link>
-              <Link href="/admin/suroviny" className="hover:underline">
-                Suroviny
-              </Link>
-            </>
+            <div className="relative group flex items-center">
+              <div className="p-2 hover:bg-gray-100 rounded-full transition cursor-pointer">
+                <Settings className="w-6 h-6 text-gray-700" />
+              </div>
+
+              {/* Dropdown menu – celé drženo pohromadě pomocí group */}
+              <div className="absolute right-0 top-10 w-48 bg-white shadow-lg rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition duration-200 z-50">
+                <Link href="/dashboard" className="block px-4 py-2 hover:bg-gray-100">
+                  Dashboard
+                </Link>
+                <Link href="/admin/users" className="block px-4 py-2 hover:bg-gray-100">
+                  Správa uživatelů
+                </Link>
+                <Link href="/pridat-recept" className="block px-4 py-2 hover:bg-gray-100">
+                  Přidat recept
+                </Link>
+                <Link href="/admin/suroviny" className="block px-4 py-2 hover:bg-gray-100">
+                  Suroviny
+                </Link>
+              </div>
+            </div>
           )}
 
           {!loading && isLoggedIn ? (
@@ -69,8 +87,19 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobilní část – login ikona + burger */}
+        {/* Mobilní část – srdce, košík, avatar a burger */}
         <div className="md:hidden flex items-center gap-3">
+          {/* ❤️ Oblíbené */}
+          <Link href="/oblibene" title="Oblíbené recepty">
+            <Heart className="w-5 h-5 text-red-500 hover:scale-110 transition" />
+          </Link>
+
+          {/* 🛒 Nákupní seznam */}
+          <Link href="/nakupni-seznam" title="Nákupní seznam">
+            <ShoppingCart className="w-5 h-5 text-green-600 hover:scale-110 transition" />
+          </Link>
+
+          {/* 👤 Avatar nebo přihlášení */}
           {!loading && isLoggedIn ? (
             <Link
               href="/profil"
@@ -85,10 +114,11 @@ export default function Navbar() {
             </Link>
           )}
 
+          {/* 🍔 Burger menu */}
           <button onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu" className="flex flex-col justify-center items-end w-8 h-6 space-y-1">
-            <span className="block w-8 h-1 bg-gray-800 rounded" />
-            <span className="block w-8 h-1 bg-gray-800 rounded" />
-            <span className="block w-8 h-1 bg-gray-800 rounded" />
+            <span className="block w-6 h-0.5 bg-gray-800 rounded" />
+            <span className="block w-6 h-0.5 bg-gray-800 rounded" />
+            <span className="block w-6 h-0.5 bg-gray-800 rounded" />
           </button>
         </div>
       </div>
