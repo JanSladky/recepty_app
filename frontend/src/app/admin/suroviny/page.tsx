@@ -75,7 +75,6 @@ export default function IngredientAdminPage() {
   useEffect(() => {
     const fetchIngredients = async () => {
       try {
-        const token = localStorage.getItem("token");
         const res = await fetch(`${API_URL}/api/ingredients`);
         if (!res.ok) throw new Error("Nepodařilo se načíst suroviny");
         const data = await res.json();
@@ -87,7 +86,6 @@ export default function IngredientAdminPage() {
 
     const fetchCategories = async () => {
       try {
-        const token = localStorage.getItem("token");
         const res = await fetch(`${API_URL}/api/ingredients/categories`);
         if (!res.ok) throw new Error("Nepodařilo se načíst kategorie");
         const data = await res.json();
@@ -171,8 +169,6 @@ export default function IngredientAdminPage() {
 
   const handleDelete = async (id: number) => {
     if (!confirm("Opravdu chceš smazat surovinu?")) return;
-
-    const token = localStorage.getItem("token"); // ✅ načti token z localStorage
 
     try {
       const token = localStorage.getItem("token");
