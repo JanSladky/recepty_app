@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import SearchBar from "@/components/SearchBar";
 import { Trash2 } from "lucide-react";
+import { Share2 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -78,6 +79,29 @@ export default function ShoppingListPage() {
       console.error("Nepodařilo se načíst recept:", error);
     }
   };
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Nákupní seznam",
+          text: shoppingList.map((item) => `☐ ${item}`).join("\n"),
+        });
+      } catch (error) {
+        console.error("Sdílení selhalo:", error);
+      }
+    } else {
+      alert("Sdílení není v tomto prohlížeči podporováno.");
+    }
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shoppingList.join("\n"));
+      alert("Seznam byl zkopírován do schránky.");
+    } catch (err) {
+      console.error("Nepodařilo se kopírovat:", err);
+    }
+  };
 
   const removeRecipeFromCook = (recipeId: number) => {
     setRecipesToCook((prev) => prev.filter((r) => r.id !== recipeId));
@@ -139,7 +163,17 @@ export default function ShoppingListPage() {
 
           {/* Pravá část - Nákupní seznam */}
           <div className="bg-white p-6 rounded-2xl shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Co nakoupit:</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-800">Co nakoupit:</h2>
+              <div className="flex gap-4 items-center">
+                <button onClick={handleShare} className="text-blue-600 hover:text-blue-800" title="Sdílet seznam">
+                  <Share2 size={22} />
+                </button>
+                <button onClick={handleCopy} className="text-gray-600 hover:text-gray-800 text-sm underline">
+                  Kopírovat
+                </button>
+              </div>
+            </div>
             {shoppingList.length > 0 ? (
               <ul className="space-y-2">
                 {shoppingList.map((item) => (
