@@ -79,24 +79,32 @@ export default function ShoppingListPage() {
       console.error("Nepodařilo se načíst recept:", error);
     }
   };
+  const formattedList = shoppingList.join("\n"); // každý řádek jedna surovina
+
   const handleShare = async () => {
-    if (navigator.share) {
+    const formattedList = shoppingList.join("\n");
+
+    if (navigator.canShare && navigator.canShare({ files: [] })) {
+      const blob = new Blob([formattedList], { type: "text/plain" });
+      const file = new File([blob], "nakupni-seznam.txt", {
+        type: "text/plain",
+      });
+
       try {
         await navigator.share({
           title: "Nákupní seznam",
-          text: shoppingList.map((item) => `☐ ${item}`).join("\n"),
+          files: [file],
         });
       } catch (error) {
         console.error("Sdílení selhalo:", error);
       }
     } else {
-      alert("Sdílení není v tomto prohlížeči podporováno.");
+      alert("Sdílení souborů není v tomto prohlížeči podporováno.");
     }
   };
-
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(shoppingList.join("\n"));
+      await navigator.clipboard.writeText(formattedList);
       alert("Seznam byl zkopírován do schránky.");
     } catch (err) {
       console.error("Nepodařilo se kopírovat:", err);
