@@ -1,6 +1,6 @@
 // 📁 src/routes/favoriteRoutes.ts
 import express from "express";
-import { authenticateToken } from "../middleware/authMiddleware";
+import { authenticateToken } from "../middleware/auth";
 import { getMyFavorites, toggleFavorite, generateShoppingList } from "../controllers/userController"; // zůstává, pokud vše řešíš v tomto controlleru
 
 const router = express.Router();

@@ -114,6 +114,8 @@ export default function DetailPage() {
         const res = await fetch(`${API_URL}/api/recipes/${id}`);
         if (!res.ok) throw new Error("Recept se nepodařilo načíst");
         const data: Recipe = await res.json();
+        console.log("🔍 Načtený recept:", data);
+        console.log("📦 Ingredience:", data.ingredients);
         setRecipe(data);
         if (email) {
           fetchFavorites(email, data.id);
@@ -262,14 +264,14 @@ export default function DetailPage() {
                       const kcal = Math.round(grams * caloriesPerGram);
 
                       const fractionLabel = unit === "ks" ? getFractionLabel(amount) : null;
-                      const label = ing.display
-                        ? ing.display
+                      const displayExists = ing.display && ing.display.trim() !== "";
+                      const label = displayExists
+                        ? `${ing.display} ${ing.name}` // přidej name do zobrazení!
                         : unit === "ks"
                         ? fractionLabel
                           ? `${fractionLabel} ${ing.name} (${Math.round(grams)} g)`
                           : `${amount} ks ${ing.name} (${Math.round(grams)} g)`
                         : `${amount} ${unit} ${ing.name}`;
-
                       return (
                         <li key={i} className="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm">
                           <span className="text-gray-700">{label}</span>

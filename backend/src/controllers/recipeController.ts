@@ -215,10 +215,18 @@ export const deleteIngredient = async (req: Request, res: Response): Promise<voi
     res.status(400).json({ error: "Neplatné ID." });
     return;
   }
+
   try {
-    await deleteIngredientFromDB(id);
+    const success = await deleteIngredientFromDB(id);
+
+    if (!success) {
+      res.status(404).json({ error: "Surovina nenalezena nebo již smazána." });
+      return;
+    }
+
     res.status(200).json({ message: "Surovina smazána." });
   } catch (error) {
+    console.error("❌ Chyba při mazání suroviny:", error);
     res.status(500).json({ error: "Nepodařilo se smazat surovinu." });
   }
 };
