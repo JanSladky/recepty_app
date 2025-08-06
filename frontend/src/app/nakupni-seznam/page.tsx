@@ -29,12 +29,28 @@ export default function ShoppingListPage() {
 
   useEffect(() => {
     const ingredients = recipesToCook.flatMap((recipe) => recipe.ingredients || []);
-    const ingredientNames = ingredients.map((ing) => ing.name);
-    const uniqueNames = [...new Set(ingredientNames)];
-    setShoppingList(uniqueNames.sort());
 
-    console.log("Recepty k vaření:", recipesToCook);
-    console.log("Suroviny:", ingredients);
+    const aggregated: Record<string, { name: string; unit: string; amount: number }> = {};
+
+    for (const ing of ingredients) {
+      const name = ing.name?.toString().trim() ?? "";
+      const unit = ing.unit?.toString().trim() ?? "";
+      const amount = parseFloat(ing.amount as string) || 0;
+
+      const key = `${name}||${unit}`;
+
+      if (!aggregated[key]) {
+        aggregated[key] = { name, unit, amount };
+      } else {
+        aggregated[key].amount += amount;
+      }
+    }
+
+    const list = Object.values(aggregated)
+      .map((i) => `${i.amount} ${i.unit} ${i.name}`.trim())
+      .sort();
+
+    setShoppingList(list);
   }, [recipesToCook]);
 
   const fetchRecipeWithIngredients = async (id: number): Promise<Recipe> => {
