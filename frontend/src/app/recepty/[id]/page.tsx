@@ -92,14 +92,18 @@ export default function DetailPage() {
   const fetchFavorites = useCallback(async (email: string, recipeId: number) => {
     try {
       const res = await fetch(`${API_URL}/api/user/favorites`, {
-        headers: { "x-user-email": email },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       if (res.ok) {
         const data = await res.json();
-        setIsFavorite((data.favoriteIds || []).includes(recipeId));
+
+        // mapujeme z objektů na jejich ID
+        const favoriteIds = Array.isArray(data) ? data.map((r: { id: number }) => r.id) : [];
+
+        setIsFavorite(favoriteIds.includes(recipeId));
       }
     } catch (error) {
-      console.error("Chyba při načítání oblíbených:", error);
+      console.error("Chyba při načítání oblíbených receptů:", error);
     }
   }, []);
 
