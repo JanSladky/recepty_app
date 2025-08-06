@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import SearchBar from "@/components/SearchBar";
+import { Trash2 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -141,9 +142,16 @@ export default function ShoppingListPage() {
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Co nakoupit:</h2>
             {shoppingList.length > 0 ? (
               <ul className="space-y-2">
-                {shoppingList.map((name) => (
-                  <li key={name} className="p-2 bg-gray-50 rounded">
-                    {name}
+                {shoppingList.map((item) => (
+                  <li key={item} className="p-2 bg-gray-50 rounded flex justify-between items-center">
+                    <span>{item}</span>
+                    <button
+                      onClick={() => setShoppingList((prev) => prev.filter((i) => i !== item))}
+                      className="text-red-500 hover:text-red-700"
+                      title="Odebrat ze seznamu"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </li>
                 ))}
               </ul>
