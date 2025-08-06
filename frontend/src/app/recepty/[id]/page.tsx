@@ -131,7 +131,8 @@ export default function DetailPage() {
   }, [id, fetchFavorites]);
 
   const handleToggleFavorite = async () => {
-    if (!userEmail || !recipe) {
+    const token = localStorage.getItem("token");
+    if (!token || !recipe) {
       alert("Pro přidání do oblíbených se musíte přihlásit.");
       router.push("/login");
       return;
@@ -140,13 +141,19 @@ export default function DetailPage() {
     setIsFavorite((prev) => !prev);
 
     try {
-      await fetch(`${API_URL}/api/user/favorites/${recipe.id}`, {
+      const res = await fetch(`${API_URL}/api/user/favorites/${recipe.id}/toggle`, {
         method: "POST",
-        headers: { "x-user-email": userEmail },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
+
+      if (!res.ok) {
+        throw new Error("Chyba při přepínání oblíbeného receptu");
+      }
     } catch (error) {
       console.error("Chyba při přepínání oblíbených:", error);
-      setIsFavorite((prev) => !prev);
+      setIsFavorite((prev) => !prev); // revertuj změnu
       alert("Akce se nezdařila, zkuste to prosím znovu.");
     }
   };
