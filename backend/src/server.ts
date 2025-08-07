@@ -10,6 +10,7 @@ import userRoutes from "./routes/userRoutes";
 import usersRoute from "./routes/users";
 import ingredientRoutes from "./routes/ingredients";
 import adminRoutes from "./routes/adminRoutes"; // ✅ jen import
+import authRoutes from "./routes/authRoutes";
 
 dotenv.config();
 
@@ -45,6 +46,7 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/", (_req, res) => res.send("✅ API pro recepty je v provozu!"));
 
 // 📚 Připojení rout
+app.use("/api/auth", authRoutes);
 app.use("/api/recipes", recipeRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/users", usersRoute);
