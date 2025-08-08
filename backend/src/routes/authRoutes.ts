@@ -1,34 +1,27 @@
 import { Router } from "express";
-import { registerUser, loginUser, getUserByEmail } from "../controllers/authController";
-import { verifyUser } from "../middleware/auth";
+import { registerUser, loginUser } from "../controllers/authController";
+import { authenticateToken } from "../middleware/auth";
 
 const router = Router();
 
-// 📝 Registrace nového uživatele
-router.post("/register", async (req, res, next) => {
-  try {
-    await registerUser(req, res);
-  } catch (err) {
-    next(err);
-  }
-});
+/**
+ * POST /api/auth/register
+ * Registrace nového uživatele
+ */
+router.post("/register", registerUser);
 
-// 🔐 Přihlášení uživatele
-router.post("/login", async (req, res, next) => {
-  try {
-    await loginUser(req, res);
-  } catch (err) {
-    next(err);
-  }
-});
+/**
+ * POST /api/auth/login
+ * Přihlášení – vrací token a uživatele bez hesla
+ */
+router.post("/login", loginUser);
 
-// 👤 Získání informací o přihlášeném uživateli (ověřeno JWT tokenem)
-router.get("/me", verifyUser, async (req, res, next) => {
-  try {
-    await getUserByEmail(req, res);
-  } catch (err) {
-    next(err);
-  }
+/**
+ * GET /api/auth/me
+ * Info o přihlášeném uživateli přímo z JWT (id, email, role)
+ */
+router.get("/me", authenticateToken, (req, res) => {
+  res.json(req.user);
 });
 
 export default router;
