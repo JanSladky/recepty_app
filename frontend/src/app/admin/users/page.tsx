@@ -37,6 +37,20 @@ function getAxiosErrorMessage(error: unknown): string {
   return "Neočekávaná chyba.";
 }
 
+/** Malý badge pro role */
+function RoleBadge({ role }: { role: Role }) {
+  const map: Record<Role, string> = {
+    USER: "bg-gray-100 text-gray-800",
+    ADMIN: "bg-blue-100 text-blue-800",
+    SUPERADMIN: "bg-purple-100 text-purple-800",
+  };
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${map[role]}`}>
+      {role}
+    </span>
+  );
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,70 +119,103 @@ export default function AdminUsersPage() {
   }, [fetchUsers]);
 
   if (loading) {
-    return <div className="p-6">Načítám uživatele…</div>;
+    return (
+      <AdminRoute requireSuperadmin>
+        <div className="p-6 max-w-5xl mx-auto">Načítám uživatele…</div>
+      </AdminRoute>
+    );
   }
 
   return (
     <AdminRoute requireSuperadmin>
-      <div className="p-6 max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold mb-4">Správa uživatelů</h1>
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-800">Správa uživatelů</h1>
+          <p className="text-gray-500 mt-1">Změna rolí a mazání účtů (jen pro SUPERADMIN).</p>
+        </div>
 
         {error && (
-          <div className="mb-4 rounded border px-3 py-2 text-sm text-red-700 border-red-300 bg-red-50">
+          <div className="mb-6 rounded-lg border px-4 py-3 text-sm text-red-700 border-red-300 bg-red-50">
             {error}
           </div>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b">
-                <th className="py-2 pr-2">ID</th>
-                <th className="py-2 pr-2">Jméno</th>
-                <th className="py-2 pr-2">Email</th>
-                <th className="py-2 pr-2">Role</th>
-                <th className="py-2 pr-2">Akce</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-b">
-                  <td className="py-2 pr-2">{u.id}</td>
-                  <td className="py-2 pr-2">{u.name ?? "-"}</td>
-                  <td className="py-2 pr-2">{u.email}</td>
-                  <td className="py-2 pr-2">
-                    <select
-                      className="border rounded px-2 py-1"
-                      value={u.role}
-                      onChange={(e) => changeRole(u.id, e.target.value as Role)}
-                      disabled={savingId === u.id}
-                    >
-                      <option value="USER">USER</option>
-                      <option value="ADMIN">ADMIN</option>
-                      <option value="SUPERADMIN">SUPERADMIN</option>
-                    </select>
-                  </td>
-                  <td className="py-2 pr-2">
-                    <button
-                      className="underline text-red-600 disabled:opacity-50"
-                      onClick={() => deleteUser(u.id)}
-                      disabled={savingId === u.id || u.role === "SUPERADMIN"}
-                    >
-                      Smazat
-                    </button>
-                  </td>
+        <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50">
+                <tr className="border-b text-gray-600">
+                  <th className="py-3 px-4">ID</th>
+                  <th className="py-3 px-4">Uživatel</th>
+                  <th className="py-3 px-4">Email</th>
+                  <th className="py-3 px-4">Role</th>
+                  <th className="py-3 px-4">Akce</th>
                 </tr>
-              ))}
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-b last:border-b-0 hover:bg-gray-50/60">
+                    <td className="py-3 px-4 align-middle text-gray-700">{u.id}</td>
 
-              {users.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-6 text-center text-sm text-gray-500">
-                    Žádní uživatelé.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    <td className="py-3 px-4 align-middle">
+                      <div className="flex items-center gap-3">
+                        {u.avatar_url ? (
+                          <img
+                            src={u.avatar_url}
+                            alt={u.name ?? u.email}
+                            className="w-8 h-8 rounded-full object-cover border"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-sm font-bold">
+                            {(u.name?.charAt(0) || u.email.charAt(0)).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="leading-tight">
+                          <div className="font-medium text-gray-800">{u.name ?? "-"}</div>
+                          <div className="text-xs text-gray-500">
+                            <RoleBadge role={u.role} />
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="py-3 px-4 align-middle text-gray-700">{u.email}</td>
+
+                    <td className="py-3 px-4 align-middle">
+                      <select
+                        className="border rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                        value={u.role}
+                        onChange={(e) => changeRole(u.id, e.target.value as Role)}
+                        disabled={savingId === u.id}
+                      >
+                        <option value="USER">USER</option>
+                        <option value="ADMIN">ADMIN</option>
+                        <option value="SUPERADMIN">SUPERADMIN</option>
+                      </select>
+                    </td>
+
+                    <td className="py-3 px-4 align-middle">
+                      <button
+                        className="text-sm font-semibold text-red-600 hover:text-red-700 hover:underline disabled:opacity-50"
+                        onClick={() => deleteUser(u.id)}
+                        disabled={savingId === u.id || u.role === "SUPERADMIN"}
+                      >
+                        Smazat
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+
+                {users.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-10 text-center text-sm text-gray-500">
+                      Žádní uživatelé.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </AdminRoute>

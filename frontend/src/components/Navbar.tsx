@@ -78,6 +78,10 @@ export default function Navbar() {
                     Dashboard
                   </Link>
                 )}
+                {/* Schvalování receptů */}
+                <Link href="/admin/cekajici-recepty" className="block px-4 py-2 hover:bg-gray-100">
+                  Schvalování receptů
+                </Link>
                 {/* Správa uživatelů jen pro SUPERADMIN */}
                 {isSuperadmin && (
                   <Link href="/admin/users" className="block px-4 py-2 hover:bg-gray-100">
@@ -187,6 +191,10 @@ export default function Navbar() {
 
           {!loading && isAdmin && (
             <>
+              {/* Schvalování receptů */}
+              <Link href="/admin/cekajici-recepty" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
+                Schvalování receptů
+              </Link>
               {isSuperadmin && (
                 <Link href="/admin/users" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
                   Správa uživatelů
