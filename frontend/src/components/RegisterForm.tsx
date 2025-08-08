@@ -32,10 +32,12 @@ const RegisterForm = () => {
         });
 
         const uploadData = await uploadRes.json();
+        console.log("📦 Cloudinary response:", uploadData); // ← uvidíš přesnou chybu
 
         if (!uploadData.secure_url) throw new Error("Chyba při nahrávání avataru.");
         avatar_url = uploadData.secure_url;
-      } catch {
+      } catch (err) {
+        console.error("❌ Upload avatar error:", err);
         setMessage("❌ Nahrání avataru selhalo.");
         return;
       }
