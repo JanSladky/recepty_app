@@ -1,16 +1,24 @@
 // 📁 backend/src/routes/userRoutes.ts
 import express from "express";
-import { loginUser, resetPassword, getMyFavorites, toggleFavorite, generateShoppingList, generateShoppingListFromPlan } from "../controllers/userController";
-import { authenticateToken } from "../middleware/auth";
-import { getUserByEmail } from "../controllers/userController";
-import { updateAvatar } from "../controllers/userController";
+import {
+  loginUser,
+  resetPassword,
+  getMyFavorites,
+  toggleFavorite,
+  generateShoppingList,
+  generateShoppingListFromPlan,
+  getUserByEmail,
+  updateAvatar
+} from "../controllers/userController";
+import { authenticateToken, verifyUser } from "../middleware/auth";
 import upload from "../middleware/upload";
-import { verifyUser } from "../middleware/auth";
 
 const router = express.Router();
 
 // ✅ Přihlášení
 router.post("/login", loginUser);
+
+// ✅ Nahrání / změna avataru
 router.post("/upload-avatar", verifyUser, upload.single("avatar"), updateAvatar);
 
 // ✅ Reset hesla
@@ -25,8 +33,10 @@ router.post("/favorites/:id/toggle", authenticateToken, toggleFavorite);
 // ✅ Vygeneruj nákupní seznam z oblíbených receptů
 router.get("/favorites/shopping-list", authenticateToken, generateShoppingList);
 
+// ✅ Nákupní seznam z plánu
 router.post("/shopping-list", authenticateToken, generateShoppingListFromPlan);
-// 🧩 přidej sem route
-router.get("/email", getUserByEmail);
+
+// ✅ Získání uživatele podle emailu (pro useAdmin hook)
+router.get("/email", authenticateToken, getUserByEmail);
 
 export default router;

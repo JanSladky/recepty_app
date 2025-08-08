@@ -1,5 +1,6 @@
+// 📁 backend/src/routes/ingredients.ts
 import express from "express";
-import { authenticateToken, verifyAdmin } from "../middleware/auth";
+import { authenticateToken, requireRole } from "../middleware/auth";
 import {
   // Controllery pro suroviny
   getAllIngredients,
@@ -7,25 +8,25 @@ import {
   updateIngredient,
   deleteIngredient,
 
-  // Controllery pro kategorie - zde byly chyby v názvech
-  getAllCategories, // Původně: getAllIngredientCategories
-  createCategory, // Původně: createIngredientCategory
-  updateCategory, // Původně: updateIngredientCategory
-  deleteCategory, // Původně: deleteIngredientCategory
+  // Controllery pro kategorie
+  getAllCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 } from "../controllers/recipeController";
 
 const router = express.Router();
 
 // --- ROUTY PRO SUROVINY ---
 router.get("/", getAllIngredients);
-router.post("/", authenticateToken, verifyAdmin, createIngredient);
-router.put("/:id", authenticateToken, verifyAdmin, updateIngredient);
-router.delete("/:id", authenticateToken, verifyAdmin, deleteIngredient);
+router.post("/", authenticateToken, requireRole("ADMIN", "SUPERADMIN"), createIngredient);
+router.put("/:id", authenticateToken, requireRole("ADMIN", "SUPERADMIN"), updateIngredient);
+router.delete("/:id", authenticateToken, requireRole("ADMIN", "SUPERADMIN"), deleteIngredient);
 
 // --- ROUTY PRO KATEGORIE SUROVIN ---
 router.get("/categories", getAllCategories);
-router.post("/categories", authenticateToken, verifyAdmin, createCategory);
-router.put("/categories/:id", authenticateToken, verifyAdmin, updateCategory);
-router.delete("/categories/:id", authenticateToken, verifyAdmin, deleteCategory);
+router.post("/categories", authenticateToken, requireRole("ADMIN", "SUPERADMIN"), createCategory);
+router.put("/categories/:id", authenticateToken, requireRole("ADMIN", "SUPERADMIN"), updateCategory);
+router.delete("/categories/:id", authenticateToken, requireRole("ADMIN", "SUPERADMIN"), deleteCategory);
 
 export default router;

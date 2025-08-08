@@ -5,28 +5,43 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import useAdmin from "@/hooks/useAdmin";
 
-// --- Komponenta pro dlaždici ---
-const DashboardTile = ({ href, title, description, icon }: { href: string; title: string; description: string; icon: string }) => (
-  <Link href={href} className="group block bg-white p-6 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-    <div className="text-4xl mb-3">{icon}</div>
-    <h3 className="text-xl font-bold text-gray-800 group-hover:text-green-600 transition-colors">{title}</h3>
-    <p className="text-gray-500 text-sm mt-1">{description}</p>
-  </Link>
-);
+type TileProps = {
+  href: string;
+  title: string;
+  description: string;
+  icon: string;
+  allowed: boolean;
+};
+
+const DashboardTile = ({ href, title, description, icon, allowed }: TileProps) => {
+  const content = (
+    <div
+      className={`group block bg-white p-6 rounded-2xl shadow-md transition-all duration-300 ${
+        allowed ? "hover:shadow-xl hover:-translate-y-1" : "opacity-50 cursor-not-allowed"
+      }`}
+    >
+      <div className="text-4xl mb-3">{icon}</div>
+      <h3 className={`text-xl font-bold text-gray-800 ${allowed ? "group-hover:text-green-600 transition-colors" : ""}`}>
+        {title}
+      </h3>
+      <p className="text-gray-500 text-sm mt-1">{description}</p>
+      {!allowed && <p className="text-xs text-red-500 mt-2">Přístup pouze pro administrátora</p>}
+    </div>
+  );
+
+  return allowed ? <Link href={href}>{content}</Link> : content;
+};
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { isAdmin, loading } = useAdmin();
+  const { isAdmin, isSuperadmin, loading } = useAdmin();
 
   useEffect(() => {
-    const email = localStorage.getItem("userEmail");
-    if (!email || (!loading && isAdmin === false)) {
-      router.push("/login");
-    }
-  }, [loading, isAdmin, router]);
+    const email = typeof window !== "undefined" ? localStorage.getItem("userEmail") : null;
+    if (!email) router.push("/login");
+  }, [router]);
 
-  // ⏳ Načítání
-  if (loading || isAdmin === null) {
+  if (loading || isAdmin === null || isSuperadmin === null) {
     return <p className="text-center p-10">Načítání...</p>;
   }
 
@@ -39,18 +54,17 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <DashboardTile href="/oblibene" title="Oblíbené recepty" description="Tvoje uložené recepty označené srdíčkem." icon="❤️" />
-          <DashboardTile href="/recepty" title="Všechny recepty" description="Procházej kompletní sbírku receptů." icon="📚" />
-          <DashboardTile href="/nakupni-seznam" title="Nákupní seznam" description="Naplánuj si vaření a vytvoř si seznam." icon="🛒" />
+          {/* Viditelné pro všechny */}
+          <DashboardTile href="/oblibene" title="Oblíbené recepty" description="Tvoje uložené recepty označené srdíčkem." icon="❤️" allowed />
+          <DashboardTile href="/recepty" title="Všechny recepty" description="Procházej kompletní sbírku receptů." icon="📚" allowed />
+          <DashboardTile href="/nakupni-seznam" title="Nákupní seznam" description="Naplánuj si vaření a vytvoř si seznam." icon="🛒" allowed />
 
-          {/* Dlaždice pouze pro adminy */}
-          {isAdmin && (
-            <>
-              <DashboardTile href="/pridat-recept" title="Přidat nový recept" description="Vytvoř a sdílej nový recept s ostatními." icon="➕" />
-              <DashboardTile href="/admin/suroviny" title="Správa surovin" description="Upravuj suroviny a jejich kategorie." icon="🥕" />
-              <DashboardTile href="/admin/users" title="Správa uživatelů" description="Prohlížej, upravuj nebo mazej uživatele aplikace." icon="🧑‍💼" />
-            </>
-          )}
+          {/* ADMIN i SUPERADMIN */}
+          <DashboardTile href="/pridat-recept" title="Přidat nový recept" description="Vytvoř a sdílej nový recept s ostatními." icon="➕" allowed={!!isAdmin} />
+          <DashboardTile href="/admin/suroviny" title="Správa surovin" description="Upravuj suroviny a jejich kategorie." icon="🥕" allowed={!!isAdmin} />
+
+          {/* Pouze SUPERADMIN */}
+          <DashboardTile href="/admin/users" title="Správa uživatelů" description="Prohlížej, upravuj nebo mazej uživatele aplikace." icon="🧑‍💼" allowed={!!isSuperadmin} />
         </div>
       </main>
     </div>

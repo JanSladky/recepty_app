@@ -2,40 +2,50 @@ import { useEffect, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+type Role = "SUPERADMIN" | "ADMIN" | "USER";
+
 export default function useAdmin() {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<Role | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isSuperadmin, setIsSuperadmin] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const email = localStorage.getItem("userEmail");
-    console.log("📧 email:", email);
-    console.log("🌍 API_URL:", API_URL);
+    const email = typeof window !== "undefined" ? localStorage.getItem("userEmail") : null;
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-    if (!email) {
+    if (!email || !token) {
+      setRole(null);
       setIsAdmin(false);
+      setIsSuperadmin(false);
       setLoading(false);
       return;
     }
 
     const fetchUser = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/user/email?email=${encodeURIComponent(email)}`);
-        
+        const res = await fetch(
+          `${API_URL}/api/user/email?email=${encodeURIComponent(email)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
         if (!res.ok) {
-          console.warn("❌ Uživatel nenalezen nebo chyba v odpovědi:", res.status);
+          setRole(null);
           setIsAdmin(false);
+          setIsSuperadmin(false);
           return;
         }
 
         const user = await res.json();
-        console.log("📦 Načtený uživatel:", user);
-        console.log("✅ user.is_admin:", user.is_admin);
-        console.log("✅ Nastavuji isAdmin na:", user.is_admin === true);
+        const r = (user.role || "USER") as Role;
 
-        setIsAdmin(user.is_admin === true);
-      } catch (err) {
-        console.error("❌ Chyba při ověřování admina:", err);
+        setRole(r);
+        setIsAdmin(r === "ADMIN" || r === "SUPERADMIN");
+        setIsSuperadmin(r === "SUPERADMIN");
+      } catch {
+        setRole(null);
         setIsAdmin(false);
+        setIsSuperadmin(false);
       } finally {
         setLoading(false);
       }
@@ -44,5 +54,5 @@ export default function useAdmin() {
     fetchUser();
   }, []);
 
-  return { isAdmin, loading };
+  return { role, isAdmin, isSuperadmin, loading };
 }

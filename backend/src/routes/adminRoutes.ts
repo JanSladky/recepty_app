@@ -1,23 +1,20 @@
 // 📁 backend/src/routes/adminRoutes.ts
-
 import { Router } from "express";
-import {
-  getAllUsers,
-  deleteUser,
-  updateUserRole,
-} from "../controllers/adminController";
-import {
-  authenticateToken,
-  verifyAdmin,
-} from "../middleware/auth";
+import { getAllUsers, deleteUser, updateUserRole } from "../controllers/adminController";
+import { authenticateToken, requireRole } from "../middleware/auth";
 
 const router = Router();
 
-// 🔐 Kombinovaný middleware
-const adminOnly = [authenticateToken, verifyAdmin];
+// všechny admin endpointy: musí být přihlášen + musí být SUPERADMIN
+router.use(authenticateToken);
 
-router.get("/users", adminOnly, getAllUsers);
-router.delete("/users/:id", adminOnly, deleteUser);
-router.put("/users/:id/role", adminOnly, updateUserRole);
+// ✅ Seznam uživatelů – jen SUPERADMIN
+router.get("/users", requireRole("SUPERADMIN"), getAllUsers);
+
+// ✅ Změna role – jen SUPERADMIN
+router.patch("/users/:id/role", requireRole("SUPERADMIN"), updateUserRole);
+
+// ✅ Smazání uživatele – jen SUPERADMIN
+router.delete("/users/:id", requireRole("SUPERADMIN"), deleteUser);
 
 export default router;

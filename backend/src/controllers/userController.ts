@@ -1,15 +1,15 @@
-import type { Response, Request } from "express";
+import type { Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import db from "../utils/db";
 import { cloudinary } from "../utils/cloudinary";
-
 import { getUserByEmailFromDB } from "../models/userModel";
+import type { AuthRequest, Role } from "../middleware/auth";
 
 const JWT_SECRET = process.env.JWT_SECRET || "tajny_klic";
 
 // ✅ Přihlášení uživatele
-export const loginUser = async (req: Request, res: Response): Promise<void> => {
+export const loginUser = async (req: AuthRequest, res: Response): Promise<void> => {
   const { email, password } = req.body;
 
   try {
@@ -27,7 +27,12 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: "1d" });
+    // Nový token obsahuje roli
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role as Role },
+      JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
     res.status(200).json({
       token,
@@ -35,7 +40,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
         id: user.id,
         email: user.email,
         name: user.name,
-        is_admin: user.is_admin,
+        role: user.role,
         avatar_url: user.avatar_url,
       },
     });
@@ -46,7 +51,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
 };
 
 // ✅ Změna avataru
-export const updateAvatar = async (req: Request, res: Response): Promise<void> => {
+export const updateAvatar = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
 
@@ -61,13 +66,9 @@ export const updateAvatar = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // Upload do Cloudinary
     const base64 = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
-    const uploadResult = await cloudinary.uploader.upload(base64, {
-      folder: "avatars",
-    });
+    const uploadResult = await cloudinary.uploader.upload(base64, { folder: "avatars" });
 
-    // Update v DB
     await db.query("UPDATE users SET avatar_url = $1 WHERE id = $2", [uploadResult.secure_url, userId]);
 
     res.status(200).json({ message: "Avatar byl aktualizován", avatar_url: uploadResult.secure_url });
@@ -78,7 +79,7 @@ export const updateAvatar = async (req: Request, res: Response): Promise<void> =
 };
 
 // ✅ Reset hesla
-export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+export const resetPassword = async (req: AuthRequest, res: Response): Promise<void> => {
   const { email, newPassword } = req.body;
 
   try {
@@ -99,8 +100,8 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// ✅ Získání oblíbených receptů přihlášeného uživatele
-export const getMyFavorites = async (req: Request, res: Response): Promise<void> => {
+// ✅ Získání oblíbených receptů
+export const getMyFavorites = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
 
@@ -111,8 +112,8 @@ export const getMyFavorites = async (req: Request, res: Response): Promise<void>
 
     const result = await db.query(
       `SELECT r.* FROM recipes r
-        JOIN favorites f ON r.id = f.recipe_id
-        WHERE f.user_id = $1`,
+       JOIN favorites f ON r.id = f.recipe_id
+       WHERE f.user_id = $1`,
       [userId]
     );
 
@@ -123,8 +124,8 @@ export const getMyFavorites = async (req: Request, res: Response): Promise<void>
   }
 };
 
-// ✅ Přidání nebo odebrání receptu z oblíbených
-export const toggleFavorite = async (req: Request, res: Response): Promise<void> => {
+// ✅ Přidání nebo odebrání z oblíbených
+export const toggleFavorite = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
     const recipeId = parseInt(req.params.id);
@@ -134,7 +135,10 @@ export const toggleFavorite = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const existing = await db.query("SELECT * FROM favorites WHERE user_id = $1 AND recipe_id = $2", [userId, recipeId]);
+    const existing = await db.query(
+      "SELECT * FROM favorites WHERE user_id = $1 AND recipe_id = $2",
+      [userId, recipeId]
+    );
 
     if (existing.rows.length > 0) {
       await db.query("DELETE FROM favorites WHERE user_id = $1 AND recipe_id = $2", [userId, recipeId]);
@@ -149,8 +153,8 @@ export const toggleFavorite = async (req: Request, res: Response): Promise<void>
   }
 };
 
-// ✅ Generování nákupního seznamu z oblíbených receptů
-export const generateShoppingList = async (req: Request, res: Response): Promise<void> => {
+// ✅ Generování nákupního seznamu z oblíbených
+export const generateShoppingList = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
 
@@ -161,11 +165,11 @@ export const generateShoppingList = async (req: Request, res: Response): Promise
 
     const result = await db.query(
       `SELECT i.name, ri.quantity, ri.unit
-        FROM recipes r
-        JOIN favorites f ON f.recipe_id = r.id
-        JOIN recipe_ingredients ri ON ri.recipe_id = r.id
-        JOIN ingredients i ON i.id = ri.ingredient_id
-        WHERE f.user_id = $1`,
+       FROM recipes r
+       JOIN favorites f ON f.recipe_id = r.id
+       JOIN recipe_ingredients ri ON ri.recipe_id = r.id
+       JOIN ingredients i ON i.id = ri.ingredient_id
+       WHERE f.user_id = $1`,
       [userId]
     );
 
@@ -176,8 +180,8 @@ export const generateShoppingList = async (req: Request, res: Response): Promise
   }
 };
 
-// ✅ Placeholder – budoucí generování nákupního seznamu z plánu
-export const generateShoppingListFromPlan = async (req: Request, res: Response): Promise<void> => {
+// ✅ Placeholder – plán
+export const generateShoppingListFromPlan = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
 
@@ -193,8 +197,8 @@ export const generateShoppingListFromPlan = async (req: Request, res: Response):
   }
 };
 
-// ✅ Vrací info o přihlášeném uživateli (token)
-export const getCurrentUser = async (req: Request, res: Response): Promise<void> => {
+// ✅ Vrací info o přihlášeném uživateli
+export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ message: "Neautorizovaný přístup." });
     return;
@@ -202,8 +206,8 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<void>
   res.status(200).json(req.user);
 };
 
-// ✅ Získání uživatele podle emailu (pro `useAdmin`)
-export const getUserByEmail = async (req: Request, res: Response): Promise<void> => {
+// ✅ Získání uživatele podle emailu
+export const getUserByEmail = async (req: AuthRequest, res: Response): Promise<void> => {
   const email = req.query.email as string;
 
   if (!email) {

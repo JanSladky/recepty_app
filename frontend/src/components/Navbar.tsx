@@ -9,16 +9,22 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar() {
   const router = useRouter();
-  const { isAdmin, loading } = useAdmin();
+  const { isAdmin, loading } = useAdmin(); // true pro ADMIN i SUPERADMIN
   const { isLoggedIn, userEmail, userAvatar } = useAuth();
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+
+  useEffect(() => {
+    const role = typeof window !== "undefined" ? localStorage.getItem("userRole") : null;
+    setIsSuperadmin(role === "SUPERADMIN");
+  }, []);
 
   const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userRole");
     localStorage.removeItem("userEmail");
     localStorage.removeItem("userAvatar");
-    localStorage.removeItem("isAdmin");
-    alert("Byl jsi odhlášen.");
     router.push("/");
     window.location.reload();
   };
@@ -36,32 +42,48 @@ export default function Navbar() {
           <Link href="/" className="hover:underline">
             Domů
           </Link>
-          <Link href="/dashboard" className="hover:underline">
-            Dashboard
-          </Link>
+
+          {/* Dashboard jen pro přihlášené */}
+          {isLoggedIn && (
+            <Link href="/dashboard" className="hover:underline">
+              Dashboard
+            </Link>
+          )}
+
           <Link href="/recepty" className="hover:underline">
             Recepty
           </Link>
 
-          <Link href="/oblibene" title="Oblíbené recepty">
-            <Heart className="text-red-500 hover:scale-110 transition" />
-          </Link>
+          {/* ❤️ jen pro přihlášené */}
+          {isLoggedIn && (
+            <Link href="/oblibene" title="Oblíbené recepty">
+              <Heart className="text-red-500 hover:scale-110 transition" />
+            </Link>
+          )}
+
+          {/* 🛒 pro všechny */}
           <Link href="/nakupni-seznam" title="Nákupní seznam">
             <ShoppingCart className="text-green-600 hover:scale-110 transition" />
           </Link>
 
+          {/* Admin menu – ADMIN i SUPERADMIN */}
           {!loading && isAdmin && (
             <div className="relative group flex items-center">
-              <div className="p-2 hover:bg-gray-100 rounded-full transition cursor-pointer">
+              <div className="p-2 hover:bg-gray-100 rounded-full transition cursor-pointer" aria-label="Admin menu">
                 <Settings className="w-6 h-6 text-gray-700" />
               </div>
-              <div className="absolute right-0 top-10 w-48 bg-white shadow-lg rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition duration-200 z-50">
-                <Link href="/dashboard" className="block px-4 py-2 hover:bg-gray-100">
-                  Dashboard
-                </Link>
-                <Link href="/admin/users" className="block px-4 py-2 hover:bg-gray-100">
-                  Správa uživatelů
-                </Link>
+              <div className="absolute right-0 top-10 w-56 bg-white shadow-lg rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition duration-200 z-50">
+                {isLoggedIn && (
+                  <Link href="/dashboard" className="block px-4 py-2 hover:bg-gray-100">
+                    Dashboard
+                  </Link>
+                )}
+                {/* Správa uživatelů jen pro SUPERADMIN */}
+                {isSuperadmin && (
+                  <Link href="/admin/users" className="block px-4 py-2 hover:bg-gray-100">
+                    Správa uživatelů
+                  </Link>
+                )}
                 <Link href="/pridat-recept" className="block px-4 py-2 hover:bg-gray-100">
                   Přidat recept
                 </Link>
@@ -72,10 +94,15 @@ export default function Navbar() {
             </div>
           )}
 
-          {!loading && isLoggedIn ? (
+          {/* vpravo login / profil */}
+          {isLoggedIn ? (
             <Link href="/profil" title="Profil">
               {userAvatar ? (
-                <img src={userAvatar} alt="Avatar" className="w-8 h-8 rounded-full object-cover border-2 border-blue-200 hover:scale-105 transition" />
+                <img
+                  src={userAvatar}
+                  alt="Avatar"
+                  className="w-8 h-8 rounded-full object-cover border-2 border-blue-200 hover:scale-105 transition"
+                />
               ) : (
                 <div className="bg-blue-100 text-blue-800 font-bold rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-blue-200 transition">
                   {userEmail?.charAt(0).toUpperCase() ?? "U"}
@@ -91,17 +118,26 @@ export default function Navbar() {
 
         {/* Mobilní navigace */}
         <div className="md:hidden flex items-center gap-3">
-          <Link href="/oblibene" title="Oblíbené recepty">
-            <Heart className="w-5 h-5 text-red-500 hover:scale-110 transition" />
-          </Link>
+          {/* ❤️ jen pro přihlášené */}
+          {isLoggedIn && (
+            <Link href="/oblibene" title="Oblíbené recepty">
+              <Heart className="w-5 h-5 text-red-500 hover:scale-110 transition" />
+            </Link>
+          )}
+
+          {/* 🛒 pro všechny */}
           <Link href="/nakupni-seznam" title="Nákupní seznam">
             <ShoppingCart className="w-5 h-5 text-green-600 hover:scale-110 transition" />
           </Link>
 
-          {!loading && isLoggedIn ? (
+          {isLoggedIn ? (
             <Link href="/profil" title="Profil">
               {userAvatar ? (
-                <img src={userAvatar} alt="Avatar" className="w-8 h-8 rounded-full object-cover border-2 border-blue-200 hover:scale-105 transition" />
+                <img
+                  src={userAvatar}
+                  alt="Avatar"
+                  className="w-8 h-8 rounded-full object-cover border-2 border-blue-200 hover:scale-105 transition"
+                />
               ) : (
                 <div className="bg-blue-100 text-blue-800 font-bold rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-blue-200 transition">
                   {userEmail?.charAt(0).toUpperCase() ?? "U"}
@@ -122,23 +158,40 @@ export default function Navbar() {
         </div>
       </div>
 
+      {/* Mobilní menu obsah */}
       {menuOpen && (
         <div className="md:hidden mt-4 flex flex-col gap-4 px-4">
           <Link href="/" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
             Domů
           </Link>
-          <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
-            Dashboard
-          </Link>
+
+          {isLoggedIn && (
+            <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
+              Dashboard
+            </Link>
+          )}
+
           <Link href="/recepty" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
             Recepty
           </Link>
 
+          {isLoggedIn && (
+            <Link href="/oblibene" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
+              Oblíbené recepty
+            </Link>
+          )}
+
+          <Link href="/nakupni-seznam" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
+            Nákupní seznam
+          </Link>
+
           {!loading && isAdmin && (
             <>
-              <Link href="/admin/users" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
-                Správa uživatelů
-              </Link>
+              {isSuperadmin && (
+                <Link href="/admin/users" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
+                  Správa uživatelů
+                </Link>
+              )}
               <Link href="/pridat-recept" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
                 Přidat recept
               </Link>
@@ -148,7 +201,7 @@ export default function Navbar() {
             </>
           )}
 
-          {!loading && isLoggedIn ? (
+          {isLoggedIn ? (
             <button
               onClick={() => {
                 setMenuOpen(false);

@@ -1,7 +1,8 @@
+// 📁 backend/src/routes/recipes.ts
 import { Router } from "express";
 import multer from "multer";
 import { storage } from "../utils/cloudinary";
-import { authenticateToken, verifyAdmin } from "../middleware/auth";
+import { authenticateToken, requireRole } from "../middleware/auth";
 import {
   getRecipes,
   getRecipeById,
@@ -12,18 +13,36 @@ import {
 
 const router = Router();
 
-// Správné vytvoření Multer instance
+// Multer instance (Cloudinary storage)
 const upload = multer({ storage });
 
 // --- Veřejné GET routy (bez ověření) ---
 router.get("/", getRecipes);
 router.get("/:id", getRecipeById);
 
-// --- Routy chráněné pro administrátory ---
-// ✅ SPRÁVNÉ POŘADÍ: nejdřív ověřit token → pak admina → pak nahrát obrazek
+// --- Routy chráněné ---
+// ADMIN i SUPERADMIN mají právo přidávat/upravovat/mazat recepty
+router.post(
+  "/",
+  authenticateToken,
+  requireRole("ADMIN", "SUPERADMIN"),
+  upload.single("image"),
+  addRecipe
+);
 
-router.post("/", authenticateToken, verifyAdmin, upload.single("image"), addRecipe);
-router.put("/:id", authenticateToken, verifyAdmin, upload.single("image"), updateRecipe);
-router.delete("/:id", authenticateToken, verifyAdmin, deleteRecipe);
+router.put(
+  "/:id",
+  authenticateToken,
+  requireRole("ADMIN", "SUPERADMIN"),
+  upload.single("image"),
+  updateRecipe
+);
+
+router.delete(
+  "/:id",
+  authenticateToken,
+  requireRole("ADMIN", "SUPERADMIN"),
+  deleteRecipe
+);
 
 export default router;
