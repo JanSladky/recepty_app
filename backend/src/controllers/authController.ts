@@ -7,7 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "tajny_klic";
 
 // ✅ Registrace nového uživatele
 export const registerUser = async (req: Request, res: Response): Promise<void> => {
-  const { name, email, password } = req.body;
+  const { name, email, password, avatar_url } = req.body; // ⬅ přidáno avatar_url
 
   if (!email || !password || !name) {
     res.status(400).json({ error: "Všechna pole jsou povinná." });
@@ -24,10 +24,10 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const { rows } = await db.query(
-      `INSERT INTO users (name, email, password, is_admin)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, email, is_admin`,
-      [name, email, hashedPassword, false]
+      `INSERT INTO users (name, email, password, is_admin, avatar_url)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, email, is_admin, avatar_url`,
+      [name, email, hashedPassword, false, avatar_url] // ⬅ avatar_url doplněn
     );
 
     const user = rows[0];
@@ -92,10 +92,7 @@ export const getUserByEmail = async (req: Request, res: Response): Promise<void>
   }
 
   try {
-    const { rows } = await db.query(
-      "SELECT id, name, email, is_admin FROM users WHERE LOWER(email) = LOWER($1)",
-      [email]
-    );
+    const { rows } = await db.query("SELECT id, name, email, is_admin FROM users WHERE LOWER(email) = LOWER($1)", [email]);
 
     if (rows.length === 0) {
       res.status(404).json({ error: "Uživatel nenalezen." });

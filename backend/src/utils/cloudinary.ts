@@ -10,11 +10,7 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 // Tato kontrola je nyní univerzální pro lokální i produkční prostředí
-if (
-  !process.env.CLOUDINARY_CLOUD_NAME ||
-  !process.env.CLOUDINARY_API_KEY ||
-  !process.env.CLOUDINARY_API_SECRET
-) {
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
   throw new Error("❌ Chybí Cloudinary environment proměnné. Zkontroluj .env soubor (lokálně) nebo nastavení na serveru (produkce).");
 }
 
@@ -23,7 +19,7 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-
+export { cloudinary };
 export const storage = new CloudinaryStorage({
   cloudinary,
   params: (req, file) => ({

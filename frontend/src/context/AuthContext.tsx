@@ -5,7 +5,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 interface AuthContextType {
   isLoggedIn: boolean;
   userEmail: string | null;
-  login: (email: string) => void;
+  userAvatar: string | null;
+  login: (email: string, avatar: string) => void;
   logout: () => void;
 }
 
@@ -13,32 +14,45 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
 
   useEffect(() => {
+    const email = localStorage.getItem("userEmail");
+    const avatar = localStorage.getItem("userAvatar");
+    setUserEmail(email);
+    setUserAvatar(avatar);
+
     const syncAuth = () => {
-      const email = localStorage.getItem("userEmail");
-      setUserEmail(email);
+      setUserEmail(localStorage.getItem("userEmail"));
+      setUserAvatar(localStorage.getItem("userAvatar"));
     };
 
-    syncAuth(); // inicializace při mountu
-
-    window.addEventListener("storage", syncAuth); // reaguje na změny z jiných částí aplikace
-
+    window.addEventListener("storage", syncAuth);
     return () => window.removeEventListener("storage", syncAuth);
   }, []);
 
-  const login = (email: string) => {
+  const login = (email: string, avatar: string) => {
     localStorage.setItem("userEmail", email);
+    localStorage.setItem("userAvatar", avatar);
     setUserEmail(email);
+    setUserAvatar(avatar);
   };
 
   const logout = () => {
     localStorage.removeItem("userEmail");
+    localStorage.removeItem("userAvatar");
     localStorage.removeItem("isAdmin");
     setUserEmail(null);
+    setUserAvatar(null);
   };
 
-  return <AuthContext.Provider value={{ isLoggedIn: !!userEmail, userEmail, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{ isLoggedIn: !!userEmail, userEmail, userAvatar, login, logout }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

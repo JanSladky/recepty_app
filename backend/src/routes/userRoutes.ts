@@ -3,11 +3,15 @@ import express from "express";
 import { loginUser, resetPassword, getMyFavorites, toggleFavorite, generateShoppingList, generateShoppingListFromPlan } from "../controllers/userController";
 import { authenticateToken } from "../middleware/auth";
 import { getUserByEmail } from "../controllers/userController";
+import { updateAvatar } from "../controllers/userController";
+import upload from "../middleware/upload";
+import { verifyUser } from "../middleware/auth";
 
 const router = express.Router();
 
 // ✅ Přihlášení
 router.post("/login", loginUser);
+router.post("/upload-avatar", verifyUser, upload.single("avatar"), updateAvatar);
 
 // ✅ Reset hesla
 router.post("/reset-password", resetPassword);

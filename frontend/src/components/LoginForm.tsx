@@ -35,8 +35,9 @@ const LoginForm = () => {
       localStorage.setItem("token", data.token);
       localStorage.setItem("userEmail", data.user.email);
       localStorage.setItem("isAdmin", data.user.is_admin ? "true" : "false");
+      localStorage.setItem("userAvatar", data.user.avatar_url);
 
-       login(data.user.email);
+      login(data.user.email, data.user.avatar_url);
 
       setMessage("✅ Přihlášení úspěšné");
 
