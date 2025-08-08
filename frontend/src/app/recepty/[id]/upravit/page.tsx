@@ -1,3 +1,4 @@
+// 📁 frontend/src/app/recepty/[id]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import RecipeForm from "@/components/RecipeForm";
 import type { Ingredient } from "@/components/IngredientAutocomplete";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 interface FullIngredient {
   id: number;
@@ -20,8 +21,10 @@ interface FullIngredient {
 }
 
 export default function EditPage() {
-  const { id } = useParams();
+  const params = useParams();
+  const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
   const router = useRouter();
+
   const [loading, setLoading] = useState(true);
   const [initialData, setInitialData] = useState<{
     title: string;
@@ -38,14 +41,14 @@ export default function EditPage() {
     const fetchRecipe = async () => {
       try {
         const res = await fetch(`${API_URL}/api/recipes/${id}`);
-        if (!res.ok) throw new Error("Chyba při načítání receptu");
+        if (!res.ok) throw new Error("Chyba při načítání receptu.");
         const data = await res.json();
 
         setInitialData({
           title: data.title,
           notes: data.notes,
           image_url: data.image_url,
-          ingredients: data.ingredients.map((i: FullIngredient) => ({
+          ingredients: (data.ingredients || []).map((i: FullIngredient) => ({
             id: i.id,
             name: i.name,
             amount: i.amount,
@@ -56,7 +59,7 @@ export default function EditPage() {
             default_grams: i.default_grams,
             display: i.display,
           })),
-          categories: data.categories,
+          categories: data.categories || [],
           meal_types: data.meal_types ?? [],
           steps: data.steps ?? [],
           calories: data.calories,
@@ -69,33 +72,33 @@ export default function EditPage() {
       }
     };
 
-    fetchRecipe();
+    if (id) fetchRecipe();
   }, [id]);
 
   const handleSubmit = async (formData: FormData) => {
     try {
-      const userEmail = localStorage.getItem("userEmail");
-      if (userEmail) {
-        formData.append("email", userEmail);
-      }
-      console.log("📦 userEmail před fetch:", userEmail);
       const token = localStorage.getItem("token");
+      if (!token) {
+        alert("Nejste přihlášen. Přihlaste se prosím znovu.");
+        router.push("/login");
+        return;
+      }
+
+      // ❌ už NEPOSÍLÁME email – autorizace je přes JWT
       const res = await fetch(`${API_URL}/api/recipes/${id}`, {
         method: "PUT",
-        body: formData,
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        body: formData, // multipart/form-data – necháme browser nastavit boundary
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!res.ok) {
-        const resClone = res.clone();
+        const clone = res.clone();
         try {
-          const errorData = await res.json();
-          throw new Error(errorData.message || errorData.error || "Neznámá chyba serveru");
+          const json = await res.json();
+          throw new Error(json.message || json.error || "Neznámá chyba serveru.");
         } catch {
-          const errorText = await resClone.text();
-          throw new Error(errorText || `Chyba serveru: ${res.status}`);
+          const text = await clone.text();
+          throw new Error(text || `Chyba serveru: ${res.status}`);
         }
       }
 
