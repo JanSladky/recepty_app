@@ -35,7 +35,7 @@ const RegisterForm = () => {
 
         if (!uploadData.secure_url) throw new Error("Chyba při nahrávání avataru.");
         avatar_url = uploadData.secure_url;
-      } catch (err) {
+      } catch {
         setMessage("❌ Nahrání avataru selhalo.");
         return;
       }

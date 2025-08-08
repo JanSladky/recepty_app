@@ -3,13 +3,19 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import Image from "next/image";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+type UploadResponse = {
+  avatar_url?: string;
+  avatarUrl?: string;
+  error?: string;
+  message?: string;
+};
+
 export default function ProfilPage() {
   const router = useRouter();
-
-  // ✅ použijeme useAuth **jen jednou** a vytáhneme vše, co potřebujeme
   const { userEmail, login, logout } = useAuth();
 
   const [avatar, setAvatar] = useState<File | null>(null);
@@ -21,7 +27,6 @@ export default function ProfilPage() {
       router.push("/login");
       return;
     }
-    // načti případný avatar z localStorage (po loginu / po minulém uploadu)
     const storedAvatar = localStorage.getItem("userAvatar");
     if (storedAvatar) setAvatarUrl(storedAvatar);
   }, [userEmail, router]);
@@ -34,20 +39,16 @@ export default function ProfilPage() {
 
     try {
       const token = localStorage.getItem("token");
-
       const res = await fetch(`${API_URL}/api/user/upload-avatar`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token ?? ""}`,
-        },
+        headers: { Authorization: `Bearer ${token ?? ""}` },
         body: formData,
       });
 
-      // robustní parsování odpovědi
       const text = await res.text();
-      let data: any;
+      let data: UploadResponse;
       try {
-        data = JSON.parse(text);
+        data = JSON.parse(text) as UploadResponse;
       } catch {
         throw new Error("Server nevrátil platné JSON.");
       }
@@ -56,11 +57,9 @@ export default function ProfilPage() {
         throw new Error(data.error || data.message || "Chyba při nahrávání obrázku");
       }
 
-      // ✅ sjednocení názvu klíče z backendu
       const newAvatarUrl = data.avatar_url || data.avatarUrl;
       if (!newAvatarUrl) throw new Error("Chybí URL nahraného avataru.");
 
-      // ✅ uložit a dát vědět AuthContextu, aby se Navbar hned překreslil
       localStorage.setItem("userAvatar", newAvatarUrl);
       login(userEmail, newAvatarUrl);
 
@@ -86,7 +85,13 @@ export default function ProfilPage() {
       <h1 className="text-3xl font-bold mb-4">Můj profil</h1>
 
       {avatarUrl ? (
-        <img src={avatarUrl} alt="Avatar" className="w-20 h-20 rounded-full object-cover" />
+        <Image
+          src={avatarUrl}
+          alt="Avatar"
+          width={80}
+          height={80}
+          className="w-20 h-20 rounded-full object-cover"
+        />
       ) : (
         <div className="w-20 h-20 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-xl font-bold">
           {userEmail.charAt(0).toUpperCase()}

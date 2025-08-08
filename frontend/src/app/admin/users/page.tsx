@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import AdminRoute from "@/components/AdminRoute";
 
@@ -16,18 +16,39 @@ type User = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
+/** Type guard pro Axios-like error (funguje i bez axios.isAxiosError) */
+function isAxiosErrorLike(e: unknown): e is {
+  isAxiosError: boolean;
+  message: string;
+  response?: { data?: unknown };
+} {
+  return typeof e === "object" && e !== null && "isAxiosError" in e;
+}
+
+/** Sjednocené čtení chybové hlášky */
+function getAxiosErrorMessage(error: unknown): string {
+  if (isAxiosErrorLike(error)) {
+    const data = (error.response?.data ?? {}) as { error?: string; message?: string };
+    return data.error || data.message || error.message || "Došlo k chybě při komunikaci se serverem.";
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Neočekávaná chyba.";
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const authHeaders = () => {
-    const token = localStorage.getItem("token");
-    return { Authorization: `Bearer ${token}` };
-  };
+  const authHeaders = useCallback(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, []);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const { data } = await axios.get<User[]>(`${API_URL}/api/admin/users`, {
@@ -35,54 +56,60 @@ export default function AdminUsersPage() {
       });
       setUsers(data);
       setError(null);
-    } catch (err: any) {
-      setError(err?.response?.data?.error || "Nepodařilo se načíst uživatele.");
+    } catch (error: unknown) {
+      setError(getAxiosErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  };
+  }, [authHeaders]);
 
-  const changeRole = async (id: number, role: Role) => {
-    try {
-      setSavingId(id);
-      await axios.patch(
-        `${API_URL}/api/admin/users/${id}/role`,
-        { role },
-        { headers: { ...authHeaders(), "Content-Type": "application/json" } }
-      );
-      await fetchUsers();
-    } catch (err: any) {
-      alert(err?.response?.data?.error || "Změna role selhala.");
-    } finally {
-      setSavingId(null);
-    }
-  };
+  const changeRole = useCallback(
+    async (id: number, role: Role) => {
+      try {
+        setSavingId(id);
+        await axios.patch(
+          `${API_URL}/api/admin/users/${id}/role`,
+          { role },
+          { headers: { ...authHeaders(), "Content-Type": "application/json" } }
+        );
+        await fetchUsers();
+      } catch (error: unknown) {
+        alert(getAxiosErrorMessage(error) || "Změna role selhala.");
+      } finally {
+        setSavingId(null);
+      }
+    },
+    [authHeaders, fetchUsers]
+  );
 
-  const deleteUser = async (id: number) => {
-    if (!confirm("Opravdu smazat tohoto uživatele?")) return;
-    try {
-      setSavingId(id);
-      await axios.delete(`${API_URL}/api/admin/users/${id}`, {
-        headers: authHeaders(),
-      });
-      await fetchUsers();
-    } catch (err: any) {
-      alert(err?.response?.data?.error || "Smazání selhalo.");
-    } finally {
-      setSavingId(null);
-    }
-  };
+  const deleteUser = useCallback(
+    async (id: number) => {
+      if (!confirm("Opravdu smazat tohoto uživatele?")) return;
+      try {
+        setSavingId(id);
+        await axios.delete(`${API_URL}/api/admin/users/${id}`, {
+          headers: authHeaders(),
+        });
+        await fetchUsers();
+      } catch (error: unknown) {
+        alert(getAxiosErrorMessage(error) || "Smazání selhalo.");
+      } finally {
+        setSavingId(null);
+      }
+    },
+    [authHeaders, fetchUsers]
+  );
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   if (loading) {
     return <div className="p-6">Načítám uživatele…</div>;
   }
 
   return (
-    <AdminRoute>
+    <AdminRoute requireSuperadmin>
       <div className="p-6 max-w-5xl mx-auto">
         <h1 className="text-2xl font-bold mb-4">Správa uživatelů</h1>
 
@@ -135,10 +162,7 @@ export default function AdminUsersPage() {
 
               {users.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={5}
-                    className="py-6 text-center text-sm text-gray-500"
-                  >
+                  <td colSpan={5} className="py-6 text-center text-sm text-gray-500">
                     Žádní uživatelé.
                   </td>
                 </tr>
