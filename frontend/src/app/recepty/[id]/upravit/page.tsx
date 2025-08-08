@@ -39,9 +39,22 @@ export default function EditPage() {
 
   useEffect(() => {
     const fetchRecipe = async () => {
+      if (!id) return;
+
       try {
-        const res = await fetch(`${API_URL}/api/recipes/${id}`);
-        if (!res.ok) throw new Error("Chyba při načítání receptu.");
+        setLoading(true);
+
+        // 🔐 PŘIDEJ TOKEN — jinak PENDING/REJECTED vrátí 404
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+
+        const res = await fetch(`${API_URL}/api/recipes/${id}`, { headers });
+        if (!res.ok) {
+          const txt = await res.text();
+          console.error("❌ GET /api/recipes/:id", res.status, txt);
+          throw new Error(txt || "Chyba při načítání receptu.");
+        }
+
         const data = await res.json();
 
         setInitialData({
@@ -66,13 +79,13 @@ export default function EditPage() {
         });
       } catch (e) {
         console.error("❌ Chyba při načítání receptu:", e);
-        alert("Nepodařilo se načíst recept.");
+        alert("Nepodařilo se načíst recept. Jste přihlášen/a a máte práva?");
       } finally {
         setLoading(false);
       }
     };
 
-    if (id) fetchRecipe();
+    fetchRecipe();
   }, [id]);
 
   const handleSubmit = async (formData: FormData) => {
@@ -84,10 +97,9 @@ export default function EditPage() {
         return;
       }
 
-      // ❌ už NEPOSÍLÁME email – autorizace je přes JWT
       const res = await fetch(`${API_URL}/api/recipes/${id}`, {
         method: "PUT",
-        body: formData, // multipart/form-data – necháme browser nastavit boundary
+        body: formData, // boundary nastaví prohlížeč sám
         headers: { Authorization: `Bearer ${token}` },
       });
 

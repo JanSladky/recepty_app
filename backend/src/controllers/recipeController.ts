@@ -1,5 +1,6 @@
 // 📁 backend/src/controllers/recipeController.ts
 import type { Request, Response } from "express";
+import db from "../utils/db"; // ⬅️ pro moderaci a pomocné dotazy
 import {
   getAllRecipes,
   getRecipeByIdFromDB,
@@ -37,6 +38,16 @@ function ensureAdmin(req: Request, res: Response): boolean {
     return false;
   }
   return true;
+}
+
+// ⬇️ helper pro kontrolu přihlášení (používá submitRecipe)
+function ensureLoggedIn(req: Request, res: Response): number | null {
+  const userId = req.user?.id;
+  if (!userId) {
+    res.status(401).json({ error: "Nejste přihlášen." });
+    return null;
+  }
+  return userId;
 }
 
 function parseJSON<T>(value: unknown, fallback: T): T {
@@ -106,10 +117,13 @@ function getUploadedImageUrl(req: Request): string | null {
 // -----------------------------
 // CONTROLLERY PRO RECEPTY
 // -----------------------------
-export const getRecipes = async (_req: Request, res: Response): Promise<void> => {
+export const getRecipes = async (req: Request, res: Response): Promise<void> => {
   try {
-    const recipes = await getAllRecipes();
-    res.status(200).json(recipes);
+    // Vezmeme kompletní data z modelu (kvůli agregacím) a na veřejném endpointu
+    // vyfiltrujeme jen APPROVED. Pokud recept status nemá (legacy), bereme jako approved.
+    const all = (await getAllRecipes()) as any[];
+    const onlyApproved = all.filter((r) => (r.status ?? "APPROVED") === "APPROVED");
+    res.status(200).json(onlyApproved);
   } catch {
     res.status(500).json({ error: "Chyba při načítání receptů." });
   }
@@ -122,11 +136,29 @@ export const getRecipeById = async (req: Request, res: Response): Promise<void> 
     return;
   }
   try {
-    const recipe = await getRecipeByIdFromDB(id);
+    const recipe = (await getRecipeByIdFromDB(id)) as any | null;
     if (!recipe) {
       res.status(404).json({ error: "Recept nenalezen." });
       return;
     }
+
+    // Přístupová pravidla pro detail:
+    // - APPROVED je veřejný
+    // - jinak může ADMIN/SUPERADMIN
+    // - nebo autor receptu (created_by)
+    const status = recipe.status ?? "APPROVED";
+    if (status !== "APPROVED") {
+      const role = req.user?.role as Role | undefined;
+      const userId = req.user?.id as number | undefined;
+      const isModerator = role === "ADMIN" || role === "SUPERADMIN";
+      const isAuthor = userId && recipe.created_by && Number(recipe.created_by) === Number(userId);
+
+      if (!isModerator && !isAuthor) {
+        res.status(404).json({ error: "Recept nenalezen." });
+        return;
+      }
+    }
+
     res.status(200).json(recipe);
   } catch {
     res.status(500).json({ error: "Chyba serveru při načítání receptu." });
@@ -252,6 +284,153 @@ export const deleteRecipe = async (req: Request, res: Response): Promise<void> =
     res.status(200).json({ message: "Recept smazán." });
   } catch {
     res.status(500).json({ error: "Nepodařilo se smazat recept." });
+  }
+};
+
+// -----------------------------
+// ⬇️ Moderace receptů
+// -----------------------------
+
+// USER (přihlášený): odešle návrh receptu → status = PENDING
+export const submitRecipe = async (req: Request, res: Response): Promise<void> => {
+  const userId = ensureLoggedIn(req, res);
+  if (!userId) return;
+
+  try {
+    const { title, notes, ingredients, categories, mealTypes, steps } = req.body as {
+      title?: string;
+      notes?: string;
+      ingredients?: unknown;
+      categories?: unknown;
+      mealTypes?: unknown;
+      steps?: unknown;
+    };
+
+    if (!title || !ingredients || !categories || !mealTypes || !steps) {
+      res.status(400).json({ error: "Chybí povinná pole." });
+      return;
+    }
+
+    const parsedIngredients = processIngredients(ingredients);
+    const parsedCategories = parseJSON<string[]>(categories, []);
+    const parsedMealTypes = parseJSON<string[]>(mealTypes, []);
+    const parsedSteps = parseJSON<string[]>(steps, []);
+    const imageUrl = getUploadedImageUrl(req) ?? "";
+
+    const recipeId = await createFullRecipe(
+      title,
+      notes ?? "",
+      imageUrl,
+      parsedMealTypes,
+      parsedIngredients,
+      parsedCategories,
+      parsedSteps
+    );
+
+    // nastavíme PENDING + autora
+    await db.query(
+      `UPDATE recipes
+         SET status = 'PENDING',
+             created_by = $1,
+             approved_by = NULL,
+             approved_at = NULL,
+             rejection_reason = NULL
+       WHERE id = $2`,
+      [userId, recipeId]
+    );
+
+    res.status(201).json({ message: "Návrh receptu přijat (čeká na schválení).", id: recipeId });
+  } catch (error) {
+    res.status(500).json({
+      error: "Nepodařilo se odeslat návrh receptu.",
+      detail: (error as Error).message,
+    });
+  }
+};
+
+// ADMIN/SUPERADMIN: načti čekající recepty
+export const getPendingRecipes = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const { rows } = await db.query(
+      `SELECT r.id, r.title, r.image_url, r.status,
+              u.email AS created_by_email
+         FROM recipes r
+         LEFT JOIN users u ON u.id = r.created_by
+        WHERE r.status = 'PENDING'
+        ORDER BY r.id DESC`
+    );
+    res.status(200).json(rows);
+  } catch (err) {
+    console.error("❌ getPendingRecipes error:", err);
+    res.status(500).json({
+      error: "Chyba při načítání čekajících receptů.",
+      detail: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
+// ADMIN/SUPERADMIN: schválit recept
+export const approveRecipe = async (req: Request, res: Response): Promise<void> => {
+  if (!ensureAdmin(req, res)) return;
+
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID receptu." });
+    return;
+  }
+
+  try {
+    const approverId = req.user!.id;
+    const result = await db.query(
+      `UPDATE recipes
+          SET status = 'APPROVED',
+              approved_by = $1,
+              approved_at = NOW(),
+              rejection_reason = NULL
+        WHERE id = $2`,
+      [approverId, id]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: "Recept nenalezen." });
+      return;
+    }
+    res.status(200).json({ message: "Recept byl schválen." });
+  } catch {
+    res.status(500).json({ error: "Nepodařilo se schválit recept." });
+  }
+};
+
+// ADMIN/SUPERADMIN: zamítnout recept (volitelně s důvodem)
+export const rejectRecipe = async (req: Request, res: Response): Promise<void> => {
+  if (!ensureAdmin(req, res)) return;
+
+  const id = Number(req.params.id);
+  const { reason } = req.body as { reason?: string };
+
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID receptu." });
+    return;
+  }
+
+  try {
+    const result = await db.query(
+      `UPDATE recipes
+          SET status = 'REJECTED',
+              rejection_reason = $2,
+              approved_by = NULL,
+              approved_at = NULL
+        WHERE id = $1`,
+      [id, reason ?? null]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: "Recept nenalezen." });
+      return;
+    }
+    res.status(200).json({ message: "Recept byl zamítnut." });
+  } catch {
+    res.status(500).json({ error: "Nepodařilo se zamítnout recept." });
   }
 };
 

@@ -1,50 +1,74 @@
+// 📁 frontend/src/app/pridat-recept/page.tsx
 "use client";
 
 import RecipeForm from "@/components/RecipeForm";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
+type Role = "SUPERADMIN" | "ADMIN" | "USER";
+
+function getRoleFromStorage(): Role {
+  // primárně čti uloženou roli (nový login)
+  const role = typeof window !== "undefined" ? localStorage.getItem("userRole") : null;
+  if (role === "SUPERADMIN" || role === "ADMIN" || role === "USER") return role;
+
+  // fallback pro starší login, kde se ukládal jen isAdmin
+  const isAdmin = typeof window !== "undefined" ? localStorage.getItem("isAdmin") : null;
+  if (isAdmin === "true") return "ADMIN";
+
+  return "USER";
+}
 
 export default function AddRecipePage() {
   const handleSubmit = async (formData: FormData) => {
     try {
-      // Získání tokenu a e-mailu z localStorage
-      const userEmail = localStorage.getItem("userEmail");
-      const token = localStorage.getItem("token");
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const role = getRoleFromStorage();
 
-      if (userEmail) {
-        formData.append("email", userEmail); // ✅ nutné pro backend
+      if (!token) {
+        throw new Error("Musíte být přihlášen, abyste mohli přidat recept.");
       }
 
-      console.log("📦 Přidávám recept jako:", userEmail);
+      // USER → návrh receptu (moderace), ADMIN/SUPERADMIN → rovnou publikace
+      const isModerator = role === "ADMIN" || role === "SUPERADMIN";
+      const endpoint = isModerator ? "/api/recipes" : "/api/recipes/submit";
 
-      const res = await fetch(`${API_URL}/api/recipes`, {
+      // Pozn.: FormData si boundary a Content-Type nastaví sám
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         body: formData,
-        headers: {
-          Authorization: `Bearer ${token}`, // ✅ potřebné pro admin přístup
-          // Poznámka: FormData sám nastaví Content-Type včetně boundary
-        },
+        headers,
       });
 
       if (!res.ok) {
-        const resClone = res.clone(); // Umožní přečíst response dvakrát
-
+        // Bezpečně načteme JSON i plain text
+        const text = await res.text();
         try {
-          const errorData = await res.json();
-          throw new Error(errorData.message || errorData.error || "Neznámá chyba serveru");
+          const data = JSON.parse(text) as { error?: string; message?: string };
+          throw new Error(data.error || data.message || `Chyba serveru: ${res.status}`);
         } catch {
-          const errorText = await resClone.text();
-          throw new Error(errorText || `Chyba serveru: ${res.status}`);
+          throw new Error(text || `Chyba serveru: ${res.status}`);
         }
       }
 
       const data = await res.json();
-      alert("✅ Recept přidán!" + (data.image_url ? ` Obrázek: ${data.image_url}` : ""));
+
+      if (isModerator) {
+        alert("✅ Recept byl přidán a je veřejně dostupný.");
+      } else {
+        alert("✅ Návrh receptu byl odeslán. Po schválení administrátorem se objeví mezi recepty.");
+      }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "Neznámá chyba při ukládání.";
       console.error("❌ Chyba při ukládání:", err);
-      alert("❌ Chyba při ukládání: " + (err as Error).message);
+      alert("❌ " + msg);
     }
   };
+
+  const role = getRoleFromStorage();
+  const submitLabel = role === "ADMIN" || role === "SUPERADMIN" ? "Přidat recept" : "Odeslat ke schválení";
 
   return (
     <main className="px-4 sm:px-6 md:px-8 lg:px-12 py-6 w-full mx-auto">
@@ -57,8 +81,11 @@ export default function AddRecipePage() {
           initialImageUrl={undefined}
           initialCategories={[]}
           initialMealTypes={[]}
-          submitLabel="Přidat recept"
+          submitLabel={submitLabel}
         />
+        <p className="text-sm text-gray-500 mt-4">
+          Pozn.: Pokud nejste administrátor, recept nejdříve půjde ke schválení.
+        </p>
       </div>
     </main>
   );

@@ -65,6 +65,7 @@ export async function updateIngredientInDB(
     [name, calories_per_gram, category_id, default_grams, unit_name, id]
   );
 }
+
 export async function deleteIngredientFromDB(id: number): Promise<boolean> {
   try {
     console.log("🧹 Nejprve mažu z recipe_ingredients:", id);
@@ -116,7 +117,12 @@ function calculateTotalCalories(ingredients: (IngredientInput & { default_grams?
 }
 
 export async function getAllRecipes(): Promise<any[]> {
-  const res = await db.query("SELECT id, title, notes, image_url, steps FROM recipes ORDER BY title ASC");
+  // ⬅️ DŮLEŽITÉ: vracíme i status + created_by, aby controller mohl filtrovat APPROVED
+  const res = await db.query(
+    `SELECT id, title, notes, image_url, steps, status, created_by
+     FROM recipes
+     ORDER BY title ASC`
+  );
   const recipes = res.rows;
 
   for (const recipe of recipes) {
@@ -150,13 +156,19 @@ export async function getRecipeByIdFromDB(id: number) {
   const [ingredientsRes, categoriesRes, mealTypesRes] = await Promise.all([
     db.query(
       `SELECT ri.amount, ri.unit, ri.display, i.name, i.calories_per_gram, i.default_grams
-     FROM recipe_ingredients ri
-     LEFT JOIN ingredients i ON ri.ingredient_id = i.id
-     WHERE ri.recipe_id = $1`,
+       FROM recipe_ingredients ri
+       LEFT JOIN ingredients i ON ri.ingredient_id = i.id
+       WHERE ri.recipe_id = $1`,
       [id]
     ),
-    db.query("SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1", [id]),
-    db.query("SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1", [id]),
+    db.query(
+      "SELECT c.name FROM recipe_categories rc JOIN categories c ON rc.category_id = c.id WHERE rc.recipe_id = $1",
+      [id]
+    ),
+    db.query(
+      "SELECT m.name FROM recipe_meal_types rmt JOIN meal_types m ON rmt.meal_type_id = m.id WHERE rmt.recipe_id = $1",
+      [id]
+    ),
   ]);
 
   const ingredients = ingredientsRes.rows.map((row) => ({
@@ -179,25 +191,37 @@ export async function getRecipeByIdFromDB(id: number) {
   );
 
   return {
-    ...recipe,
+    ...recipe, // obsahuje i status/created_by
     calories: totalCalories,
     steps: recipe.steps ?? [],
-    ingredients: ingredients,
+    ingredients,
     categories: categoriesRes.rows.map((r) => r.name),
     meal_types: uniqueMealTypes,
   };
 }
 
-async function insertRelations(client: any, recipeId: number, mealTypes: string[], ingredients: IngredientInput[], categories: string[]) {
+async function insertRelations(
+  client: any,
+  recipeId: number,
+  mealTypes: string[],
+  ingredients: IngredientInput[],
+  categories: string[]
+) {
   for (const ing of ingredients) {
     const res = await client.query("SELECT id FROM ingredients WHERE name = $1", [ing.name]);
     let ingredientId = res.rows[0]?.id;
+
     if (!ingredientId) {
       const insert = await client.query(
         `INSERT INTO ingredients (name, calories_per_gram, default_grams, unit_name, category_id)
-         VALUES ($1, $2, $3, $4, 5) -- Pozn: default kategorie 5 jako záchrana
+         VALUES ($1, $2, $3, $4, 5)
          RETURNING id`,
-        [ing.name, ing.calories_per_gram, ing.amount || null, ing.unit || null]
+        [
+          ing.name,
+          ing.calories_per_gram,
+          ing.default_grams ?? null, // ⬅️ FIX: dřív tu bylo omylem ing.amount
+          ing.unit || null,
+        ]
       );
       ingredientId = insert.rows[0].id;
     }
@@ -218,8 +242,14 @@ async function insertRelations(client: any, recipeId: number, mealTypes: string[
 
   for (const cat of categories) {
     const res = await client.query("SELECT id FROM categories WHERE name = $1", [cat]);
-    const categoryId = res.rows[0]?.id ?? (await client.query("INSERT INTO categories (name) VALUES ($1) RETURNING id", [cat])).rows[0].id;
-    await client.query("INSERT INTO recipe_categories (recipe_id, category_id) VALUES ($1, $2)", [recipeId, categoryId]);
+    const categoryId =
+      res.rows[0]?.id ??
+      (await client.query("INSERT INTO categories (name) VALUES ($1) RETURNING id", [cat])).rows[0].id;
+
+    await client.query("INSERT INTO recipe_categories (recipe_id, category_id) VALUES ($1, $2)", [
+      recipeId,
+      categoryId,
+    ]);
   }
 
   const uniqueMealTypes = [...new Set(mealTypes.map((m) => m.trim().toLowerCase()))];
@@ -227,6 +257,7 @@ async function insertRelations(client: any, recipeId: number, mealTypes: string[
     const existing = await client.query("SELECT id, name FROM meal_types WHERE LOWER(name) = $1", [meal]);
     let mealTypeId: number;
     const properName = meal.charAt(0).toUpperCase() + meal.slice(1);
+
     if (existing.rows.length > 0) {
       mealTypeId = existing.rows[0].id;
       if (existing.rows[0].name !== properName) {
@@ -236,7 +267,11 @@ async function insertRelations(client: any, recipeId: number, mealTypes: string[
       const insert = await client.query("INSERT INTO meal_types (name) VALUES ($1) RETURNING id", [properName]);
       mealTypeId = insert.rows[0].id;
     }
-    await client.query("INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)", [recipeId, mealTypeId]);
+
+    await client.query("INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)", [
+      recipeId,
+      mealTypeId,
+    ]);
   }
 }
 
@@ -252,14 +287,16 @@ export async function createFullRecipe(
   const client = await db.connect();
   try {
     await client.query("BEGIN");
-    const result = await client.query(`INSERT INTO recipes (title, notes, image_url, steps) VALUES ($1, $2, $3, $4::jsonb) RETURNING id`, [
-      title,
-      notes,
-      imageUrl,
-      JSON.stringify(steps),
-    ]);
+    const result = await client.query(
+      `INSERT INTO recipes (title, notes, image_url, steps)
+       VALUES ($1, $2, $3, $4::jsonb)
+       RETURNING id`,
+      [title, notes, imageUrl, JSON.stringify(steps)]
+    );
     const recipeId = result.rows[0].id;
+
     await insertRelations(client, recipeId, mealTypes, ingredients, categories);
+
     await client.query("COMMIT");
     return recipeId;
   } catch (err) {
@@ -283,17 +320,19 @@ export async function updateRecipeInDB(
   const client = await db.connect();
   try {
     await client.query("BEGIN");
-    await client.query(`UPDATE recipes SET title = $1, notes = $2, image_url = $3, steps = $4::jsonb WHERE id = $5`, [
-      title,
-      notes,
-      imageUrl,
-      JSON.stringify(steps),
-      id,
-    ]);
+    await client.query(
+      `UPDATE recipes
+         SET title = $1, notes = $2, image_url = $3, steps = $4::jsonb
+       WHERE id = $5`,
+      [title, notes, imageUrl, JSON.stringify(steps), id]
+    );
+
     await client.query("DELETE FROM recipe_ingredients WHERE recipe_id = $1", [id]);
     await client.query("DELETE FROM recipe_categories WHERE recipe_id = $1", [id]);
     await client.query("DELETE FROM recipe_meal_types WHERE recipe_id = $1", [id]);
+
     await insertRelations(client, id, mealTypes, ingredients, categories);
+
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");
@@ -321,34 +360,32 @@ export async function deleteRecipeFromDB(id: number): Promise<void> {
 }
 
 // --- OBLÍBENÉ RECEPTY ---
-// Získá pole IDček všech oblíbených receptů pro daného uživatele
 export async function getFavoriteRecipeIdsForUser(userId: number): Promise<number[]> {
   const res = await db.query(`SELECT recipe_id FROM user_favorites WHERE user_id = $1`, [userId]);
   return res.rows.map((row: { recipe_id: number }) => row.recipe_id);
 }
 
-// Přidá recept do oblíbených pro daného uživatele
 export async function addFavoriteInDB(userId: number, recipeId: number): Promise<void> {
-  // "ON CONFLICT DO NOTHING" zajistí, že se nestane chyba, pokud už je recept v oblíbených
-  await db.query(`INSERT INTO user_favorites (user_id, recipe_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [userId, recipeId]);
+  await db.query(
+    `INSERT INTO user_favorites (user_id, recipe_id)
+     VALUES ($1, $2)
+     ON CONFLICT DO NOTHING`,
+    [userId, recipeId]
+  );
 }
 
-// Odebere recept z oblíbených pro daného uživatele
 export async function removeFavoriteInDB(userId: number, recipeId: number): Promise<void> {
   await db.query(`DELETE FROM user_favorites WHERE user_id = $1 AND recipe_id = $2`, [userId, recipeId]);
 }
 
-// Získá všechny suroviny pro zadaná ID receptů (pro nákupní seznam)
 export async function getIngredientsForRecipes(recipeIds: number[]): Promise<IngredientInput[]> {
-  if (recipeIds.length === 0) {
-    return [];
-  }
+  if (recipeIds.length === 0) return [];
   const query = `
-        SELECT i.name, ri.amount, ri.unit, i.calories_per_gram, i.default_grams
-        FROM recipe_ingredients ri
-        JOIN ingredients i ON ri.ingredient_id = i.id
-        WHERE ri.recipe_id = ANY($1::int[])
-    `;
+    SELECT i.name, ri.amount, ri.unit, i.calories_per_gram, i.default_grams
+      FROM recipe_ingredients ri
+      JOIN ingredients i ON ri.ingredient_id = i.id
+     WHERE ri.recipe_id = ANY($1::int[])
+  `;
   const res = await db.query(query, [recipeIds]);
   return res.rows;
 }

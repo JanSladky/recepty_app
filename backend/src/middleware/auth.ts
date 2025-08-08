@@ -42,21 +42,33 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
     res.status(403).json({ message: "Neplatný nebo expirovaný token." });
   }
 };
+// VOLITELNÁ autentizace – když je token, načteme uživatele; když není, necháme projít
+export const authenticateTokenOptional = (req: Request, _res: Response, next: NextFunction): void => {
+  try {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader?.split(" ")[1];
+    if (!token) return next();
+
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    req.user = decoded;
+  } catch {
+    // nevadí – prostě pokračuj bez uživatele
+  }
+  next();
+};
 
 // ✅ Požadované role
-export const requireRole =
-  (...allowed: Role[]) =>
-  (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.user) {
-      res.status(401).json({ message: "Nejste přihlášen." });
-      return;
-    }
-    if (!allowed.includes(req.user.role)) {
-      res.status(403).json({ message: "Nemáte oprávnění k této akci." });
-      return;
-    }
-    next();
-  };
+export const requireRole = (...allowed: Role[]) => (req: Request, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({ message: "Nejste přihlášen." });
+    return;
+  }
+  if (!allowed.includes(req.user.role)) {
+    res.status(403).json({ message: "Nemáte oprávnění k této akci." });
+    return;
+  }
+  next();
+};
 
 // ✅ Alias-y (kompatibilita)
 export const verifyUser = authenticateToken;
