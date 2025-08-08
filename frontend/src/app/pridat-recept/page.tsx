@@ -27,7 +27,7 @@ export default function AddRecipePage() {
 
       if (!token) {
         throw new Error("Musíte být přihlášen, abyste mohli přidat recept.");
-      }
+        }
 
       // USER → návrh receptu (moderace), ADMIN/SUPERADMIN → rovnou publikace
       const isModerator = role === "ADMIN" || role === "SUPERADMIN";
@@ -46,14 +46,15 @@ export default function AddRecipePage() {
         // Bezpečně načteme JSON i plain text
         const text = await res.text();
         try {
-          const data = JSON.parse(text) as { error?: string; message?: string };
-          throw new Error(data.error || data.message || `Chyba serveru: ${res.status}`);
+          const obj = JSON.parse(text) as { error?: string; message?: string };
+          throw new Error(obj.error || obj.message || `Chyba serveru: ${res.status}`);
         } catch {
           throw new Error(text || `Chyba serveru: ${res.status}`);
         }
       }
 
-      const data = await res.json();
+      // ⬇️ už nic neparsujeme do `data`, aby ESLint nekřičel
+      await res.json();
 
       if (isModerator) {
         alert("✅ Recept byl přidán a je veřejně dostupný.");
