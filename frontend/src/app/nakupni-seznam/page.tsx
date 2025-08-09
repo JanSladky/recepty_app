@@ -1,8 +1,9 @@
+// 📁 frontend/src/app/nakupni-seznam/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Trash2, Share2, RotateCcw } from "lucide-react";
+import { Trash2, Share2, RotateCcw, ShoppingCart } from "lucide-react";
 
 type Ingredient = { name: string; unit?: string; amount?: number };
 type Recipe = { id: number; title: string; image_url?: string; ingredients: Ingredient[] };
@@ -91,73 +92,108 @@ export default function ShoppingListPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl sm:text-5xl font-bold text-gray-800">Nákupní seznam</h1>
-            <p className="text-lg text-gray-500 mt-2">Recepty přidávej kliknutím na košík u receptu.</p>
-          </div>
+      <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
+        {/* HLAVIČKA */}
+        <header className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900">Nákupní seznam</h1>
+              <p className="text-gray-500 mt-1">
+                Recepty přidávej kliknutím na košík u receptu. Vpravo se ti automaticky sečtou suroviny.
+              </p>
+            </div>
 
-          <div className="flex gap-3">
-            <Link href="/recepty" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border hover:bg-gray-50 transition">
-              ← Zpět na recepty
-            </Link>
-            {recipesToCook.length > 0 && (
-              <button
-                onClick={clearCart}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
-                title="Vyprázdnit košík"
+            <div className="flex items-center gap-3">
+              <Link
+                href="/recepty"
+                className="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2.5 shadow-sm hover:bg-gray-50 transition"
               >
-                <RotateCcw size={18} />
-                Vyprázdnit
-              </button>
-            )}
-          </div>
-        </div>
+                ← Zpět na recepty
+              </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Levá část – vybrané recepty */}
-          <div className="bg-white p-6 rounded-2xl shadow-lg">
-            <h3 className="font-bold text-xl mb-4">Plán vaření</h3>
+              {recipesToCook.length > 0 && (
+                <button
+                  onClick={clearCart}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-2.5 text-gray-700 hover:bg-gray-200 transition"
+                  title="Vyprázdnit košík"
+                >
+                  <RotateCcw size={18} />
+                  Vyprázdnit
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* OBSAH */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* LEVÁ KARTA – Plán vaření */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Plán vaření</h2>
+              <span className="inline-flex items-center justify-center text-xs font-semibold bg-green-100 text-green-700 rounded-full px-2.5 py-1">
+                <ShoppingCart size={14} className="mr-1" />
+                {recipesToCook.length}
+              </span>
+            </div>
 
             {recipesToCook.length > 0 ? (
-              <div className="space-y-2">
+              <ul className="space-y-3">
                 {recipesToCook.map((recipe) => (
-                  <div key={recipe.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                    <span className="font-medium">{recipe.title}</span>
-                    <button onClick={() => removeRecipeFromCook(recipe.id)} className="text-red-500 text-sm font-semibold">
+                  <li
+                    key={recipe.id}
+                    className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2.5 border border-gray-200"
+                  >
+                    <span className="font-medium text-gray-800">{recipe.title}</span>
+                    <button
+                      onClick={() => removeRecipeFromCook(recipe.id)}
+                      className="text-red-600 text-sm font-semibold hover:text-red-700"
+                    >
                       Odebrat
                     </button>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             ) : (
-              <p className="text-gray-500">Zatím nic. Přidej si recepty z přehledu.</p>
+              <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-gray-500">
+                Zatím nic. Otevři přehled receptů a přidávej je košíkem.
+              </div>
             )}
           </div>
 
-          {/* Pravá část – agregovaný nákupní seznam */}
-          <div className="bg-white p-6 rounded-2xl shadow-lg">
+          {/* PRAVÁ KARTA – Co nakoupit */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-gray-800">Co nakoupit</h2>
-              <div className="flex gap-4 items-center">
-                <button onClick={handleShare} className="text-blue-600 hover:text-blue-800" title="Sdílet seznam">
-                  <Share2 size={22} />
+              <h2 className="text-xl font-bold text-gray-900">Co nakoupit</h2>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleShare}
+                  className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 rounded-lg px-3 py-1.5"
+                  title="Sdílet seznam"
+                >
+                  <Share2 size={18} />
+                  Sdílet
                 </button>
-                <button onClick={handleCopy} className="text-gray-600 hover:text-gray-800 text-sm underline">
+                <button
+                  onClick={handleCopy}
+                  className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-800 rounded-lg px-3 py-1.5"
+                >
                   Kopírovat
                 </button>
               </div>
             </div>
 
             {shoppingList.length > 0 ? (
-              <ul className="space-y-2">
+              <ul className="divide-y divide-gray-100">
                 {shoppingList.map((item) => (
-                  <li key={item} className="p-2 bg-gray-50 rounded flex justify-between items-center">
-                    <span>{item}</span>
+                  <li key={item} className="flex items-center justify-between py-2.5">
+                    <span className="text-gray-800">{item}</span>
                     <button
-                      onClick={() => alert("Jednotlivé suroviny se odstraňují vyřazením receptu v levém panelu.")}
-                      className="text-red-500 hover:text-red-700"
+                      onClick={() =>
+                        alert("Jednotlivé suroviny se odstraňují vyřazením receptu v levém panelu.")
+                      }
+                      className="text-red-500 hover:text-red-600"
                       title="Odebrat ze seznamu"
                     >
                       <Trash2 size={18} />
@@ -166,10 +202,12 @@ export default function ShoppingListPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-gray-500">Přidej recepty do košíku a tady se zobrazí nákupní seznam.</p>
+              <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-gray-500">
+                Přidej recepty do košíku a tady se zobrazí nákupní seznam.
+              </div>
             )}
           </div>
-        </div>
+        </section>
       </main>
     </div>
   );
