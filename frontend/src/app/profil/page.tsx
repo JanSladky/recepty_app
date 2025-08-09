@@ -17,20 +17,21 @@ type UploadResponse = {
 
 export default function ProfilPage() {
   const router = useRouter();
-  const { userEmail, login, logout } = useAuth();
+  const { userEmail, login, logout, ready } = useAuth();
 
   const [avatar, setAvatar] = useState<File | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    if (!ready) return; // ✅ Čekáme, dokud se nenačte stav z localStorage
     if (!userEmail) {
       router.push("/login");
       return;
     }
     const storedAvatar = localStorage.getItem("userAvatar");
     if (storedAvatar) setAvatarUrl(storedAvatar);
-  }, [userEmail, router]);
+  }, [ready, userEmail, router]); // ✅ Přidán ready do dependency
 
   const handleUpload = async () => {
     if (!avatar || !userEmail) return;
@@ -79,7 +80,9 @@ export default function ProfilPage() {
     window.location.reload();
   };
 
-  if (!userEmail) return <div className="p-10 text-center">Načítání profilu...</div>;
+  // ✅ Loader dokud se nenačte stav
+  if (!ready) return <div className="p-10 text-center">Načítání profilu...</div>;
+  if (!userEmail) return <div className="p-10 text-center">Nepřihlášený uživatel</div>;
 
   return (
     <div className="bg-gray-50 min-h-screen">

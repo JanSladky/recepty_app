@@ -8,6 +8,7 @@ interface AuthContextType {
   userAvatar: string | null;
   login: (email: string, avatar: string) => void;
   logout: () => void;
+  ready: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,12 +16,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const email = localStorage.getItem("userEmail");
     const avatar = localStorage.getItem("userAvatar");
     setUserEmail(email);
     setUserAvatar(avatar);
+    setReady(true);
 
     const syncAuth = () => {
       setUserEmail(localStorage.getItem("userEmail"));
@@ -46,13 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserAvatar(null);
   };
 
-  return (
-    <AuthContext.Provider
-      value={{ isLoggedIn: !!userEmail, userEmail, userAvatar, login, logout }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ isLoggedIn: !!userEmail, userEmail, userAvatar, login, logout, ready }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
