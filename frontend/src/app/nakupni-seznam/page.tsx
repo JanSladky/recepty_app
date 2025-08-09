@@ -88,7 +88,7 @@ export default function ShoppingListPage() {
     setRecipesToCook((prev) => {
       const next = prev.filter((r) => r.id !== recipeId);
       writeCart((next as unknown) as CartItem[]);
-      notifyCart(); // ✅ doplněno: informuj navbar
+      notifyCart(); // ✅ informuj navbar
       return next;
     });
   };
@@ -96,7 +96,7 @@ export default function ShoppingListPage() {
   const clearCart = () => {
     writeCart([]);
     setRecipesToCook([]);
-    notifyCart(); // ✅ doplněno: informuj navbar
+    notifyCart(); // ✅ informuj navbar
   };
 
   return (

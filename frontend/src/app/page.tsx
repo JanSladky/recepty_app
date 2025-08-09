@@ -40,6 +40,13 @@ function writeCart(items: CartItem[]) {
   localStorage.setItem(CART_KEY, JSON.stringify(items));
 }
 
+/** 🔔 informuje navbar (a další posluchače), že se košík změnil */
+const notifyCart = () => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("cartUpdated"));
+  }
+};
+
 export default function HomePage() {
   const router = useRouter();
   const { isAdmin, loading } = useAdmin();
@@ -136,6 +143,7 @@ export default function HomePage() {
       if (current.find((i) => i.id === recipeId)) {
         const updated = current.filter((i) => i.id !== recipeId);
         writeCart(updated);
+        notifyCart(); // ✅ informuj navbar
         setCartIds(updated.map((i) => i.id));
         setCartCount(updated.length);
         setJustAddedTitle("Recept odebrán z košíku");
@@ -154,6 +162,7 @@ export default function HomePage() {
       };
       const updated = [...current, item];
       writeCart(updated);
+      notifyCart(); // ✅ informuj navbar
       setCartIds(updated.map((i) => i.id));
       setCartCount(updated.length);
       setJustAddedTitle(`Přidáno: ${full.title}`);
@@ -191,6 +200,7 @@ export default function HomePage() {
       if (c.find((i) => i.id === id)) {
         const updated = c.filter((i) => i.id !== id);
         writeCart(updated);
+        notifyCart(); // ✅ informuj navbar
         setCartIds(updated.map((i) => i.id));
         setCartCount(updated.length);
       }
