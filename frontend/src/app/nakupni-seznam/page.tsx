@@ -1,107 +1,74 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import SearchBar from "@/components/SearchBar";
-import { Trash2 } from "lucide-react";
-import { Share2 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
+import { Trash2, Share2, RotateCcw } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-type Ingredient = { name: string; [key: string]: unknown };
-type Recipe = { id: number; title: string; image_url: string; ingredients: Ingredient[] };
+type Ingredient = { name: string; unit?: string; amount?: number };
+type Recipe = { id: number; title: string; image_url?: string; ingredients: Ingredient[] };
+type CartItem = { id: number; title: string; ingredients: Ingredient[] };
+
+const CART_KEY = "shopping_cart_v1";
+
+function readCart(): CartItem[] {
+  try {
+    const raw = localStorage.getItem(CART_KEY);
+    return raw ? (JSON.parse(raw) as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+function writeCart(items: CartItem[]) {
+  localStorage.setItem(CART_KEY, JSON.stringify(items));
+}
 
 export default function ShoppingListPage() {
-  const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
-  const [query, setQuery] = useState("");
   const [recipesToCook, setRecipesToCook] = useState<Recipe[]>([]);
-  const [shoppingList, setShoppingList] = useState<string[]>([]);
 
+  // Načti vybrané recepty z košíku
   useEffect(() => {
-    const fetchRecipes = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/recipes`);
-        const data = await res.json();
-        setAllRecipes(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Chyba při načítání receptů:", error);
-      }
-    };
-    fetchRecipes();
+    const items = readCart();
+    setRecipesToCook(items as unknown as Recipe[]);
   }, []);
 
-  useEffect(() => {
-    const ingredients = recipesToCook.flatMap((recipe) => recipe.ingredients || []);
-
+  // Agregace surovin
+  const shoppingList = useMemo(() => {
+    const ingredients = recipesToCook.flatMap((r) => r.ingredients || []);
     const aggregated: Record<string, { name: string; unit: string; amount: number }> = {};
 
     for (const ing of ingredients) {
       const name = ing.name?.toString().trim() ?? "";
       const unit = ing.unit?.toString().trim() ?? "";
-      const amount = parseFloat(ing.amount as string) || 0;
-
+      const amount = typeof ing.amount === "number" ? ing.amount : parseFloat(String(ing.amount ?? 0)) || 0;
       const key = `${name}||${unit}`;
-
-      if (!aggregated[key]) {
-        aggregated[key] = { name, unit, amount };
-      } else {
-        aggregated[key].amount += amount;
-      }
+      if (!aggregated[key]) aggregated[key] = { name, unit, amount };
+      else aggregated[key].amount += amount;
     }
 
-    const list = Object.values(aggregated)
-      .map((i) => `${i.amount} ${i.unit} ${i.name}`.trim())
+    return Object.values(aggregated)
+      .map((i) => `${i.amount || 0} ${i.unit || ""} ${i.name}`.trim())
       .sort();
-
-    setShoppingList(list);
   }, [recipesToCook]);
 
-  const fetchRecipeWithIngredients = async (id: number): Promise<Recipe> => {
-    const res = await fetch(`${API_URL}/api/recipes/${id}`);
-    if (!res.ok) {
-      throw new Error(`Chyba při načítání detailu receptu ${id}`);
-    }
-    return await res.json();
-  };
-
-  const addRecipeToCook = async (recipe: Recipe) => {
-    const alreadyAdded = recipesToCook.some((r) => Number(r.id) === Number(recipe.id));
-    if (alreadyAdded) return; // zabrání duplicitě
-
-    try {
-      const fullRecipe = await fetchRecipeWithIngredients(recipe.id);
-      console.log("Přidáno do plánu:", fullRecipe);
-
-      setRecipesToCook((prev) => {
-        const stillNotAdded = !prev.some((r) => Number(r.id) === Number(fullRecipe.id));
-        return stillNotAdded ? [...prev, fullRecipe] : prev;
-      });
-    } catch (error) {
-      console.error("Nepodařilo se načíst recept:", error);
-    }
-  };
-  const formattedList = shoppingList.join("\n"); // každý řádek jedna surovina
+  const formattedList = shoppingList.join("\n");
 
   const handleShare = async () => {
-    const formattedList = shoppingList.join("\n");
-
     if (navigator.canShare && navigator.canShare({ files: [] })) {
       const blob = new Blob([formattedList], { type: "text/plain" });
-      const file = new File([blob], "nakupni-seznam.txt", {
-        type: "text/plain",
-      });
-
+      const file = new File([blob], "nakupni-seznam.txt", { type: "text/plain" });
       try {
-        await navigator.share({
-          title: "Nákupní seznam",
-          files: [file],
-        });
+        await navigator.share({ title: "Nákupní seznam", files: [file] });
       } catch (error) {
         console.error("Sdílení selhalo:", error);
       }
     } else {
-      alert("Sdílení souborů není v tomto prohlížeči podporováno.");
+      await navigator.clipboard.writeText(formattedList);
+      alert("Seznam byl zkopírován do schránky.");
     }
   };
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(formattedList);
@@ -112,67 +79,75 @@ export default function ShoppingListPage() {
   };
 
   const removeRecipeFromCook = (recipeId: number) => {
-    setRecipesToCook((prev) => prev.filter((r) => r.id !== recipeId));
+    setRecipesToCook((prev) => {
+      const next = prev.filter((r) => r.id !== recipeId);
+      writeCart(next as unknown as CartItem[]);
+      return next;
+    });
   };
 
-  const filteredRecipes = query.length >= 3 ? allRecipes.filter((r) => r.title.toLowerCase().includes(query.toLowerCase())) : [];
+  const clearCart = () => {
+    writeCart([]);
+    setRecipesToCook([]);
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen">
       <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-800">Nákupní seznam</h1>
-          <p className="text-lg text-gray-500 mt-2">Vyhledej recepty a přidej je do plánu vaření.</p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl sm:text-5xl font-bold text-gray-800">Nákupní seznam</h1>
+            <p className="text-lg text-gray-500 mt-2">Recepty přidávej kliknutím na košík u receptu.</p>
+          </div>
+
+          <div className="flex gap-3">
+            <Link
+              href="/recepty"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border hover:bg-gray-50 transition"
+            >
+              ← Zpět na recepty
+            </Link>
+            {recipesToCook.length > 0 && (
+              <button
+                onClick={clearCart}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+                title="Vyprázdnit košík"
+              >
+                <RotateCcw size={18} />
+                Vyprázdnit
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Levá část - Vyhledávání a plán */}
-          <div>
-            <SearchBar query={query} onQueryChange={setQuery} />
-            <div className="mt-4 space-y-2">
-              {filteredRecipes.map((recipe) => {
-                const isAdded = recipesToCook.some((r) => r.id === recipe.id);
-                return (
-                  <div key={recipe.id} className="flex items-center justify-between bg-white p-2 rounded-lg shadow-sm">
-                    <span>{recipe.title}</span>
-                    {isAdded ? (
-                      <button disabled className="bg-gray-100 text-gray-400 text-sm font-semibold px-3 py-1 rounded-md cursor-not-allowed">
-                        Přidáno
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => addRecipeToCook(recipe)}
-                        className="bg-green-100 text-green-800 text-sm font-semibold px-3 py-1 rounded-md hover:bg-green-200"
-                      >
-                        Přidat
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+          {/* Levá část – vybrané recepty */}
+          <div className="bg-white p-6 rounded-2xl shadow-lg">
+            <h3 className="font-bold text-xl mb-4">Plán vaření</h3>
 
-            {recipesToCook.length > 0 && (
-              <div className="mt-8">
-                <h3 className="font-bold text-lg mb-2">Plán vaření:</h3>
-                <div className="space-y-2">
-                  {recipesToCook.map((recipe) => (
-                    <div key={recipe.id} className="flex items-center justify-between bg-white p-2 rounded-lg shadow-sm">
-                      <span>{recipe.title}</span>
-                      <button onClick={() => removeRecipeFromCook(recipe.id)} className="text-red-500 text-sm font-semibold">
-                        Odebrat
-                      </button>
-                    </div>
-                  ))}
-                </div>
+            {recipesToCook.length > 0 ? (
+              <div className="space-y-2">
+                {recipesToCook.map((recipe) => (
+                  <div key={recipe.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <span className="font-medium">{recipe.title}</span>
+                    <button
+                      onClick={() => removeRecipeFromCook(recipe.id)}
+                      className="text-red-500 text-sm font-semibold"
+                    >
+                      Odebrat
+                    </button>
+                  </div>
+                ))}
               </div>
+            ) : (
+              <p className="text-gray-500">Zatím nic. Přidej si recepty z přehledu.</p>
             )}
           </div>
 
-          {/* Pravá část - Nákupní seznam */}
+          {/* Pravá část – agregovaný nákupní seznam */}
           <div className="bg-white p-6 rounded-2xl shadow-lg">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-gray-800">Co nakoupit:</h2>
+              <h2 className="text-2xl font-bold text-gray-800">Co nakoupit</h2>
               <div className="flex gap-4 items-center">
                 <button onClick={handleShare} className="text-blue-600 hover:text-blue-800" title="Sdílet seznam">
                   <Share2 size={22} />
@@ -182,13 +157,16 @@ export default function ShoppingListPage() {
                 </button>
               </div>
             </div>
+
             {shoppingList.length > 0 ? (
               <ul className="space-y-2">
                 {shoppingList.map((item) => (
                   <li key={item} className="p-2 bg-gray-50 rounded flex justify-between items-center">
                     <span>{item}</span>
                     <button
-                      onClick={() => setShoppingList((prev) => prev.filter((i) => i !== item))}
+                      onClick={() =>
+                        alert("Jednotlivé suroviny se odstraňují vyřazením receptu v levém panelu.")
+                      }
                       className="text-red-500 hover:text-red-700"
                       title="Odebrat ze seznamu"
                     >
@@ -198,7 +176,7 @@ export default function ShoppingListPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-gray-500">Přidej recept do plánu a zde se objeví seznam surovin.</p>
+              <p className="text-gray-500">Přidej recepty do košíku a tady se zobrazí nákupní seznam.</p>
             )}
           </div>
         </div>

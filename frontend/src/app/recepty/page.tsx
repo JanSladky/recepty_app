@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { ShoppingCart } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -23,18 +24,47 @@ const IconHeart = ({ isFavorite }: { isFavorite: boolean }) => (
   </svg>
 );
 
+type Ingredient = { name: string; unit?: string; amount?: number };
 type Recipe = {
   id: number;
   title: string;
   image_url: string;
   meal_types?: string[];
+  ingredients?: Ingredient[];
 };
+
+type CartItem = { id: number; title: string; ingredients: Ingredient[] };
+
+const CART_KEY = "shopping_cart_v1";
+
+function readCart(): CartItem[] {
+  try {
+    const raw = localStorage.getItem(CART_KEY);
+    return raw ? (JSON.parse(raw) as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+function writeCart(items: CartItem[]) {
+  localStorage.setItem(CART_KEY, JSON.stringify(items));
+}
 
 export default function ReceptyPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+
+  const [cartCount, setCartCount] = useState<number>(0);
+  const [cartIds, setCartIds] = useState<number[]>([]);
+  const [justAddedTitle, setJustAddedTitle] = useState<string | null>(null);
+
+  // init košíku po mountu
+  useEffect(() => {
+    const items = readCart();
+    setCartCount(items.length);
+    setCartIds(items.map((i) => i.id));
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -43,22 +73,18 @@ export default function ReceptyPage() {
       try {
         setLoading(true);
 
-        // 1️⃣ Načti recepty
+        // 1) recepty
         const recipesRes = await fetch(`${API_URL}/api/recipes`);
         const recipesData = await recipesRes.json();
         setRecipes(Array.isArray(recipesData) ? recipesData : []);
 
-        // 2️⃣ Pokud přihlášený, načti oblíbené
+        // 2) oblíbené
         if (token) {
           const favRes = await fetch(`${API_URL}/api/user/favorites`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           });
-
           if (favRes.ok) {
             const favData = await favRes.json();
-            console.log("💾 Backend poslal:", favData);
             setFavoriteIds(Array.isArray(favData) ? favData.map((r: { id: number }) => r.id) : []);
           }
         }
@@ -85,30 +111,88 @@ export default function ReceptyPage() {
     try {
       const res = await fetch(`${API_URL}/api/user/favorites/${recipeId}/toggle`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (!res.ok) {
-        throw new Error("Neúspěšné uložení");
-      }
+      if (!res.ok) throw new Error("Neúspěšné uložení");
     } catch (error) {
       console.error("❌ Chyba při uložení oblíbeného:", error);
-      // Vrátíme zpět stav
       setFavoriteIds((prev) => (isFav ? [...prev, recipeId] : prev.filter((id) => id !== recipeId)));
     }
   };
 
-  console.log("🔁 Načtené oblíbené ID:", favoriteIds);
+  // Přidat do košíku
+  const addToCart = async (recipeId: number) => {
+    try {
+      const res = await fetch(`${API_URL}/api/recipes/${recipeId}`);
+      if (!res.ok) throw new Error("Nepodařilo se načíst recept");
+      const full: Recipe = await res.json();
+
+      const current = readCart();
+      if (current.find((i) => i.id === recipeId)) {
+        setJustAddedTitle("Recept už je v košíku");
+        setTimeout(() => setJustAddedTitle(null), 4000);
+        return;
+      }
+      const item: CartItem = {
+        id: full.id,
+        title: full.title,
+        ingredients: (full.ingredients || []) as Ingredient[],
+      };
+      const updated = [...current, item];
+      writeCart(updated);
+      setCartCount(updated.length);
+      setCartIds(updated.map((i) => i.id));
+      setJustAddedTitle(`Přidáno: ${full.title}`);
+      setTimeout(() => setJustAddedTitle(null), 4000);
+    } catch (e) {
+      console.error(e);
+      alert("Nepodařilo se přidat do košíku.");
+    }
+  };
+
+  // Odebrat z košíku (bez fetchu – máme title v kartě)
+  const removeFromCart = (recipeId: number, title: string) => {
+    const current = readCart();
+    const updated = current.filter((i) => i.id !== recipeId);
+    writeCart(updated);
+    setCartCount(updated.length);
+    setCartIds(updated.map((i) => i.id));
+    setJustAddedTitle(`Odebráno: ${title}`);
+    setTimeout(() => setJustAddedTitle(null), 4000);
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen">
       <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800">Všechny recepty</h1>
-          <p className="text-lg text-gray-500 mt-2">Prohlížej si naši kompletní sbírku.</p>
+        <div className="flex items-center justify-between mb-8">
+          <div className="text-center sm:text-left">
+            <h1 className="text-4xl font-bold text-gray-800">Všechny recepty</h1>
+            <p className="text-lg text-gray-500 mt-2">Prohlížej si naši kompletní sbírku.</p>
+          </div>
+
+          <Link
+            href="/nakupni-seznam"
+            className="relative inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition"
+            title="Přejít na nákupní seznam"
+          >
+            <ShoppingCart size={20} />
+            Košík
+            {cartCount > 0 && (
+              <span className="ml-1 inline-flex items-center justify-center text-xs font-bold bg-white text-green-700 rounded-full w-6 h-6">
+                {cartCount}
+              </span>
+            )}
+          </Link>
         </div>
+
+        {justAddedTitle && (
+          <div className="mb-6 rounded-lg bg-green-50 text-green-800 border border-green-200 px-4 py-2">
+            {justAddedTitle} –{" "}
+            <Link href="/nakupni-seznam" className="underline">
+              Přejít na seznam
+            </Link>
+          </div>
+        )}
 
         {loading ? (
           <p className="text-center text-gray-500">Načítám recepty...</p>
@@ -134,6 +218,15 @@ export default function ReceptyPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {(showFavoritesOnly ? recipes.filter((r) => favoriteIds.includes(r.id)) : recipes).map((recipe) => {
                 const isFavorite = favoriteIds.includes(recipe.id);
+                const img =
+                  recipe.image_url && recipe.image_url.startsWith("http")
+                    ? recipe.image_url
+                    : recipe.image_url
+                    ? `${API_URL ?? ""}${recipe.image_url}`
+                    : "/placeholder.jpg";
+
+                const inCart = cartIds.includes(recipe.id);
+
                 return (
                   <div
                     key={recipe.id}
@@ -142,13 +235,7 @@ export default function ReceptyPage() {
                     <Link href={`/recepty/${recipe.id}`}>
                       <div className="relative w-full h-48">
                         <Image
-                          src={
-                            recipe.image_url && recipe.image_url.startsWith("http")
-                              ? recipe.image_url
-                              : recipe.image_url
-                              ? `${API_URL ?? ""}${recipe.image_url}`
-                              : "/placeholder.jpg"
-                          }
+                          src={img}
                           alt={recipe.title}
                           fill
                           className="object-cover transition-transform duration-300 group-hover:scale-110"
@@ -162,23 +249,53 @@ export default function ReceptyPage() {
                           ))}
                         </div>
                       </div>
-                      <div className="p-4">
-                        <h2 className="text-lg font-bold text-gray-800 truncate group-hover:text-green-600 transition-colors">{recipe.title}</h2>
-                      </div>
                     </Link>
 
-                    {localStorage.getItem("token") && (
+                    {/* Akční tlačítka na obrázku */}
+                    <div className="absolute top-2 left-2 flex gap-2 z-10">
+                      {localStorage.getItem("token") && (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleToggleFavorite(recipe.id);
+                          }}
+                          className="bg-black/30 backdrop-blur-sm p-2 rounded-full hover:bg-black/50 transition"
+                          aria-label="Přidat do oblíbených"
+                        >
+                          <IconHeart isFavorite={isFavorite} />
+                        </button>
+                      )}
+
+                      {/* Toggle košíku: přidat / odebrat */}
                       <button
                         onClick={(e) => {
                           e.preventDefault();
-                          handleToggleFavorite(recipe.id);
+                          if (inCart) {
+                            removeFromCart(recipe.id, recipe.title);
+                          } else {
+                            addToCart(recipe.id);
+                          }
                         }}
-                        className="absolute top-2 left-2 bg-black/30 backdrop-blur-sm p-2 rounded-full hover:bg-black/50 transition z-10"
-                        aria-label="Přidat do oblíbených"
+                        className={`relative p-2 rounded-full backdrop-blur-sm transition text-white ${
+                          inCart
+                            ? "bg-red-500/70 hover:bg-red-600" // odebrání – červené
+                            : "bg-black/30 hover:bg-black/50" // přidání – původní styl
+                        }`}
+                        title={inCart ? "Odebrat z košíku" : "Přidat do nákupního seznamu"}
+                        aria-label={inCart ? "Odebrat z košíku" : "Přidat do košíku"}
                       >
-                        <IconHeart isFavorite={isFavorite} />
+                        <ShoppingCart size={20} />
+                        {inCart && (
+                          <span className="pointer-events-none absolute left-1 right-1 top-1/2 h-0.5 bg-white/90 rotate-45"></span>
+                        )}
                       </button>
-                    )}
+                    </div>
+
+                    <div className="p-4">
+                      <h2 className="text-lg font-bold text-gray-800 truncate group-hover:text-green-600 transition-colors">
+                        {recipe.title}
+                      </h2>
+                    </div>
                   </div>
                 );
               })}
