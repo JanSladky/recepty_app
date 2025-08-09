@@ -1,7 +1,7 @@
 // 📁 frontend/src/app/nakupni-seznam/page.tsx
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { Trash2, Share2, RotateCcw, ShoppingCart } from "lucide-react";
 
@@ -10,6 +10,7 @@ type Recipe = { id: number; title: string; image_url?: string; ingredients: Ingr
 type CartItem = { id: number; title: string; ingredients: Ingredient[] };
 
 const CART_KEY = "shopping_cart_v1";
+const HIDDEN_ING_KEY = "shopping_hidden_v1"; // skryté/odškrtnuté položky
 
 function readCart(): CartItem[] {
   try {
@@ -32,46 +33,73 @@ const notifyCart = () => {
 
 export default function ShoppingListPage() {
   const [recipesToCook, setRecipesToCook] = useState<Recipe[]>([]);
+  const [hiddenKeys, setHiddenKeys] = useState<string[]>([]);
+  const mountedRef = useRef(false); // abychom nepálili efekt při prvním mountu hned
 
-  // Načti vybrané recepty z košíku
+  // Načti vybrané recepty z košíku + skryté položky
   useEffect(() => {
     const items = readCart();
     setRecipesToCook((items as unknown) as Recipe[]);
+
+    try {
+      const raw = localStorage.getItem(HIDDEN_ING_KEY);
+      setHiddenKeys(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      setHiddenKeys([]);
+    }
   }, []);
 
-  // Agregace surovin
-  const shoppingList = useMemo(() => {
+  // ⬅️ NOVĚ: Persistuj změny a notifikuj navbar AŽ PO renderu
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    writeCart((recipesToCook as unknown) as CartItem[]);
+    notifyCart();
+  }, [recipesToCook]);
+
+  // Ulož skryté položky při změně
+  useEffect(() => {
+    localStorage.setItem(HIDDEN_ING_KEY, JSON.stringify(hiddenKeys));
+  }, [hiddenKeys]);
+
+  // Agregace surovin (s možností skrývání položek)
+  const aggregatedList = useMemo(() => {
     const ingredients = recipesToCook.flatMap((r) => r.ingredients || []);
-    const aggregated: Record<string, { name: string; unit: string; amount: number }> = {};
+    const aggregated: Record<string, { key: string; name: string; unit: string; amount: number }> = {};
 
     for (const ing of ingredients) {
       const name = ing.name?.toString().trim() ?? "";
       const unit = ing.unit?.toString().trim() ?? "";
       const amount = typeof ing.amount === "number" ? ing.amount : parseFloat(String(ing.amount ?? 0)) || 0;
       const key = `${name}||${unit}`;
-      if (!aggregated[key]) aggregated[key] = { name, unit, amount };
+      if (!aggregated[key]) aggregated[key] = { key, name, unit, amount };
       else aggregated[key].amount += amount;
     }
 
-    return Object.values(aggregated)
-      .map((i) => `${i.amount || 0} ${i.unit || ""} ${i.name}`.trim())
-      .sort();
-  }, [recipesToCook]);
+    const visible = Object.values(aggregated).filter((row) => !hiddenKeys.includes(row.key));
+    return visible
+      .map((i) => ({ key: i.key, label: `${i.amount || 0} ${i.unit || ""} ${i.name}`.trim() }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [recipesToCook, hiddenKeys]);
 
-  const formattedList = shoppingList.join("\n");
+  const formattedList = aggregatedList.map((x) => x.label).join("\n");
 
   const handleShare = async () => {
-    if (navigator.canShare && navigator.canShare({ files: [] })) {
-      const blob = new Blob([formattedList], { type: "text/plain" });
-      const file = new File([blob], "nakupni-seznam.txt", { type: "text/plain" });
-      try {
-        await navigator.share({ title: "Nákupní seznam", files: [file] });
-      } catch (error) {
-        console.error("Sdílení selhalo:", error);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Nákupní seznam", text: formattedList });
+        return;
       }
-    } else {
+    } catch (error) {
+      console.error("Sdílení selhalo:", error);
+    }
+    try {
       await navigator.clipboard.writeText(formattedList);
       alert("Seznam byl zkopírován do schránky.");
+    } catch (err) {
+      console.error("Nepodařilo se kopírovat:", err);
     }
   };
 
@@ -85,18 +113,19 @@ export default function ShoppingListPage() {
   };
 
   const removeRecipeFromCook = (recipeId: number) => {
-    setRecipesToCook((prev) => {
-      const next = prev.filter((r) => r.id !== recipeId);
-      writeCart((next as unknown) as CartItem[]);
-      notifyCart(); // ✅ informuj navbar
-      return next;
-    });
+    // ⚠️ žádné writeCart ani notifyCart tady – postará se o to useEffect výše
+    setRecipesToCook((prev) => prev.filter((r) => r.id !== recipeId));
   };
 
   const clearCart = () => {
-    writeCart([]);
-    setRecipesToCook([]);
-    notifyCart(); // ✅ informuj navbar
+    setRecipesToCook([]); // persist+notify proběhne v useEffect
+    setHiddenKeys([]);
+    localStorage.removeItem(HIDDEN_ING_KEY);
+  };
+
+  // skrývání jedné položky nákupu (nezávisle na receptech)
+  const hideOne = (key: string) => {
+    setHiddenKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
   };
 
   return (
@@ -193,15 +222,13 @@ export default function ShoppingListPage() {
               </div>
             </div>
 
-            {shoppingList.length > 0 ? (
+            {aggregatedList.length > 0 ? (
               <ul className="divide-y divide-gray-100">
-                {shoppingList.map((item) => (
-                  <li key={item} className="flex items-center justify-between py-2.5">
-                    <span className="text-gray-800">{item}</span>
+                {aggregatedList.map((item) => (
+                  <li key={item.key} className="flex items-center justify-between py-2.5">
+                    <span className="text-gray-800">{item.label}</span>
                     <button
-                      onClick={() =>
-                        alert("Jednotlivé suroviny se odstraňují vyřazením receptu v levém panelu.")
-                      }
+                      onClick={() => hideOne(item.key)}
                       className="text-red-500 hover:text-red-600"
                       title="Odebrat ze seznamu"
                     >
