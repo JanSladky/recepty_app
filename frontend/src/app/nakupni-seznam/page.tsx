@@ -4,8 +4,6 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Trash2, Share2, RotateCcw } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 type Ingredient = { name: string; unit?: string; amount?: number };
 type Recipe = { id: number; title: string; image_url?: string; ingredients: Ingredient[] };
 type CartItem = { id: number; title: string; ingredients: Ingredient[] };
@@ -30,7 +28,7 @@ export default function ShoppingListPage() {
   // Načti vybrané recepty z košíku
   useEffect(() => {
     const items = readCart();
-    setRecipesToCook(items as unknown as Recipe[]);
+    setRecipesToCook((items as unknown) as Recipe[]);
   }, []);
 
   // Agregace surovin
@@ -81,7 +79,7 @@ export default function ShoppingListPage() {
   const removeRecipeFromCook = (recipeId: number) => {
     setRecipesToCook((prev) => {
       const next = prev.filter((r) => r.id !== recipeId);
-      writeCart(next as unknown as CartItem[]);
+      writeCart((next as unknown) as CartItem[]);
       return next;
     });
   };
@@ -101,10 +99,7 @@ export default function ShoppingListPage() {
           </div>
 
           <div className="flex gap-3">
-            <Link
-              href="/recepty"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border hover:bg-gray-50 transition"
-            >
+            <Link href="/recepty" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border hover:bg-gray-50 transition">
               ← Zpět na recepty
             </Link>
             {recipesToCook.length > 0 && (
@@ -130,10 +125,7 @@ export default function ShoppingListPage() {
                 {recipesToCook.map((recipe) => (
                   <div key={recipe.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
                     <span className="font-medium">{recipe.title}</span>
-                    <button
-                      onClick={() => removeRecipeFromCook(recipe.id)}
-                      className="text-red-500 text-sm font-semibold"
-                    >
+                    <button onClick={() => removeRecipeFromCook(recipe.id)} className="text-red-500 text-sm font-semibold">
                       Odebrat
                     </button>
                   </div>
@@ -164,9 +156,7 @@ export default function ShoppingListPage() {
                   <li key={item} className="p-2 bg-gray-50 rounded flex justify-between items-center">
                     <span>{item}</span>
                     <button
-                      onClick={() =>
-                        alert("Jednotlivé suroviny se odstraňují vyřazením receptu v levém panelu.")
-                      }
+                      onClick={() => alert("Jednotlivé suroviny se odstraňují vyřazením receptu v levém panelu.")}
                       className="text-red-500 hover:text-red-700"
                       title="Odebrat ze seznamu"
                     >
