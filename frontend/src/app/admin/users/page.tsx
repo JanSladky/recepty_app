@@ -16,7 +16,7 @@ type User = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-/** Type guard pro Axios-like error (funguje i bez axios.isAxiosError) */
+/** Type guard pro Axios-like error */
 function isAxiosErrorLike(e: unknown): e is {
   isAxiosError: boolean;
   message: string;
@@ -31,9 +31,7 @@ function getAxiosErrorMessage(error: unknown): string {
     const data = (error.response?.data ?? {}) as { error?: string; message?: string };
     return data.error || data.message || error.message || "Došlo k chybě při komunikaci se serverem.";
   }
-  if (error instanceof Error) {
-    return error.message;
-  }
+  if (error instanceof Error) return error.message;
   return "Neočekávaná chyba.";
 }
 
@@ -44,11 +42,7 @@ function RoleBadge({ role }: { role: Role }) {
     ADMIN: "bg-blue-100 text-blue-800",
     SUPERADMIN: "bg-purple-100 text-purple-800",
   };
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${map[role]}`}>
-      {role}
-    </span>
-  );
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${map[role]}`}>{role}</span>;
 }
 
 export default function AdminUsersPage() {
@@ -65,13 +59,11 @@ export default function AdminUsersPage() {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const { data } = await axios.get<User[]>(`${API_URL}/api/admin/users`, {
-        headers: authHeaders(),
-      });
+      const { data } = await axios.get<User[]>(`${API_URL}/api/admin/users`, { headers: authHeaders() });
       setUsers(data);
       setError(null);
-    } catch (error: unknown) {
-      setError(getAxiosErrorMessage(error));
+    } catch (err) {
+      setError(getAxiosErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -87,8 +79,8 @@ export default function AdminUsersPage() {
           { headers: { ...authHeaders(), "Content-Type": "application/json" } }
         );
         await fetchUsers();
-      } catch (error: unknown) {
-        alert(getAxiosErrorMessage(error) || "Změna role selhala.");
+      } catch (err) {
+        alert(getAxiosErrorMessage(err) || "Změna role selhala.");
       } finally {
         setSavingId(null);
       }
@@ -101,12 +93,10 @@ export default function AdminUsersPage() {
       if (!confirm("Opravdu smazat tohoto uživatele?")) return;
       try {
         setSavingId(id);
-        await axios.delete(`${API_URL}/api/admin/users/${id}`, {
-          headers: authHeaders(),
-        });
+        await axios.delete(`${API_URL}/api/admin/users/${id}`, { headers: authHeaders() });
         await fetchUsers();
-      } catch (error: unknown) {
-        alert(getAxiosErrorMessage(error) || "Smazání selhalo.");
+      } catch (err) {
+        alert(getAxiosErrorMessage(err) || "Smazání selhalo.");
       } finally {
         setSavingId(null);
       }
@@ -140,7 +130,8 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
+        {/* ======= Desktop TABULKA (md a výš) ======= */}
+        <div className="hidden md:block overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-gray-50">
@@ -160,11 +151,7 @@ export default function AdminUsersPage() {
                     <td className="py-3 px-4 align-middle">
                       <div className="flex items-center gap-3">
                         {u.avatar_url ? (
-                          <img
-                            src={u.avatar_url}
-                            alt={u.name ?? u.email}
-                            className="w-8 h-8 rounded-full object-cover border"
-                          />
+                          <img src={u.avatar_url} alt={u.name ?? u.email} className="w-8 h-8 rounded-full object-cover border" />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-sm font-bold">
                             {(u.name?.charAt(0) || u.email.charAt(0)).toUpperCase()}
@@ -172,7 +159,7 @@ export default function AdminUsersPage() {
                         )}
                         <div className="leading-tight">
                           <div className="font-medium text-gray-800">{u.name ?? "-"}</div>
-                          <div className="text-xs text-gray-500">
+                          <div className="mt-1">
                             <RoleBadge role={u.role} />
                           </div>
                         </div>
@@ -216,6 +203,62 @@ export default function AdminUsersPage() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* ======= Mobile KARTY (do md) — žádné horizontální scrollování ======= */}
+        <div className="md:hidden space-y-4">
+          {users.map((u) => (
+            <div key={u.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <div className="flex items-center gap-3">
+                {u.avatar_url ? (
+                  <img src={u.avatar_url} alt={u.name ?? u.email} className="w-10 h-10 rounded-full object-cover border" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-sm font-bold">
+                    {(u.name?.charAt(0) || u.email.charAt(0)).toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-800 leading-tight">{u.name ?? "-"}</div>
+                  <div className="mt-1"><RoleBadge role={u.role} /></div>
+                </div>
+                <div className="text-xs text-gray-500">ID {u.id}</div>
+              </div>
+
+              <div className="mt-3 text-sm text-gray-700 break-words">{u.email}</div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Role</label>
+                  <select
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                    value={u.role}
+                    onChange={(e) => changeRole(u.id, e.target.value as Role)}
+                    disabled={savingId === u.id}
+                  >
+                    <option value="USER">USER</option>
+                    <option value="ADMIN">ADMIN</option>
+                    <option value="SUPERADMIN">SUPERADMIN</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    className="text-sm font-semibold text-red-600 hover:text-red-700 hover:underline disabled:opacity-50"
+                    onClick={() => deleteUser(u.id)}
+                    disabled={savingId === u.id || u.role === "SUPERADMIN"}
+                  >
+                    Smazat uživatele
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {users.length === 0 && (
+            <div className="text-center text-sm text-gray-500 py-8 bg-white border rounded-xl">
+              Žádní uživatelé.
+            </div>
+          )}
         </div>
       </div>
     </AdminRoute>
