@@ -90,7 +90,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
     if (field === "amount" || field === "calories_per_gram" || field === "default_grams") {
       updated[index] = {
         ...updated[index],
-        [field]: parseFloat(value) || undefined, // Zde použijeme undefined pro prázdné pole
+        [field]: parseFloat(value) || undefined,
       };
     } else if (field === "unit") {
       updated[index] = {
@@ -144,7 +144,6 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
   const handleNewChange = (field: keyof NewIngredient, value: string | number) => {
     let processedValue = value;
     if (field === "category_id") {
-      // Pokud je hodnota prázdný řetězec, ponech ji tak. Jinak ji převeď na číslo.
       processedValue = value === "" ? "" : parseInt(value as string, 10);
     }
     setNewIngredient({
@@ -154,37 +153,31 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
   };
 
   const handleCreate = async () => {
-    // 1. Validace vstupů od uživatele
     if (!newIngredient.name.trim() || !newIngredient.category_id || !newIngredient.calories_per_gram) {
       alert("Vyplň prosím název, kategorii a kalorie.");
       return;
     }
 
     try {
-      // 2. Příprava dat (payload) pro odeslání na server
       const payload = {
         name: newIngredient.name,
-        calories_per_gram: parseFloat(newIngredient.calories_per_gram.toString()) || 0, // <-- ZMĚNA ZPĚT ZDE
+        calories_per_gram: parseFloat(newIngredient.calories_per_gram.toString()) || 0,
         category_id: newIngredient.category_id,
         default_grams: newIngredient.default_grams ? parseFloat(newIngredient.default_grams.toString()) : null,
         unit_name: newIngredient.unit_name || null,
       };
 
-      // 3. Odeslání dat na server pomocí fetch
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ingredients`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      // 4. Zpracování odpovědi ze serveru
       if (!res.ok) {
-        // Pokud server vrátí chybu, zobrazíme ji a ukončíme funkci
         const errorResponse = await res.text();
         throw new Error(errorResponse || "Nepodařilo se přidat ingredienci");
       }
 
-      // 5. Zpracování úspěšné odpovědi
       const createdIngredient = await res.json();
       setIngredients((prev) => [
         ...prev,
@@ -197,10 +190,8 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
       ]);
 
       alert("Ingredience úspěšně přidána.");
-      // Vyčištění formuláře pro novou surovinu
       setNewIngredient({ name: "", calories_per_gram: 0, category_id: "", default_grams: undefined, unit_name: "" });
     } catch (err) {
-      // 6. Zachycení jakékoliv chyby (síťové nebo z bodu 4) a její zobrazení
       console.error("Chyba při přidání ingredience:", err);
       alert("Nepodařilo se přidat ingredienci.");
     }
@@ -237,7 +228,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
             </div>
             <input
               type="number"
-              value={ingredient.amount}
+              value={ingredient.amount === 0 ? "" : ingredient.amount}
               onChange={(e) => handleInputChange(index, "amount", e.target.value)}
               placeholder="Množství"
               className="border p-2 rounded w-full"
@@ -252,15 +243,15 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
             </select>
             <input
               type="number"
-              value={ingredient.calories_per_gram}
+              value={ingredient.calories_per_gram === 0 ? "" : ingredient.calories_per_gram}
               onChange={(e) => handleInputChange(index, "calories_per_gram", e.target.value)}
-              placeholder="Kalorie / gram"
+              placeholder="kcal / 1g"
               className="border p-2 rounded w-full"
               required
             />
             <input
               type="number"
-              value={ingredient.default_grams || ""}
+              value={!ingredient.default_grams ? "" : ingredient.default_grams}
               onChange={(e) => handleInputChange(index, "default_grams", e.target.value)}
               placeholder="Průměrná váha (g)"
               title="Průměrná váha kusu v gramech"
@@ -302,15 +293,22 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
             value={newIngredient.name}
             onChange={(e) => handleNewChange("name", e.target.value)}
             className="border p-2 rounded w-full sm:w-[150px] flex-1 min-w-[120px]"
+            required
           />
           <input
             type="number"
-            placeholder="Kalorie / 1g"
-            value={newIngredient.calories_per_gram}
+            placeholder="kcal / 1g"
+            value={newIngredient.calories_per_gram || ""}
             onChange={(e) => handleNewChange("calories_per_gram", e.target.value)}
             className="border p-2 rounded w-32"
+            required
           />
-          <select value={newIngredient.category_id} onChange={(e) => handleNewChange("category_id", e.target.value)} className="border p-2 rounded w-48">
+          <select
+            value={newIngredient.category_id}
+            onChange={(e) => handleNewChange("category_id", e.target.value)}
+            className="border p-2 rounded w-48"
+            required
+          >
             <option value="">Vyber kategorii</option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>
@@ -325,7 +323,12 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Ingredie
             onChange={(e) => handleNewChange("default_grams", e.target.value)}
             className="border p-2 rounded w-32"
           />
-          <select value={newIngredient.unit_name || ""} onChange={(e) => handleNewChange("unit_name", e.target.value)} className="border p-2 rounded w-32">
+          <select
+            value={newIngredient.unit_name || ""}
+            onChange={(e) => handleNewChange("unit_name", e.target.value)}
+            className="border p-2 rounded w-32"
+            required
+          >
             <option value="">Jednotka</option>
             {units.map((unit) => (
               <option key={unit} value={unit}>

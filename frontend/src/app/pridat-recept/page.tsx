@@ -1,6 +1,7 @@
 // 📁 frontend/src/app/pridat-recept/page.tsx
 "use client";
 
+import { useEffect, useState } from "react";
 import RecipeForm from "@/components/RecipeForm";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -20,6 +21,14 @@ function getRoleFromStorage(): Role {
 }
 
 export default function AddRecipePage() {
+  // Stabilní default pro server i první klientský render – zabrání hydration chybě
+  const [submitLabel, setSubmitLabel] = useState<string>("Odeslat ke schválení");
+
+  useEffect(() => {
+    const role = getRoleFromStorage();
+    setSubmitLabel(role === "ADMIN" || role === "SUPERADMIN" ? "Přidat recept" : "Odeslat ke schválení");
+  }, []);
+
   const handleSubmit = async (formData: FormData) => {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -27,7 +36,7 @@ export default function AddRecipePage() {
 
       if (!token) {
         throw new Error("Musíte být přihlášen, abyste mohli přidat recept.");
-        }
+      }
 
       // USER → návrh receptu (moderace), ADMIN/SUPERADMIN → rovnou publikace
       const isModerator = role === "ADMIN" || role === "SUPERADMIN";
@@ -67,9 +76,6 @@ export default function AddRecipePage() {
       alert("❌ " + msg);
     }
   };
-
-  const role = getRoleFromStorage();
-  const submitLabel = role === "ADMIN" || role === "SUPERADMIN" ? "Přidat recept" : "Odeslat ke schválení";
 
   return (
     <main className="px-4 sm:px-6 md:px-8 lg:px-12 py-6 w-full mx-auto">
