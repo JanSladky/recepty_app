@@ -121,7 +121,9 @@ export default function ReceptyPage() {
   };
 
   // Přidat do košíku
-  const addToCart = async (recipeId: number) => {
+  const addToCart = async (recipeId: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     try {
       const res = await fetch(`${API_URL}/api/recipes/${recipeId}`);
       if (!res.ok) throw new Error("Nepodařilo se načíst recept");
@@ -140,6 +142,10 @@ export default function ReceptyPage() {
       };
       const updated = [...current, item];
       writeCart(updated);
+
+      // 🔔 oznám změnu košíku (pro Navbar badge)
+      window.dispatchEvent(new Event("cartUpdated"));
+
       setCartCount(updated.length);
       setCartIds(updated.map((i) => i.id));
       setJustAddedTitle(`Přidáno: ${full.title}`);
@@ -153,8 +159,12 @@ export default function ReceptyPage() {
   // Odebrat z košíku (bez fetchu – máme title v kartě)
   const removeFromCart = (recipeId: number, title: string) => {
     const current = readCart();
-    const updated = current.filter((i) => i.id !== recipeId);
+    const updated = current.filter((i) => i.id !== recipeId); // ← OPRAVENO (odstraněno „the“)
     writeCart(updated);
+
+    // 🔔 oznám změnu košíku (pro Navbar badge)
+    window.dispatchEvent(new Event("cartUpdated"));
+
     setCartCount(updated.length);
     setCartIds(updated.map((i) => i.id));
     setJustAddedTitle(`Odebráno: ${title}`);
@@ -178,9 +188,7 @@ export default function ReceptyPage() {
             <ShoppingCart size={20} />
             Košík
             {cartCount > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center text-xs font-bold bg-white text-green-700 rounded-full w-6 h-6">
-                {cartCount}
-              </span>
+              <span className="ml-1 inline-flex items-center justify-center text-xs font-bold bg-white text-green-700 rounded-full w-6 h-6">{cartCount}</span>
             )}
           </Link>
         </div>
@@ -234,12 +242,7 @@ export default function ReceptyPage() {
                   >
                     <Link href={`/recepty/${recipe.id}`}>
                       <div className="relative w-full h-48">
-                        <Image
-                          src={img}
-                          alt={recipe.title}
-                          fill
-                          className="object-cover transition-transform duration-300 group-hover:scale-110"
-                        />
+                        <Image src={img} alt={recipe.title} fill className="object-cover transition-transform duration-300 group-hover:scale-110" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                         <div className="absolute top-2 right-2 flex flex-wrap-reverse gap-1">
                           {recipe.meal_types?.map((type) => (
@@ -273,28 +276,22 @@ export default function ReceptyPage() {
                           if (inCart) {
                             removeFromCart(recipe.id, recipe.title);
                           } else {
-                            addToCart(recipe.id);
+                            addToCart(recipe.id, e);
                           }
                         }}
                         className={`relative p-2 rounded-full backdrop-blur-sm transition text-white ${
-                          inCart
-                            ? "bg-red-500/70 hover:bg-red-600" // odebrání – červené
-                            : "bg-black/30 hover:bg-black/50" // přidání – původní styl
+                          inCart ? "bg-red-500/70 hover:bg-red-600" : "bg-black/30 hover:bg-black/50"
                         }`}
                         title={inCart ? "Odebrat z košíku" : "Přidat do nákupního seznamu"}
                         aria-label={inCart ? "Odebrat z košíku" : "Přidat do košíku"}
                       >
                         <ShoppingCart size={20} />
-                        {inCart && (
-                          <span className="pointer-events-none absolute left-1 right-1 top-1/2 h-0.5 bg-white/90 rotate-45"></span>
-                        )}
+                        {inCart && <span className="pointer-events-none absolute left-1 right-1 top-1/2 h-0.5 bg-white/90 rotate-45"></span>}
                       </button>
                     </div>
 
                     <div className="p-4">
-                      <h2 className="text-lg font-bold text-gray-800 truncate group-hover:text-green-600 transition-colors">
-                        {recipe.title}
-                      </h2>
+                      <h2 className="text-lg font-bold text-gray-800 truncate group-hover:text-green-600 transition-colors">{recipe.title}</h2>
                     </div>
                   </div>
                 );
