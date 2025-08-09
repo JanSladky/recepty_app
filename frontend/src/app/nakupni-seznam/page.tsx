@@ -23,6 +23,13 @@ function writeCart(items: CartItem[]) {
   localStorage.setItem(CART_KEY, JSON.stringify(items));
 }
 
+/** 🔔 informuje navbar (a další posluchače), že se košík změnil */
+const notifyCart = () => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("cartUpdated"));
+  }
+};
+
 export default function ShoppingListPage() {
   const [recipesToCook, setRecipesToCook] = useState<Recipe[]>([]);
 
@@ -81,6 +88,7 @@ export default function ShoppingListPage() {
     setRecipesToCook((prev) => {
       const next = prev.filter((r) => r.id !== recipeId);
       writeCart((next as unknown) as CartItem[]);
+      notifyCart(); // ✅ doplněno: informuj navbar
       return next;
     });
   };
@@ -88,6 +96,7 @@ export default function ShoppingListPage() {
   const clearCart = () => {
     writeCart([]);
     setRecipesToCook([]);
+    notifyCart(); // ✅ doplněno: informuj navbar
   };
 
   return (
