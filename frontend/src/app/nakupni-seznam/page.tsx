@@ -33,47 +33,6 @@ const notifyCart = () => {
 
 /* ---------- Pomocné: parsování a normalizace jednotek ---------- */
 
-// vezme cokoliv (číslo/string) a vrátí číslo; umí  "0,15", "0.15 kg", "150 g"
-function parseAmount(raw: unknown): number {
-  if (typeof raw === "number") return isFinite(raw) ? raw : 0;
-  const s = String(raw ?? "")
-    .replace(",", ".")
-    .replace(/[^\d.]/g, ""); // odstraň text typu " g", "kg", …
-  const n = parseFloat(s);
-  return isFinite(n) ? n : 0;
-}
-
-// sjednotí jednotku na základní – g / ml / ks (ostatní ponechá)
-function toBaseUnit(amount: number, unit: string | undefined) {
-  const u = (unit ?? "").trim().toLowerCase();
-  switch (u) {
-    case "kg":
-      return { amount: amount * 1000, unit: "g" };
-    case "g":
-      return { amount, unit: "g" };
-    case "l":
-      return { amount: amount * 1000, unit: "ml" };
-    case "ml":
-      return { amount, unit: "ml" };
-    case "ks":
-    case "kus":
-    case "kusy":
-      return { amount, unit: "ks" };
-    default:
-      // neznámé necháme jak jsou (aby se nepletly s g/ml)
-      return { amount, unit: (unit ?? "").trim() };
-  }
-}
-
-// hezčí zobrazení – zaokrouhlím na 2 desetinná místa u g/ml
-function formatAmount(amount: number, unit: string) {
-  if (unit === "g" || unit === "ml") {
-    const val = Math.round(amount * 100) / 100;
-    return `${val} ${unit}`;
-  }
-  return `${amount || 0} ${unit || ""}`.trim();
-}
-
 export default function ShoppingListPage() {
   const [recipesToCook, setRecipesToCook] = useState<Recipe[]>([]);
   const [hiddenKeys, setHiddenKeys] = useState<string[]>([]);

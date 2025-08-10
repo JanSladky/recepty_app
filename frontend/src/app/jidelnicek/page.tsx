@@ -18,8 +18,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const PLAN_KEY = "meal_plan_v1";
 const CART_KEY = "shopping_cart_v1";
 
-const toISO = (d: Date) => d.toISOString().slice(0, 10); // YYYY-MM-DD
-
+type CartItem = { id: number; title: string; ingredients: Ingredient[] };
 type Ingredient = { name: string; unit?: string; amount?: number };
 type Recipe = { id: number; title: string; image_url?: string; ingredients?: Ingredient[] };
 
@@ -44,7 +43,7 @@ function readPlan(): PlanStorage {
 function writePlan(p: PlanStorage) {
   localStorage.setItem(PLAN_KEY, JSON.stringify(p));
 }
-function readCart() {
+function readCart(): CartItem[] {
   try {
     const raw = localStorage.getItem(CART_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -376,7 +375,7 @@ export default function MealPlanPage() {
     (async () => {
       try {
         const current = readCart();
-        const toAdd: any[] = [];
+        const toAdd: CartItem[] = [];
 
         for (const it of items) {
           if (it.type === "recipe") {
