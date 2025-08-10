@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { User, Heart, ShoppingCart, Settings } from "lucide-react";
+import { User, Heart, ShoppingCart, Settings, CalendarDays } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useAdmin from "@/hooks/useAdmin";
@@ -23,13 +23,11 @@ function getCartCount(): number {
 
 export default function Navbar() {
   const router = useRouter();
-  const { isAdmin, loading } = useAdmin(); // true pro ADMIN i SUPERADMIN
+  const { isAdmin, loading } = useAdmin();
   const { isLoggedIn, userEmail, userAvatar } = useAuth();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
-
-  // 🔢 badge košíku
   const [cartCount, setCartCount] = useState<number>(0);
 
   useEffect(() => {
@@ -37,11 +35,9 @@ export default function Navbar() {
       typeof window !== "undefined" && localStorage.getItem("userRole") === "SUPERADMIN"
     );
 
-    // první načtení
     const update = () => setCartCount(getCartCount());
     update();
 
-    // poslouchej na změny košíku z různých míst
     const onCartUpdated = () => update();
     const onStorage = (e: StorageEvent) => {
       if (e.key === CART_KEY) update();
@@ -96,12 +92,19 @@ export default function Navbar() {
           </Link>
 
           {isLoggedIn && (
+            <Link href="/jidelnicek" title="Týdenní jídelníček" className="flex items-center gap-1 hover:underline">
+              <CalendarDays className="w-5 h-5 text-green-600" />
+              Jídelníček
+            </Link>
+          )}
+
+          {isLoggedIn && (
             <Link href="/oblibene" title="Oblíbené recepty">
               <Heart className="text-red-500 hover:scale-110 transition" />
             </Link>
           )}
 
-          {/* 🛒 Košík s badge */}
+          {/* 🛒 Košík */}
           <Link href="/nakupni-seznam" title="Nákupní seznam" className="relative">
             <ShoppingCart className="text-green-600 hover:scale-110 transition" />
             {cartCount > 0 && (
@@ -111,13 +114,10 @@ export default function Navbar() {
             )}
           </Link>
 
-          {/* Admin menu – ADMIN i SUPERADMIN */}
+          {/* Admin menu */}
           {!loading && isAdmin && (
             <div className="relative group flex items-center">
-              <div
-                className="p-2 hover:bg-gray-100 rounded-full transition cursor-pointer"
-                aria-label="Admin menu"
-              >
+              <div className="p-2 hover:bg-gray-100 rounded-full transition cursor-pointer">
                 <Settings className="w-6 h-6 text-gray-700" />
               </div>
               <div className="absolute right-0 top-10 w-56 bg-white shadow-lg rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition duration-200 z-50">
@@ -168,6 +168,12 @@ export default function Navbar() {
 
         {/* Mobilní navigace */}
         <div className="md:hidden flex items-center gap-3">
+          {isLoggedIn && (
+            <Link href="/jidelnicek" title="Týdenní jídelníček">
+              <CalendarDays className="w-5 h-5 text-green-600 hover:scale-110 transition" />
+            </Link>
+          )}
+
           {isLoggedIn && (
             <Link href="/oblibene" title="Oblíbené recepty">
               <Heart className="w-5 h-5 text-red-500 hover:scale-110 transition" />
@@ -231,6 +237,12 @@ export default function Navbar() {
           <Link href="/recepty" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
             Recepty
           </Link>
+
+          {isLoggedIn && (
+            <Link href="/jidelnicek" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">
+              Jídelníček
+            </Link>
+          )}
 
           {isLoggedIn && (
             <Link href="/oblibene" onClick={() => setMenuOpen(false)} className="hover:underline py-3 text-lg">

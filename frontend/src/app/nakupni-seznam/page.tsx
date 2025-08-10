@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { Trash2, Share2, RotateCcw, ShoppingCart } from "lucide-react";
 
-type Ingredient = { name: string; unit?: string; amount?: number };
+type Ingredient = { name: string; unit?: string; amount?: number | string };
 type Recipe = { id: number; title: string; image_url?: string; ingredients: Ingredient[] };
 type CartItem = { id: number; title: string; ingredients: Ingredient[] };
 
@@ -31,6 +31,49 @@ const notifyCart = () => {
   }
 };
 
+/* ---------- Pomocné: parsování a normalizace jednotek ---------- */
+
+// vezme cokoliv (číslo/string) a vrátí číslo; umí  "0,15", "0.15 kg", "150 g"
+function parseAmount(raw: unknown): number {
+  if (typeof raw === "number") return isFinite(raw) ? raw : 0;
+  const s = String(raw ?? "")
+    .replace(",", ".")
+    .replace(/[^\d.]/g, ""); // odstraň text typu " g", "kg", …
+  const n = parseFloat(s);
+  return isFinite(n) ? n : 0;
+}
+
+// sjednotí jednotku na základní – g / ml / ks (ostatní ponechá)
+function toBaseUnit(amount: number, unit: string | undefined) {
+  const u = (unit ?? "").trim().toLowerCase();
+  switch (u) {
+    case "kg":
+      return { amount: amount * 1000, unit: "g" };
+    case "g":
+      return { amount, unit: "g" };
+    case "l":
+      return { amount: amount * 1000, unit: "ml" };
+    case "ml":
+      return { amount, unit: "ml" };
+    case "ks":
+    case "kus":
+    case "kusy":
+      return { amount, unit: "ks" };
+    default:
+      // neznámé necháme jak jsou (aby se nepletly s g/ml)
+      return { amount, unit: (unit ?? "").trim() };
+  }
+}
+
+// hezčí zobrazení – zaokrouhlím na 2 desetinná místa u g/ml
+function formatAmount(amount: number, unit: string) {
+  if (unit === "g" || unit === "ml") {
+    const val = Math.round(amount * 100) / 100;
+    return `${val} ${unit}`;
+  }
+  return `${amount || 0} ${unit || ""}`.trim();
+}
+
 export default function ShoppingListPage() {
   const [recipesToCook, setRecipesToCook] = useState<Recipe[]>([]);
   const [hiddenKeys, setHiddenKeys] = useState<string[]>([]);
@@ -49,7 +92,7 @@ export default function ShoppingListPage() {
     }
   }, []);
 
-  // ⬅️ NOVĚ: Persistuj změny a notifikuj navbar AŽ PO renderu
+  // Persist košíku a notifikace až po mountu
   useEffect(() => {
     if (!mountedRef.current) {
       mountedRef.current = true;
@@ -64,24 +107,56 @@ export default function ShoppingListPage() {
     localStorage.setItem(HIDDEN_ING_KEY, JSON.stringify(hiddenKeys));
   }, [hiddenKeys]);
 
-  // Agregace surovin (s možností skrývání položek)
+  // Agregace surovin (s normalizací jednotek + skrýváním)
   const aggregatedList = useMemo(() => {
-    const ingredients = recipesToCook.flatMap((r) => r.ingredients || []);
+    // pomocné převody
+    const toBase = (num: number, unit?: string) => {
+      const u = (unit ?? "").toLowerCase();
+      if (u === "kg") return { n: num * 1000, u: "g" };
+      if (u === "g") return { n: num, u: "g" };
+      if (u === "l") return { n: num * 1000, u: "ml" };
+      if (u === "ml") return { n: num, u: "ml" };
+      if (["ks", "kus", "kusy"].includes(u)) return { n: num, u: "ks" };
+      return { n: num, u: (unit ?? "").trim() };
+    };
+
+    const fmt = (num: number, unit: string) => {
+      if (unit === "g" || unit === "ml") return `${Math.round(num * 100) / 100} ${unit}`;
+      return `${num || 0} ${unit || ""}`.trim();
+    };
+
+    // agregace
     const aggregated: Record<string, { key: string; name: string; unit: string; amount: number }> = {};
+    const ingredients = recipesToCook.flatMap((r) => r.ingredients || []);
 
     for (const ing of ingredients) {
-      const name = ing.name?.toString().trim() ?? "";
-      const unit = ing.unit?.toString().trim() ?? "";
-      const amount = typeof ing.amount === "number" ? ing.amount : parseFloat(String(ing.amount ?? 0)) || 0;
-      const key = `${name}||${unit}`;
-      if (!aggregated[key]) aggregated[key] = { key, name, unit, amount };
-      else aggregated[key].amount += amount;
+      const name = (ing.name ?? "").toString().trim();
+
+      // ⬇️ amount může být number i string ("150 g", "0,15 kg"), zkusím vytáhnout i jednotku z amount, pokud chybí v ing.unit
+      let unit = (ing.unit ?? "").toString().trim();
+      let num: number;
+
+      if (typeof ing.amount === "number") {
+        num = ing.amount;
+      } else {
+        const s = String(ing.amount ?? "").replace(",", ".");
+        const mNum = s.match(/[\d.]+/);
+        num = mNum ? parseFloat(mNum[0]) : 0;
+        if (!unit) {
+          const mU = s.match(/[a-zA-Z]+/);
+          if (mU) unit = mU[0];
+        }
+      }
+
+      const { n, u } = toBase(isFinite(num) ? num : 0, unit);
+      const key = `${name}||${u}`;
+
+      if (!aggregated[key]) aggregated[key] = { key, name, unit: u, amount: 0 };
+      aggregated[key].amount += n;
     }
 
     const visible = Object.values(aggregated).filter((row) => !hiddenKeys.includes(row.key));
-    return visible
-      .map((i) => ({ key: i.key, label: `${i.amount || 0} ${i.unit || ""} ${i.name}`.trim() }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+    return visible.map((i) => ({ key: i.key, label: `${fmt(i.amount, i.unit)} ${i.name}`.trim() })).sort((a, b) => a.label.localeCompare(b.label, "cs"));
   }, [recipesToCook, hiddenKeys]);
 
   const formattedList = aggregatedList.map((x) => x.label).join("\n");
@@ -114,7 +189,8 @@ export default function ShoppingListPage() {
 
   const removeRecipeFromCook = (recipeId: number) => {
     // ⚠️ žádné writeCart ani notifyCart tady – postará se o to useEffect výše
-    setRecipesToCook((prev) => prev.filter((r) => r.id !== recipeId));
+    setRecipesToCook((prev) => prev.filter((_, i, arr) => arr[i].id !== recipeId || i !== arr.findIndex((x) => x.id === recipeId)));
+    // ↑ tahle verze odebere jen jednu instanci receptu se shodným id (když je jich víc)
   };
 
   const clearCart = () => {
@@ -136,16 +212,11 @@ export default function ShoppingListPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900">Nákupní seznam</h1>
-              <p className="text-gray-500 mt-1">
-                Recepty přidávej kliknutím na košík u receptu. Vpravo se ti automaticky sečtou suroviny.
-              </p>
+              <p className="text-gray-500 mt-1">Recepty přidávej kliknutím na košík u receptu. Vpravo se ti automaticky sečtou suroviny.</p>
             </div>
 
             <div className="flex items-center gap-3">
-              <Link
-                href="/recepty"
-                className="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2.5 shadow-sm hover:bg-gray-50 transition"
-              >
+              <Link href="/recepty" className="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2.5 shadow-sm hover:bg-gray-50 transition">
                 ← Zpět na recepty
               </Link>
 
@@ -177,16 +248,13 @@ export default function ShoppingListPage() {
 
             {recipesToCook.length > 0 ? (
               <ul className="space-y-3">
-                {recipesToCook.map((recipe) => (
+                {recipesToCook.map((recipe, i) => (
                   <li
-                    key={recipe.id}
+                    key={`${recipe.id}-${i}`} // unikátní klíč i při více stejných receptech
                     className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2.5 border border-gray-200"
                   >
                     <span className="font-medium text-gray-800">{recipe.title}</span>
-                    <button
-                      onClick={() => removeRecipeFromCook(recipe.id)}
-                      className="text-red-600 text-sm font-semibold hover:text-red-700"
-                    >
+                    <button onClick={() => removeRecipeFromCook(recipe.id)} className="text-red-600 text-sm font-semibold hover:text-red-700">
                       Odebrat
                     </button>
                   </li>
@@ -213,10 +281,7 @@ export default function ShoppingListPage() {
                   <Share2 size={18} />
                   Sdílet
                 </button>
-                <button
-                  onClick={handleCopy}
-                  className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-800 rounded-lg px-3 py-1.5"
-                >
+                <button onClick={handleCopy} className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-800 rounded-lg px-3 py-1.5">
                   Kopírovat
                 </button>
               </div>
@@ -227,11 +292,7 @@ export default function ShoppingListPage() {
                 {aggregatedList.map((item) => (
                   <li key={item.key} className="flex items-center justify-between py-2.5">
                     <span className="text-gray-800">{item.label}</span>
-                    <button
-                      onClick={() => hideOne(item.key)}
-                      className="text-red-500 hover:text-red-600"
-                      title="Odebrat ze seznamu"
-                    >
+                    <button onClick={() => hideOne(item.key)} className="text-red-500 hover:text-red-600" title="Odebrat ze seznamu">
                       <Trash2 size={18} />
                     </button>
                   </li>
