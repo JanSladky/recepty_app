@@ -1,24 +1,35 @@
-// 📁 frontend/src/app/recepty/[id]/page.tsx
+// 📁 frontend/src/app/recepty/[id]/upravit/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import RecipeForm from "@/components/RecipeForm";
-import type { Ingredient } from "@/components/IngredientAutocomplete";
+import type { IngredientRow } from "@/components/IngredientAutocomplete";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-interface FullIngredient {
-  id: number;
+// Shape, jak přichází ingredience z backendu (detail receptu)
+type BackendIng = {
   name: string;
   amount: number;
   unit: string;
-  calories_per_gram: number;
-  category_id: number;
-  category_name: string;
-  default_grams?: number;
-  display?: string;
-}
+  calories_per_gram: number | string;
+  display?: string | null;
+  default_grams?: number | null;
+
+  // ⬇⬇⬇ DOPLNĚNO
+  off_id?: string | null;
+
+  // OFF makra – mohou být null
+  energy_kcal_100g?: number | null;
+  proteins_100g?: number | null;
+  carbs_100g?: number | null;
+  sugars_100g?: number | null;
+  fat_100g?: number | null;
+  saturated_fat_100g?: number | null;
+  fiber_100g?: number | null;
+  sodium_100g?: number | null;
+};
 
 export default function EditPage() {
   const params = useParams();
@@ -29,8 +40,8 @@ export default function EditPage() {
   const [initialData, setInitialData] = useState<{
     title: string;
     notes: string;
-    image_url: string;
-    ingredients: Ingredient[];
+    image_url: string | null;
+    ingredients: IngredientRow[];
     categories: string[];
     meal_types: string[];
     steps: string[];
@@ -44,7 +55,6 @@ export default function EditPage() {
       try {
         setLoading(true);
 
-        // 🔐 PŘIDEJ TOKEN — jinak PENDING/REJECTED vrátí 404
         const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
         const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -57,21 +67,34 @@ export default function EditPage() {
 
         const data = await res.json();
 
+        const mappedIngredients: IngredientRow[] = (data.ingredients || []).map((i: BackendIng) => ({
+          name: i.name,
+          amount: Number(i.amount || 0),
+          unit: i.unit || "g",
+          calories_per_gram: Number(i.calories_per_gram || 0),
+          default_grams:
+            i.default_grams === undefined || i.default_grams === null ? undefined : Number(i.default_grams),
+          display: i.display ?? undefined,
+
+          // ⬇⬇⬇ DOPLNĚNO – držíme OFF vazbu i při editaci
+          off_id: i.off_id ?? undefined,
+
+          // OFF makra (na 100 g)
+          energy_kcal_100g: i.energy_kcal_100g ?? null,
+          proteins_100g: i.proteins_100g ?? null,
+          carbs_100g: i.carbs_100g ?? null,
+          sugars_100g: i.sugars_100g ?? null,
+          fat_100g: i.fat_100g ?? null,
+          saturated_fat_100g: i.saturated_fat_100g ?? null,
+          fiber_100g: i.fiber_100g ?? null,
+          sodium_100g: i.sodium_100g ?? null,
+        }));
+
         setInitialData({
           title: data.title,
-          notes: data.notes,
-          image_url: data.image_url,
-          ingredients: (data.ingredients || []).map((i: FullIngredient) => ({
-            id: i.id,
-            name: i.name,
-            amount: i.amount,
-            unit: i.unit || "",
-            calories_per_gram: i.calories_per_gram,
-            category_id: i.category_id,
-            category_name: i.category_name,
-            default_grams: i.default_grams,
-            display: i.display,
-          })),
+          notes: data.notes ?? "",
+          image_url: data.image_url ?? null,
+          ingredients: mappedIngredients,
           categories: data.categories || [],
           meal_types: data.meal_types ?? [],
           steps: data.steps ?? [],
@@ -99,7 +122,7 @@ export default function EditPage() {
 
       const res = await fetch(`${API_URL}/api/recipes/${id}`, {
         method: "PUT",
-        body: formData, // boundary nastaví prohlížeč sám
+        body: formData,
         headers: { Authorization: `Bearer ${token}` },
       });
 

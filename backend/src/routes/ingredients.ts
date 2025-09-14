@@ -1,4 +1,3 @@
-// 📁 backend/src/routes/ingredients.ts
 import express from "express";
 import { authenticateToken, requireRole } from "../middleware/auth";
 import {
@@ -7,18 +6,20 @@ import {
   createIngredient,
   updateIngredient,
   deleteIngredient,
-
   // Controllery pro kategorie
   getAllCategories,
   createCategory,
   updateCategory,
   deleteCategory,
+  // 🔍 Přidej náš controller na vyhledávání
+  searchLocalIngredients,
 } from "../controllers/recipeController";
 
 const router = express.Router();
 
 // --- ROUTY PRO SUROVINY ---
 router.get("/", getAllIngredients);
+router.get("/search", searchLocalIngredients); // <<< TADY je nový endpoint
 router.post("/", authenticateToken, requireRole("ADMIN", "SUPERADMIN"), createIngredient);
 router.put("/:id", authenticateToken, requireRole("ADMIN", "SUPERADMIN"), updateIngredient);
 router.delete("/:id", authenticateToken, requireRole("ADMIN", "SUPERADMIN"), deleteIngredient);

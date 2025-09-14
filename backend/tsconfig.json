@@ -1,17 +1,24 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "commonjs",
-    "rootDir": "./src",
-    "outDir": "./dist",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "types": ["node"],
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": "./src",
+
+    // DŮLEŽITÉ: rootDir dej na projekt (nebo ho klidně úplně vynech)
+    "rootDir": ".",
+    "outDir": "./dist",
+
+    // ať fungují importy jak ze src, tak ze scripts
+    "baseUrl": ".",
     "paths": {
-      "@utils/*": ["utils/*"]
+      "@/*": ["src/*"],
+      "@utils/*": ["src/utils/*"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src", "scripts"]
 }

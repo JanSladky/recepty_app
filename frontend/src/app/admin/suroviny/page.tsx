@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import useAdmin from "@/hooks/useAdmin";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5050";
 
-// --- Helper Icons ---
+// --- Helper Icons (ponecháno) ---
 const IconSave = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -23,6 +23,7 @@ const IconSave = () => (
     <polyline points="7 3 7 8 15 8"></polyline>
   </svg>
 );
+
 const IconTrash = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -45,15 +46,28 @@ const IconTrash = () => (
 export type Ingredient = {
   id: number;
   name: string;
-  calories_per_gram: number;
-  category_id: number;
-  default_grams?: number | null;
-  unit_name?: string | null;
+  name_cs: string | null;
+  category_id: number | null;
+  unit_name: string | null;
+  default_grams: number | null;
+  calories_per_gram: number | null;
+  off_id: string | null;
+  energy_kcal_100g: number | null;
+  proteins_100g: number | null;
+  carbs_100g: number | null;
+  sugars_100g: number | null;
+  fat_100g: number | null;
+  saturated_fat_100g: number | null;
+  fiber_100g: number | null;
+  sodium_100g: number | null;
 };
 
-export type Category = {
-  id: number;
-  name: string;
+export type Category = { id: number; name: string };
+
+const toNullOrNumber = (v: unknown): number | null => {
+  if (v === "" || v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 };
 
 export default function IngredientAdminPage() {
@@ -62,6 +76,8 @@ export default function IngredientAdminPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
   const [edited, setEdited] = useState<Record<number, Partial<Ingredient>>>({});
+
+  // pro přidání nové suroviny (neřeší makra – můžeš si doplnit)
   const [newIngredient, setNewIngredient] = useState({
     name: "",
     calories_per_gram: "",
@@ -69,416 +85,351 @@ export default function IngredientAdminPage() {
     default_grams: "",
     unit_name: "",
   });
-  const [newCategory, setNewCategory] = useState("");
-  const [editedCategories, setEditedCategories] = useState<Record<number, string>>({});
 
   useEffect(() => {
-    const fetchIngredients = async () => {
+    async function fetchAll() {
       try {
-        const res = await fetch(`${API_URL}/api/ingredients`);
-        if (!res.ok) throw new Error("Nepodařilo se načíst suroviny");
-        const data = await res.json();
-        setIngredients(data);
-      } catch (error) {
-        console.error("Chyba při načítání surovin:", error);
+        const [ingRes, catRes] = await Promise.all([fetch(`${API_URL}/api/ingredients?limit=1000`), fetch(`${API_URL}/api/ingredients/categories`)]);
+        if (!ingRes.ok) throw new Error("Nepodařilo se načíst suroviny");
+        if (!catRes.ok) throw new Error("Nepodařilo se načíst kategorie");
+        const [ing, cat] = (await Promise.all([ingRes.json(), catRes.json()])) as [Ingredient[], Category[]];
+        setIngredients(ing);
+        setCategories(cat);
+      } catch (err) {
+        console.error(err);
       }
-    };
-
-    const fetchCategories = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/ingredients/categories`);
-        if (!res.ok) throw new Error("Nepodařilo se načíst kategorie");
-        const data = await res.json();
-        setCategories(data);
-      } catch (error) {
-        console.error("Chyba při načítání kategorií:", error);
-      }
-    };
-
-    fetchIngredients();
-    fetchCategories();
+    }
+    fetchAll();
   }, []);
 
   if (loading) return <p className="text-center p-10">Načítání oprávnění...</p>;
   if (!isAdmin) return <p className="text-center p-10 text-red-600 font-semibold">Nemáš oprávnění pro přístup k této stránce.</p>;
 
+  /** Chytré upravení řádku – umí autokalkulace kcal/100g <-> kcal/g */
   const handleInputChange = (id: number, field: keyof Ingredient, value: string | number) => {
-    setEdited((prev) => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [field]: value,
-      },
-    }));
+    setEdited((prev) => {
+      const row = { ...(prev[id] ?? {}) } as Partial<Ingredient>;
+
+      // zapsat primární změnu
+      (row as Record<string, unknown>)[field] = value;
+
+      // autokalkulace
+      if (field === "energy_kcal_100g") {
+        const kcal100 = Number(value);
+        if (Number.isFinite(kcal100)) {
+          // nastav/aktualizuj i kcal/g
+          row.calories_per_gram = Number((kcal100 / 100).toFixed(4));
+        }
+      } else if (field === "calories_per_gram") {
+        const kcalG = Number(value);
+        if (Number.isFinite(kcalG)) {
+          // pokud chybí/není vyplněno kcal/100g, dopočti
+          const current = prev[id] ?? {};
+          const currentKcal100 = current.energy_kcal_100g ?? ingredients.find((i) => i.id === id)?.energy_kcal_100g ?? null;
+          if (currentKcal100 == null || Number(currentKcal100) === 0) {
+            row.energy_kcal_100g = Number((kcalG * 100).toFixed(2));
+          }
+        }
+      }
+
+      return { ...prev, [id]: row };
+    });
   };
 
   const handleSave = async (id: number) => {
     const current = ingredients.find((i) => i.id === id);
     if (!current) {
-      alert("Chyba: Surovina nebyla nalezena.");
+      alert("Surovina nenalezena.");
       return;
     }
+    const e = edited[id] || {};
 
-    const editedData = edited[id] || {};
-    const mergedData = { ...current, ...editedData };
-    // OPRAVA: Nahradili jsme 'any' za specifické typy, abychom prošli kontrolou ESLint.
-    const valueOrNull = (val: string | number | null | undefined) => (val === "" || val == null ? null : Number(val));
+    const payload: Ingredient = {
+      id: current.id,
+      // texty
+      name: (e.name ?? current.name) as string,
+      name_cs: (e.name_cs ?? current.name_cs ?? null) as string | null,
+      off_id: (e.off_id ?? current.off_id ?? null) as string | null,
+      unit_name: (e.unit_name ?? current.unit_name ?? null) as string | null,
 
-    const finalPayload = {
-      ...mergedData,
-      calories_per_gram: Number(mergedData.calories_per_gram),
-      category_id: Number(mergedData.category_id),
-      default_grams: valueOrNull(mergedData.default_grams),
-      unit_name: mergedData.unit_name === "" || mergedData.unit_name == null ? null : mergedData.unit_name,
+      // čísla
+      category_id: Number(e.category_id ?? current.category_id ?? 0) || null,
+      default_grams: toNullOrNumber(e.default_grams ?? current.default_grams),
+      calories_per_gram: toNullOrNumber(e.calories_per_gram ?? current.calories_per_gram),
+
+      energy_kcal_100g: toNullOrNumber(e.energy_kcal_100g ?? current.energy_kcal_100g),
+      proteins_100g: toNullOrNumber(e.proteins_100g ?? current.proteins_100g),
+      carbs_100g: toNullOrNumber(e.carbs_100g ?? current.carbs_100g),
+      sugars_100g: toNullOrNumber(e.sugars_100g ?? current.sugars_100g),
+      fat_100g: toNullOrNumber(e.fat_100g ?? current.fat_100g),
+      saturated_fat_100g: toNullOrNumber(e.saturated_fat_100g ?? current.saturated_fat_100g),
+      fiber_100g: toNullOrNumber(e.fiber_100g ?? current.fiber_100g),
+      sodium_100g: toNullOrNumber(e.sodium_100g ?? current.sodium_100g),
     };
 
-    if (!finalPayload.category_id) {
-      alert("Chyba: Kategorie je povinný údaj.");
+    if (payload.category_id == null) {
+      alert("Kategorie je povinná.");
       return;
     }
 
     try {
-      const token = localStorage.getItem("token");
-
+      const token = localStorage.getItem("token") ?? "";
       const res = await fetch(`${API_URL}/api/ingredients/${id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // ✅ zde přidáno
-        },
-        body: JSON.stringify(finalPayload),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
       });
-
-      if (res.ok) {
-        alert("Surovina úspěšně uložena!");
-        setIngredients((prev) => prev.map((ing) => (ing.id === id ? finalPayload : ing)));
-        setEdited((prev) => {
-          const copy = { ...prev };
-          delete copy[id];
-          return copy;
-        });
-      } else {
-        const errorData = await res.json();
-        alert(`Chyba při ukládání: ${errorData.error || "Neznámá chyba serveru."}`);
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        alert(`Uložení selhalo: ${err.error || `HTTP ${res.status}`}`);
+        return;
       }
-    } catch (error) {
-      console.error("Chyba při komunikaci se serverem:", error);
-      alert("Chyba: Nepodařilo se spojit se serverem.");
+
+      // optimistický update
+      setIngredients((prev) => prev.map((ing) => (ing.id === id ? payload : ing)));
+      setEdited((prev) => {
+        const c = { ...prev };
+        delete c[id];
+        return c;
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Chyba při komunikaci se serverem.");
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Opravdu chceš smazat surovinu?")) return;
-
+    if (!confirm("Opravdu smazat surovinu?")) return;
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("token") ?? "";
       const res = await fetch(`${API_URL}/api/ingredients/${id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`, // ✅ posíláme správně jako Bearer token
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (res.ok) {
-        setIngredients((prev) => prev.filter((i) => i.id !== id));
-      } else {
-        const errorText = await res.text();
-        alert(`Smazání se nezdařilo: ${errorText}`);
+      if (!res.ok) {
+        alert("Smazání selhalo.");
+        return;
       }
-    } catch (error) {
-      console.error("Chyba při mazání:", error);
+      setIngredients((prev) => prev.filter((i) => i.id !== id));
+      setEdited((prev) => {
+        const c = { ...prev };
+        delete c[id];
+        return c;
+      });
+    } catch (err) {
+      console.error(err);
       alert("Chyba při komunikaci se serverem.");
     }
   };
+
   const handleNewChange = (field: keyof typeof newIngredient, value: string) => {
-    setNewIngredient((prev) => ({ ...prev, [field]: value }));
+    setNewIngredient((p) => ({ ...p, [field]: value }));
   };
 
   const handleCreate = async () => {
     const { name, calories_per_gram, category_id, default_grams, unit_name } = newIngredient;
-    if (!name || !calories_per_gram || !category_id) {
-      alert("Vyplňte prosím název, kalorie a kategorii.");
+    if (!name || !category_id) {
+      alert("Vyplň název a kategorii.");
       return;
     }
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("token") ?? "";
       const res = await fetch(`${API_URL}/api/ingredients`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // ✅ zde přidáno
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           name,
           category_id: Number(category_id),
-          calories_per_gram: Number(calories_per_gram),
-          default_grams: default_grams ? Number(default_grams) : undefined,
-          unit_name: unit_name || undefined,
+          calories_per_gram: calories_per_gram ? Number(calories_per_gram) : null,
+          default_grams: default_grams ? Number(default_grams) : null,
+          unit_name: unit_name || null,
         }),
       });
-
-      if (res.ok) {
-        const created = await res.json();
-        setIngredients((prev) => [...prev, created]);
-        setNewIngredient({ name: "", calories_per_gram: "", category_id: "", default_grams: "", unit_name: "" });
-      } else {
-        const errorData = await res.json();
-        alert(`Chyba při vytváření: ${errorData.error || "Neznámá chyba"}`);
+      if (!res.ok) {
+        alert("Vytvoření selhalo.");
+        return;
       }
-    } catch (error) {
-      console.error("Chyba při vytváření:", error);
+      const created = (await res.json()) as Ingredient;
+      setIngredients((prev) => [...prev, created]);
+      setNewIngredient({ name: "", calories_per_gram: "", category_id: "", default_grams: "", unit_name: "" });
+    } catch (err) {
+      console.error(err);
       alert("Chyba při komunikaci se serverem.");
     }
   };
 
-  const handleCategoryUpdate = async (id: number) => {
-    const name = editedCategories[id];
-    if (!name) return;
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // ✅ zde přidáno
-        },
-        body: JSON.stringify({ name }),
-      });
-      if (res.ok) {
-        setCategories((prev) => prev.map((cat) => (cat.id === id ? { ...cat, name } : cat)));
-        const copy = { ...editedCategories };
-        delete copy[id];
-        setEditedCategories(copy);
-      } else {
-        alert("Úprava kategorie se nezdařila.");
-      }
-    } catch (error) {
-      console.error("Chyba při úpravě kategorie:", error);
-      alert("Chyba při komunikaci se serverem.");
-    }
-  };
-
-  const handleCategoryDelete = async (id: number) => {
-    if (!confirm("Opravdu chceš smazat tuto kategorii?")) return;
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/api/ingredients/categories/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`, // ✅ zde přidáno
-        },
-      });
-      if (res.ok) {
-        setCategories((prev) => prev.filter((c) => c.id !== id));
-      } else {
-        alert("Smazání kategorie se nezdařilo.");
-      }
-    } catch (error) {
-      console.error("Chyba při mazání kategorie:", error);
-      alert("Chyba při komunikaci se serverem.");
-    }
-  };
-
-  const handleCategoryCreate = async () => {
-    if (!newCategory.trim()) {
-      alert("Název kategorie nemůže být prázdný.");
-      return;
-    }
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/api/ingredients/categories`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // ✅ zde přidáno
-        },
-        body: JSON.stringify({ name: newCategory }),
-      });
-
-      if (res.ok) {
-        const created = await res.json();
-        setCategories((prev) => [...prev, created]);
-        setNewCategory("");
-      } else {
-        alert("Vytvoření kategorie se nezdařilo.");
-      }
-    } catch (error) {
-      console.error("Chyba při vytváření kategorie:", error);
-      alert("Chyba při komunikaci se serverem.");
-    }
-  };
-
-  const filtered = ingredients.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = ingredients.filter((i) => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return true;
+    return (i.name ?? "").toLowerCase().includes(needle) || (i.name_cs ?? "").toLowerCase().includes(needle);
+  });
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <main className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+      <main className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-800">Správa surovin</h1>
-          <p className="text-lg text-gray-500 mt-2">Přidávej a upravuj suroviny a kategorie.</p>
+          <p className="text-lg text-gray-500 mt-2">Prohlížej a upravuj názvy, překlady i makra.</p>
         </div>
 
-        {/* --- Panel pro přidání a hledání --- */}
+        {/* Přidání + Hledání */}
         <div className="bg-white p-6 rounded-2xl shadow-lg mb-8">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Přidat novou surovinu</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4 items-end">
             <input
-              type="text"
+              className="p-3 border rounded-lg md:col-span-2"
               placeholder="Název"
               value={newIngredient.name}
               onChange={(e) => handleNewChange("name", e.target.value)}
-              className="p-3 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-green-500 focus:border-green-500 transition md:col-span-2"
             />
             <input
+              className="p-3 border rounded-lg"
+              placeholder="kcal/g"
               type="number"
-              placeholder="kcal/1g"
               value={newIngredient.calories_per_gram}
               onChange={(e) => handleNewChange("calories_per_gram", e.target.value)}
-              className="p-3 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
             />
-            <select
-              value={newIngredient.category_id}
-              onChange={(e) => handleNewChange("category_id", e.target.value)}
-              className="p-3 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
-            >
-              <option value="">Kategorie...</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
+            <select className="p-3 border rounded-lg" value={newIngredient.category_id} onChange={(e) => handleNewChange("category_id", e.target.value)}>
+              <option value="">Kategorie…</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>
             <input
-              type="number"
+              className="p-3 border rounded-lg"
               placeholder="g/ks"
+              type="number"
               value={newIngredient.default_grams}
               onChange={(e) => handleNewChange("default_grams", e.target.value)}
-              className="p-3 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
             />
-            <button
-              onClick={handleCreate}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-4 py-3 transition duration-200 w-full"
-            >
+            <input
+              className="p-3 border rounded-lg"
+              placeholder="Jednotka (např. g / ml / ks)"
+              value={newIngredient.unit_name}
+              onChange={(e) => handleNewChange("unit_name", e.target.value)}
+            />
+            <button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-4 py-3">
               ➕ Přidat
             </button>
           </div>
+
           <div className="mt-6 border-t pt-6">
             <input
               type="text"
-              placeholder="Hledat existující surovinu..."
+              placeholder="Hledat (CZ/EN)…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+              className="w-full p-3 border rounded-lg"
             />
           </div>
         </div>
 
-        {/* --- Seznam surovin --- */}
+        {/* Seznam surovin (edit) */}
         <div className="space-y-3">
-          {filtered.map((ingredient) => {
-            const editedItem = edited[ingredient.id] || {};
+          {filtered.map((ing) => {
+            const e = edited[ing.id] || {};
             return (
-              <div key={ingredient.id} className="bg-white p-4 rounded-xl shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3 items-center">
-                <input
-                  type="text"
-                  value={editedItem.name ?? ingredient.name}
-                  onChange={(e) => handleInputChange(ingredient.id, "name", e.target.value)}
-                  className="border rounded-lg p-2 w-full md:col-span-2"
-                />
-                <input
-                  type="number"
-                  value={editedItem.calories_per_gram ?? ingredient.calories_per_gram ?? ""}
-                  onChange={(e) => handleInputChange(ingredient.id, "calories_per_gram", e.target.value)}
-                  className="border rounded-lg p-2 w-full"
-                />
-                <select
-                  value={editedItem.category_id ?? ingredient.category_id ?? ""}
-                  onChange={(e) => handleInputChange(ingredient.id, "category_id", e.target.value)}
-                  className="border rounded-lg p-2 w-full"
-                >
-                  <option value="">Vyber kategorii</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  placeholder="g/ks"
-                  value={editedItem.default_grams ?? ingredient.default_grams ?? ""}
-                  onChange={(e) => handleInputChange(ingredient.id, "default_grams", e.target.value)}
-                  className="border rounded-lg p-2 w-full"
-                />
-                <select
-                  value={editedItem.unit_name ?? ingredient.unit_name ?? ""}
-                  onChange={(e) => handleInputChange(ingredient.id, "unit_name", e.target.value)}
-                  className="border rounded-lg p-2 w-full"
-                >
-                  <option value="">Jednotka...</option>
-                  {["g", "ml", "ks", "lžíce", "lžička", "šálek", "hrnek"].map((unit) => (
-                    <option key={unit} value={unit}>
-                      {unit}
-                    </option>
-                  ))}
-                </select>
-                <div className="flex gap-2 justify-end">
-                  <button
-                    onClick={() => handleSave(ingredient.id)}
-                    className="bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg transition duration-200"
+              <div key={ing.id} className="bg-white p-4 rounded-xl shadow-sm">
+                <div className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-1 text-xs text-gray-500">#{ing.id}</div>
+
+                  <input
+                    className="col-span-3 p-2 border rounded"
+                    value={e.name ?? ing.name ?? ""}
+                    onChange={(ev) => handleInputChange(ing.id, "name", ev.target.value)}
+                    placeholder="Název (EN)"
+                  />
+                  <input
+                    className="col-span-3 p-2 border rounded"
+                    value={e.name_cs ?? ing.name_cs ?? ""}
+                    onChange={(ev) => handleInputChange(ing.id, "name_cs", ev.target.value)}
+                    placeholder="Název (CS)"
+                  />
+
+                  <select
+                    className="col-span-2 p-2 border rounded"
+                    value={e.category_id ?? ing.category_id ?? ""}
+                    onChange={(ev) => handleInputChange(ing.id, "category_id", ev.target.value)}
                   >
-                    <IconSave />
-                  </button>
-                  <button onClick={() => handleDelete(ingredient.id)} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg transition duration-200">
-                    <IconTrash />
-                  </button>
+                    <option value="">Kategorie</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    className="col-span-1 p-2 border rounded"
+                    placeholder="jed."
+                    value={e.unit_name ?? ing.unit_name ?? ""}
+                    onChange={(ev) => handleInputChange(ing.id, "unit_name", ev.target.value)}
+                  />
+
+                  <div className="col-span-2 flex justify-end gap-2">
+                    <button onClick={() => handleSave(ing.id)} className="bg-green-600 hover:bg-green-700 text-white p-2 rounded" title="Uložit">
+                      <IconSave />
+                    </button>
+                    <button onClick={() => handleDelete(ing.id)} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded" title="Smazat">
+                      <IconTrash />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Makra řádek */}
+                <div className="mt-2 grid grid-cols-12 gap-2 text-xs">
+                  <NumberCell
+                    label="kcal/100g"
+                    value={e.energy_kcal_100g ?? ing.energy_kcal_100g}
+                    onChange={(v) => handleInputChange(ing.id, "energy_kcal_100g", v)}
+                  />
+                  <NumberCell label="bílkoviny" value={e.proteins_100g ?? ing.proteins_100g} onChange={(v) => handleInputChange(ing.id, "proteins_100g", v)} />
+                  <NumberCell label="sacharidy" value={e.carbs_100g ?? ing.carbs_100g} onChange={(v) => handleInputChange(ing.id, "carbs_100g", v)} />
+                  <NumberCell label="cukry" value={e.sugars_100g ?? ing.sugars_100g} onChange={(v) => handleInputChange(ing.id, "sugars_100g", v)} />
+                  <NumberCell label="tuky" value={e.fat_100g ?? ing.fat_100g} onChange={(v) => handleInputChange(ing.id, "fat_100g", v)} />
+                  <NumberCell
+                    label="nasycené"
+                    value={e.saturated_fat_100g ?? ing.saturated_fat_100g}
+                    onChange={(v) => handleInputChange(ing.id, "saturated_fat_100g", v)}
+                  />
+                  <NumberCell label="vláknina" value={e.fiber_100g ?? ing.fiber_100g} onChange={(v) => handleInputChange(ing.id, "fiber_100g", v)} />
+                  <NumberCell label="sodík" value={e.sodium_100g ?? ing.sodium_100g} onChange={(v) => handleInputChange(ing.id, "sodium_100g", v)} />
+                  <NumberCell
+                    label="kcal/g"
+                    value={e.calories_per_gram ?? ing.calories_per_gram}
+                    onChange={(v) => handleInputChange(ing.id, "calories_per_gram", v)}
+                  />
+                  <NumberCell label="g/ks" value={e.default_grams ?? ing.default_grams} onChange={(v) => handleInputChange(ing.id, "default_grams", v)} />
+                  <TextCell label="OFF id" value={e.off_id ?? ing.off_id ?? ""} onChange={(v) => handleInputChange(ing.id, "off_id", v)} />
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* --- Panel pro kategorie --- */}
-        <div className="bg-white p-6 rounded-2xl shadow-lg mt-12">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Správa kategorií</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <input
-              type="text"
-              placeholder="Název nové kategorie"
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-              className="p-3 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-green-500 focus:border-green-500 transition sm:col-span-2"
-            />
-            <button
-              onClick={handleCategoryCreate}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-4 py-3 transition duration-200 w-full"
-            >
-              ➕ Přidat kategorii
-            </button>
-          </div>
-          <div className="space-y-2">
-            {categories.map((cat) => (
-              <div key={cat.id} className="flex gap-2 items-center bg-gray-50 p-2 rounded-lg">
-                <input
-                  type="text"
-                  value={editedCategories[cat.id] ?? cat.name}
-                  onChange={(e) => setEditedCategories((prev) => ({ ...prev, [cat.id]: e.target.value }))}
-                  className="border rounded-lg p-2 w-full flex-grow"
-                />
-                <button
-                  onClick={() => handleCategoryUpdate(cat.id)}
-                  className="bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg transition duration-200"
-                >
-                  <IconSave />
-                </button>
-                <button onClick={() => handleCategoryDelete(cat.id)} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg transition duration-200">
-                  <IconTrash />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Panel kategorií – případně doplň později */}
       </main>
+    </div>
+  );
+}
+
+/** Malé pomocné cell komponenty pro čísla / text */
+function NumberCell({ label, value, onChange }: { label: string; value: number | string | null | undefined; onChange: (v: string) => void }) {
+  return (
+    <div className="col-span-3 sm:col-span-2 md:col-span-1">
+      <div className="text-gray-500">{label}</div>
+      <input type="number" step="0.0001" className="w-full p-2 border rounded" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+function TextCell({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="col-span-3 sm:col-span-2 md:col-span-2">
+      <div className="text-gray-500">{label}</div>
+      <input className="w-full p-2 border rounded" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }

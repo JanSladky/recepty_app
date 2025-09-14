@@ -1,365 +1,627 @@
 "use client";
 
-import React, { forwardRef, useImperativeHandle, useState, useEffect } from "react";
+import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from "react";
 
-export type Ingredient = {
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5050";
+
+/** Jedna ingredience v receptu */
+export type IngredientRow = {
+  _key?: string;
   name: string;
   amount: number;
-  unit: Unit;
-  default_grams?: number;
+  unit: string;
   calories_per_gram: number;
-};
-export type IngredientAutocompleteHandle = {
-  getIngredients: () => Ingredient[];
-  setInitialIngredients: (ingredients: Ingredient[]) => void;
+  default_grams?: number;
+  display?: string;
+
+  // OFF identifikátor + metadata
+  off_id?: string | null;
+  brands?: string | null;
+  quantity?: string | null;
+  image_small_url?: string | null;
+
+  // výživové hodnoty (na 100 g)
+  energy_kcal_100g?: number | null;
+  proteins_100g?: number | null;
+  carbs_100g?: number | null;
+  sugars_100g?: number | null;
+  fat_100g?: number | null;
+  saturated_fat_100g?: number | null;
+  fiber_100g?: number | null;
+  sodium_100g?: number | null;
 };
 
-type IngredientAutocompleteProps = {
-  initialIngredients?: Ingredient[];
-};
-
+/** ===== sjednocený typ návrhu (lokální i OFF) ===== */
 type Suggestion = {
-  name: string;
-  calories_per_gram: number;
-  unit_name?: string;
-  default_grams?: number;
+  source: "local" | "off";
+  code: string;                    // uniq klíč – u lokálních String(id), u OFF kód/EAN
+  id?: number;                     // jen u lokálních
+  name: string;                    // původní (typicky EN)
+  name_cs?: string | null;         // český název z DB – RENDEROVAT, KDYŽ JE
+  brands?: string | null;
+  quantity?: string | null;
+  image_small_url?: string | null;
+  calories_per_gram?: number | null; // lokální může vracet rovnou kcal/g
+  default_grams?: number | null;     // lokální default množství
+
+  patch: {
+    off_id: string | null;
+    energy_kcal_100g: number | null;
+    proteins_100g: number | null;
+    carbs_100g: number | null;
+    sugars_100g: number | null;
+    fat_100g: number | null;
+    saturated_fat_100g: number | null;
+    fiber_100g: number | null;
+    sodium_100g: number | null;
+  };
 };
 
-type NewIngredient = {
-  name: string;
-  calories_per_gram: number;
-  category_id: number | "";
-  default_grams?: number;
-  unit_name?: string;
+export type IngredientAutocompleteHandle = {
+  getIngredients: () => IngredientRow[];
+  setInitialIngredients: (rows: IngredientRow[]) => void;
 };
 
-type Category = {
-  id: number;
-  name: string;
+type Props = {
+  initialIngredients?: IngredientRow[];
+  onChange?: (rows: IngredientRow[]) => void;
 };
 
-const units = ["g", "ml", "ks", "lžíce", "lžička", "šálek", "hrnek"] as const;
-type Unit = typeof units[number];
+// --- utils ---
+function uid() {
+  const g = globalThis as unknown as { crypto?: { randomUUID?: () => string } };
+  if (g.crypto && typeof g.crypto.randomUUID === "function") {
+    return g.crypto.randomUUID();
+  }
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
 
-const fractions = [
-  { label: "1", value: 1 },
-  { label: "1/2", value: 0.5 },
-  { label: "1/3", value: 1 / 3 },
-  { label: "1/4", value: 0.25 },
-];
-
-const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, IngredientAutocompleteProps>(({ initialIngredients = [] }, ref) => {
-  const [ingredients, setIngredients] = useState<Ingredient[]>(
-    initialIngredients.length > 0 ? initialIngredients : [{ name: "", amount: 0, unit: "g", calories_per_gram: 0 }]
-  );
-  const [allSuggestions, setAllSuggestions] = useState<Suggestion[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [newIngredient, setNewIngredient] = useState<NewIngredient>({
-    name: "",
-    calories_per_gram: 0,
-    category_id: "",
-    default_grams: undefined,
-    unit_name: "",
-  });
-  const [focusedInputIndex, setFocusedInputIndex] = useState<number | null>(null);
-
-  useImperativeHandle(ref, () => ({
-    getIngredients: () => ingredients,
-    setInitialIngredients: (initial) => {
-      setIngredients(initial.length > 0 ? initial : [{ name: "", amount: 0, unit: "g", calories_per_gram: 0 }]);
-    },
-  }));
-
+function useDebounced<T>(value: T, delay = 180) {
+  const [v, setV] = useState(value);
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ingredients`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-      .then(setAllSuggestions)
-      .catch((err) => console.error("❌ Nelze načíst seznam surovin:", err));
-  }, []);
+    const t = setTimeout(() => setV(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return v;
+}
 
-  useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ingredients/categories`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-      .then(setCategories)
-      .catch((err) => console.error("❌ Nelze načíst kategorie:", err));
-  }, []);
+// odstraní diakritiku, interpunkci, slova typu "raw" apod. a znormalizuje pro deduplikaci
+function normalizeLabel(s: string): string {
+  const base = (s || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")     // bez diakritiky
+    .toLowerCase()
+    .replace(/[,.;:()]+/g, " ")
+    .replace(/\s+(raw|fresh|uncooked|shelf\s*stable)\b/g, " ") // obecná “šum” slova
+    .replace(/\s+/g, " ")
+    .trim();
 
-  const handleInputChange = (index: number, field: keyof Ingredient, value: string) => {
-    const updated = [...ingredients];
+  // jemné aliasy – zatím jen česnek (slije "garlic", "garlic raw", "česnek", "česnek stroužek")
+  if (/(^|\s)garlic(\s|$)/.test(base) || /(^|\s)cesnek(\s|$)/.test(base) || base.includes("strouzek")) {
+    return "cesnek";
+  }
 
-    if (field === "amount" || field === "calories_per_gram" || field === "default_grams") {
-      updated[index] = {
-        ...updated[index],
-        [field]: parseFloat(value) || undefined,
-      };
-    } else if (field === "unit") {
-      updated[index] = { ...updated[index], unit: value as Unit };
-    } else if (field === "name") {
-      updated[index] = { ...updated[index], name: value };
-      const found = allSuggestions.find((s) => s.name.toLowerCase() === value.toLowerCase());
-      if (found) {
-        updated[index].calories_per_gram = found.calories_per_gram;
-        if (found.unit_name) updated[index].unit = found.unit_name as Unit;
-        updated[index].default_grams = found.default_grams;
+  return base;
+}
+
+// Sjednocení/odstranění duplicit: seskupí návrhy se stejným normalizovaným labelem.
+// Vybere “vítěze” podle priority: (1) local s makry → (2) local → (3) off s makry → (4) off.
+function mergeSuggestions(a: Suggestion[]): Suggestion[] {
+  const groups = new Map<string, Suggestion[]>();
+
+  for (const s of a) {
+    const label = s.name_cs?.trim() || s.name || "";
+    const key = normalizeLabel(label);
+    if (!key) continue;
+    const list = groups.get(key) ?? [];
+    list.push(s);
+    groups.set(key, list);
+  }
+
+  function score(s: Suggestion): number {
+    const hasMacros =
+      s.patch?.energy_kcal_100g != null ||
+      s.patch?.proteins_100g != null ||
+      s.patch?.carbs_100g != null ||
+      s.patch?.fat_100g != null;
+    if (s.source === "local" && hasMacros) return 100;
+    if (s.source === "local") return 90;
+    if (s.source === "off" && hasMacros) return 80;
+    return 70;
+  }
+
+  const out: Suggestion[] = [];
+  for (const [, list] of groups) {
+    list.sort((a, b) => score(b) - score(a));
+    out.push(list[0]);
+  }
+  out.sort((a, b) => (a.source === b.source ? 0 : a.source === "local" ? -1 : 1));
+  return out;
+}
+
+// LRU cache
+class LRU {
+  private map = new Map<string, Suggestion[]>();
+  constructor(private max = 200) {}
+  get(k: string) {
+    if (!this.map.has(k)) return undefined;
+    const v = this.map.get(k)!;
+    this.map.delete(k);
+    this.map.set(k, v);
+    return v;
+  }
+  set(k: string, v: Suggestion[]) {
+    if (this.map.has(k)) this.map.delete(k);
+    this.map.set(k, v);
+    if (this.map.size > this.max) {
+      const first = this.map.keys().next().value as string;
+      this.map.delete(first);
+    }
+  }
+}
+const lru = new LRU(200);
+
+// --- komponenta ---
+const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
+  ({ initialIngredients = [], onChange }, ref) => {
+    const normalizedInitial =
+      initialIngredients && initialIngredients.length
+        ? initialIngredients
+        : [{ name: "", amount: 0, unit: "g", calories_per_gram: 0 }];
+
+    const [rows, setRows] = useState<IngredientRow[]>(
+      normalizedInitial.map((r) => ({
+        _key: r._key ?? uid(),
+        name: (r.name ?? "") as string,
+        amount: Number(r.amount ?? 0),
+        unit: (r.unit ?? "g") as string,
+        calories_per_gram: Number(r.calories_per_gram ?? 0),
+        default_grams: r.default_grams === undefined ? undefined : Number(r.default_grams),
+        display: r.display ?? undefined,
+
+        off_id: r.off_id ?? null,
+        brands: (r.brands as string | null) ?? null,
+        quantity: (r.quantity as string | null) ?? null,
+        image_small_url: r.image_small_url ?? null,
+
+        energy_kcal_100g: r.energy_kcal_100g ?? null,
+        proteins_100g: r.proteins_100g ?? null,
+        carbs_100g: r.carbs_100g ?? null,
+        sugars_100g: r.sugars_100g ?? null,
+        fat_100g: r.fat_100g ?? null,
+        saturated_fat_100g: r.saturated_fat_100g ?? null,
+        fiber_100g: r.fiber_100g ?? null,
+        sodium_100g: r.sodium_100g ?? null,
+      }))
+    );
+
+    const [queries, setQueries] = useState<string[]>(
+      normalizedInitial.map((r) => (r.name ?? "") as string)
+    );
+
+    const [suggestions, setSuggestions] = useState<Record<number, Suggestion[]>>({});
+    const [highlightIndex, setHighlightIndex] = useState<Record<number, number>>({});
+
+    // jen jeden otevřený dropdown
+    const [openIndex, setOpenIndex] = useState<number | null>(null);
+    const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+    // per-row input refy kvůli focusu
+    const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
+    // klik mimo – zavři
+    useEffect(() => {
+      function onDocMouseDown(e: MouseEvent) {
+        if (!wrapperRef.current) return;
+        if (!wrapperRef.current.contains(e.target as Node)) {
+          setOpenIndex(null);
+          setSuggestions({});
+          setHighlightIndex({});
+        }
       }
+      document.addEventListener("mousedown", onDocMouseDown, true);
+      return () => document.removeEventListener("mousedown", onDocMouseDown, true);
+    }, []);
+
+    useImperativeHandle(ref, () => ({
+      getIngredients: () => rows,
+      setInitialIngredients: (v: IngredientRow[]) => {
+        const list = (v ?? []).map((r) => ({
+          _key: r._key ?? uid(),
+          name: (r.name ?? "") as string,
+          amount: Number(r.amount ?? 0),
+          unit: (r.unit ?? "g") as string,
+          calories_per_gram: Number(r.calories_per_gram ?? 0),
+          default_grams: r.default_grams === undefined ? undefined : Number(r.default_grams),
+          display: r.display ?? undefined,
+
+          off_id: r.off_id ?? null,
+          brands: (r.brands as string | null) ?? null,
+          quantity: (r.quantity as string | null) ?? null,
+          image_small_url: r.image_small_url ?? null,
+
+          energy_kcal_100g: r.energy_kcal_100g ?? null,
+          proteins_100g: r.proteins_100g ?? null,
+          carbs_100g: r.carbs_100g ?? null,
+          sugars_100g: r.sugars_100g ?? null,
+          fat_100g: r.fat_100g ?? null,
+          saturated_fat_100g: r.saturated_fat_100g ?? null,
+          fiber_100g: r.fiber_100g ?? null,
+          sodium_100g: r.sodium_100g ?? null,
+        }));
+
+        const safeList =
+          list.length > 0
+            ? list
+            : [{ _key: uid(), name: "", amount: 0, unit: "g", calories_per_gram: 0 }];
+
+        setRows(safeList);
+        setQueries(safeList.map((r) => r.name ?? ""));
+
+        // focus na první řádek
+        setTimeout(() => inputRefs.current[0]?.focus(), 0);
+      },
+    }));
+
+    // propagace do parentu
+    useEffect(() => {
+      onChange?.(rows);
+    }, [rows, onChange]);
+
+    // === hledání (lokál + OFF) ===
+    const debouncedQueries = useDebounced(queries, 180);
+    const ctrls = useRef<Record<number, AbortController>>({});
+
+    async function fetchLocalDB(q: string, limit: number, signal: AbortSignal): Promise<Suggestion[]> {
+      const url = `${API_URL}/api/ingredients/search?` +
+        new URLSearchParams({ q, limit: String(limit) }).toString();
+      const res = await fetch(url, { signal });
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+      return (await res.json()) as Suggestion[];
     }
 
-    setIngredients(updated);
-  };
-
-  const selectSuggestion = (index: number, suggestion: Suggestion) => {
-    const updated = [...ingredients];
-    updated[index].name = suggestion.name;
-    updated[index].calories_per_gram = suggestion.calories_per_gram;
-    updated[index].unit = (suggestion.unit_name as Unit) || "g";
-    updated[index].default_grams = suggestion.default_grams;
-    setIngredients(updated);
-    setFocusedInputIndex(null);
-  };
-
-  const applyFraction = (index: number, fraction: number) => {
-    const updated = [...ingredients];
-    const baseAmount = ingredients[index].default_grams || 0;
-    updated[index].amount = Math.round(baseAmount * fraction);
-    updated[index].unit = "g";
-    setIngredients(updated);
-  };
-
-  const addIngredient = () => {
-    setIngredients([...ingredients, { name: "", amount: 0, unit: "g", calories_per_gram: 0, default_grams: undefined }]);
-  };
-
-  const removeIngredient = (index: number) => {
-    setIngredients(ingredients.filter((_, i) => i !== index));
-  };
-
-  const handleNewChange = (field: keyof NewIngredient, value: string | number) => {
-    let processedValue = value;
-    if (field === "category_id") processedValue = value === "" ? "" : parseInt(value as string, 10);
-    setNewIngredient({ ...newIngredient, [field]: processedValue });
-  };
-
-  // Uživatel (jakákoliv role) může přidat novou ingredienci do DB.
-  const handleCreate = async () => {
-    // validace jen při kliknutí na „Přidat“ (nebrzdí odeslání hlavního formuláře)
-    if (!newIngredient.name.trim() || !newIngredient.category_id || !newIngredient.calories_per_gram || !newIngredient.unit_name) {
-      alert("Vyplň prosím název, kategorii, kalorie (kcal/1g) a jednotku.");
-      return;
+    async function fetchOFF(q: string, limit: number, signal: AbortSignal): Promise<Suggestion[]> {
+      const url = `${API_URL}/api/off/search?` +
+        new URLSearchParams({ q, limit: String(limit) }).toString();
+      const res = await fetch(url, { signal });
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+      return (await res.json()) as Suggestion[];
     }
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (!token) {
-      alert("Pro přidání ingredience se prosím přihlaste.");
-      return;
+    async function fetchBoth(q: string, limit: number, signal: AbortSignal): Promise<Suggestion[]> {
+      const [localRes, offRes] = await Promise.allSettled([
+        fetchLocalDB(q, limit, signal),
+        fetchOFF(q, limit, signal),
+      ]);
+      const local = localRes.status === "fulfilled" ? localRes.value : [];
+      const off = offRes.status === "fulfilled" ? offRes.value : [];
+      return mergeSuggestions([...local, ...off]).slice(0, 20);
     }
 
-    try {
-      const payload = {
-        name: newIngredient.name,
-        calories_per_gram: parseFloat(newIngredient.calories_per_gram.toString()) || 0,
-        category_id: newIngredient.category_id,
-        default_grams: newIngredient.default_grams ? parseFloat(newIngredient.default_grams.toString()) : null,
-        unit_name: newIngredient.unit_name || null,
+    useEffect(() => {
+      debouncedQueries.forEach(async (term, idx) => {
+        const q: string = (term ?? "").trim();
+        ctrls.current[idx]?.abort?.();
+
+        if (!q || q.length < 2) {
+          setSuggestions((s) => ({ ...s, [idx]: [] }));
+          return;
+        }
+
+        const cached = lru.get(q);
+        if (cached) {
+          setSuggestions((s) => ({ ...s, [idx]: cached }));
+          setHighlightIndex((h) => ({ ...h, [idx]: -1 }));
+        }
+
+        const ctrl = new AbortController();
+        ctrls.current[idx] = ctrl;
+
+        try {
+          const list = await fetchBoth(q, 20, ctrl.signal);
+          lru.set(q, list);
+          setSuggestions((s) => ({ ...s, [idx]: list }));
+          setHighlightIndex((h) => ({ ...h, [idx]: -1 }));
+        } catch (e: unknown) {
+          const name = (e as { name?: string })?.name ?? "";
+          if (name !== "AbortError") {
+            setSuggestions((s) => ({ ...s, [idx]: [] }));
+          }
+        }
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [debouncedQueries]);
+
+    // === manipulace s řádky ===
+    const addRowTop = () => {
+      const newRow: IngredientRow = {
+        _key: uid(),
+        name: "",
+        amount: 0,
+        unit: "g",
+        calories_per_gram: 0,
+        off_id: null,
+        brands: null,
+        quantity: null,
+        image_small_url: null,
+        energy_kcal_100g: null,
+        proteins_100g: null,
+        carbs_100g: null,
+        sugars_100g: null,
+        fat_100g: null,
+        saturated_fat_100g: null,
+        fiber_100g: null,
+        sodium_100g: null,
       };
+      setRows((prev) => [newRow, ...prev]);
+      setQueries((prev) => ["", ...prev]);
+      setTimeout(() => inputRefs.current[0]?.focus(), 0);
+    };
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ingredients`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // ⬅️ vždy posíláme token
-        },
-        body: JSON.stringify(payload),
+    const removeRow = (index: number) => {
+      setRows((prev) => prev.filter((_, i) => i !== index));
+      setQueries((prev) => prev.filter((_, i) => i !== index));
+      ctrls.current[index]?.abort?.();
+      delete ctrls.current[index];
+      if (openIndex === index) setOpenIndex(null);
+    };
+
+    const updateRow = (index: number, patch: Partial<IngredientRow>) => {
+      setRows((prev) =>
+        prev.map((r, i) =>
+          i === index
+            ? {
+                ...r,
+                ...patch,
+                name: (patch.name ?? r.name ?? "") as string,
+                unit: (patch.unit ?? r.unit ?? "g") as string,
+                calories_per_gram: Number(
+                  patch.calories_per_gram ?? r.calories_per_gram ?? 0
+                ),
+              }
+            : r
+        )
+      );
+    };
+
+    const selectSuggestion = (index: number, s: Suggestion) => {
+      const label = (s.name_cs && s.name_cs.trim()) ? s.name_cs! : s.name;
+
+      const kcalPerGram =
+        s.patch?.energy_kcal_100g && s.patch.energy_kcal_100g > 0
+          ? s.patch.energy_kcal_100g / 100
+          : (s.calories_per_gram ?? 0) || 0;
+
+      updateRow(index, {
+        name: label,                                   // uložíme česky
+        calories_per_gram: Number(kcalPerGram || 0),
+        default_grams: s.default_grams ?? undefined,
+
+        off_id: (s.patch?.off_id ?? (s.source === "off" ? s.code : null)) || null,
+        brands: (s.brands as string | null) ?? null,
+        quantity: (s.quantity as string | null) ?? null,
+        image_small_url: s.image_small_url ?? null,
+
+        energy_kcal_100g: s.patch?.energy_kcal_100g ?? null,
+        proteins_100g: s.patch?.proteins_100g ?? null,
+        carbs_100g: s.patch?.carbs_100g ?? null,
+        sugars_100g: s.patch?.sugars_100g ?? null,
+        fat_100g: s.patch?.fat_100g ?? null,
+        saturated_fat_100g: s.patch?.saturated_fat_100g ?? null,
+        fiber_100g: s.patch?.fiber_100g ?? null,
+        sodium_100g: s.patch?.sodium_100g ?? null,
       });
 
-      if (!res.ok) {
-        const errorResponse = await res.text();
-        throw new Error(errorResponse || "Nepodařilo se přidat ingredienci");
+      // nastav text v inputu na český label
+      setQueries((prev) => prev.map((q, i) => (i === index ? label : q)));
+
+      // zavři dropdown + zruš probíhající request
+      ctrls.current[index]?.abort?.();
+      setSuggestions((prev) => ({ ...prev, [index]: [] }));
+      setHighlightIndex((h) => ({ ...h, [index]: -1 }));
+      setOpenIndex(null);
+
+      // vrať caret do inputu
+      setTimeout(() => {
+        const el = inputRefs.current[index];
+        if (el) {
+          el.focus();
+          const v = el.value ?? "";
+          try {
+            el.setSelectionRange(String(v).length, String(v).length);
+          } catch {}
+        }
+      }, 0);
+    };
+
+    const onKeyDownList = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+      const list = suggestions[index] || [];
+      const hi = highlightIndex[index] ?? -1;
+      if (!list.length) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const next = hi < list.length - 1 ? hi + 1 : 0;
+        setHighlightIndex((h) => ({ ...h, [index]: next }));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const next = hi > 0 ? hi - 1 : list.length - 1;
+        setHighlightIndex((h) => ({ ...h, [index]: next }));
+      } else if (e.key === "Enter" && hi >= 0) {
+        e.preventDefault();
+        selectSuggestion(index, list[hi]);
+      } else if (e.key === "Escape") {
+        setSuggestions((prev) => ({ ...prev, [index]: [] }));
+        if (openIndex === index) setOpenIndex(null);
       }
+    };
 
-      const createdIngredient = await res.json();
-
-      // pro pohodlí rovnou přidáme do horního seznamu ingrediencí
-      setIngredients((prev) => [
-        ...prev,
-        {
-          name: createdIngredient.name,
-          amount: 0,
-          unit: createdIngredient.unit_name || "g",
-          calories_per_gram: createdIngredient.calories_per_gram,
-          default_grams: createdIngredient.default_grams ?? undefined,
-        },
-      ]);
-
-      // vyčistit mini-formulář
-      setNewIngredient({ name: "", calories_per_gram: 0, category_id: "", default_grams: undefined, unit_name: "" });
-      alert("Ingredience úspěšně přidána.");
-    } catch (err) {
-      console.error("Chyba při přidání ingredience:", err);
-      alert("Nepodařilo se přidat ingredienci.");
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      {ingredients.map((ingredient, index) => {
-        const filtered = ingredient.name.length >= 3 ? allSuggestions.filter((s) => s.name.toLowerCase().includes(ingredient.name.toLowerCase())) : [];
-        const showFractions = ingredient.unit === "ks" && ingredient.amount === 1 && ingredient.default_grams;
-
-        return (
-          <div key={index} className="relative grid grid-cols-1 sm:grid-cols-6 gap-2 items-center border rounded p-3 bg-gray-50">
-            <div className="relative col-span-2">
-              <input
-                type="text"
-                value={ingredient.name}
-                onChange={(e) => handleInputChange(index, "name", e.target.value)}
-                onFocus={() => setFocusedInputIndex(index)}
-                onBlur={() => setTimeout(() => setFocusedInputIndex(null), 200)}
-                placeholder="Název suroviny"
-                className="border p-2 rounded w-full"
-                required
-              />
-              {focusedInputIndex === index && filtered.length > 0 && (
-                <div className="absolute bg-white border rounded shadow max-h-40 overflow-y-auto w-full z-10">
-                  {filtered.map((s) => (
-                    <div key={s.name} onClick={() => selectSuggestion(index, s)} className="p-2 hover:bg-gray-100 cursor-pointer">
-                      {s.name}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <input
-              type="number"
-              value={ingredient.amount}
-              onChange={(e) => handleInputChange(index, "amount", e.target.value)}
-              placeholder="Množství"
-              className="border p-2 rounded w-full"
-              required
-            />
-
-            <select
-              value={ingredient.unit || "g"}
-              onChange={(e) => handleInputChange(index, "unit", e.target.value)}
-              className="border p-2 rounded w-full"
-            >
-              {units.map((unit) => (
-                <option key={unit} value={unit}>
-                  {unit}
-                </option>
-              ))}
-            </select>
-
-            <input
-              type="number"
-              value={ingredient.calories_per_gram}
-              onChange={(e) => handleInputChange(index, "calories_per_gram", e.target.value)}
-              placeholder="kcal / 1g"
-              className="border p-2 rounded w-full"
-              required
-            />
-
-            <input
-              type="number"
-              value={ingredient.default_grams || ""}
-              onChange={(e) => handleInputChange(index, "default_grams", e.target.value)}
-              placeholder="Průměrná váha (g)"
-              title="Průměrná váha kusu v gramech"
-              className="border p-2 rounded w-full"
-            />
-
-            {showFractions && (
-              <div className="flex gap-2 flex-wrap col-span-full">
-                {fractions.map((fraction) => (
-                  <button
-                    key={fraction.label}
-                    type="button"
-                    onClick={() => applyFraction(index, fraction.value)}
-                    className="px-3 py-1 rounded border bg-white border-gray-300 hover:bg-yellow-100"
-                  >
-                    {fraction.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => removeIngredient(index)}
-              className="text-red-500 text-lg hover:text-red-700 transition-colors sm:col-span-full"
-            >
-              🗑
-            </button>
-          </div>
-        );
-      })}
-
-      <button type="button" onClick={addIngredient} className="bg-green-600 text-white px-4 py-1 rounded">
-        ➕ Přidat surovinu
-      </button>
-
-      {/* Mini-sekce: přidat chybějící ingredienci do DB (vidí všichni přihlášení uživatelé) */}
-      <div className="mt-6">
-        <h4 className="font-semibold mb-4">Přidat novou ingredienci do databáze:</h4>
-        <div className="flex flex-wrap gap-3 mb-4">
-          <input
-            type="text"
-            placeholder="Název"
-            value={newIngredient.name}
-            onChange={(e) => handleNewChange("name", e.target.value)}
-            className="border p-2 rounded w-full sm:w-[150px] flex-1 min-w-[120px]"
-          />
-
-          <input
-            type="number"
-            placeholder="kcal / 1g"
-            value={newIngredient.calories_per_gram}
-            onChange={(e) => handleNewChange("calories_per_gram", e.target.value)}
-            className="border p-2 rounded w-32"
-          />
-
-          <select
-            value={newIngredient.category_id}
-            onChange={(e) => handleNewChange("category_id", e.target.value)}
-            className="border p-2 rounded w-48"
+    // === render ===
+    return (
+      <div ref={wrapperRef} className="space-y-3">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={addRowTop}
+            className="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
           >
-            <option value="">Vyber kategorii</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-
-          <input
-            type="number"
-            placeholder="Default gramy"
-            value={newIngredient.default_grams || ""}
-            onChange={(e) => handleNewChange("default_grams", e.target.value)}
-            className="border p-2 rounded w-32"
-          />
-
-          <select
-            value={newIngredient.unit_name || ""}
-            onChange={(e) => handleNewChange("unit_name", e.target.value)}
-            className="border p-2 rounded w-32"
-          >
-            <option value="">Jednotka</option>
-            {units.map((unit) => (
-              <option key={unit} value={unit}>
-                {unit}
-              </option>
-            ))}
-          </select>
-
-          <button type="button" onClick={handleCreate} className="bg-blue-600 text-white rounded px-4 py-2">
-            ➕ Přidat
+            + Přidat surovinu (nahoru)
           </button>
         </div>
+
+        <div className="space-y-2">
+          {rows.map((row, idx) => {
+            const list = suggestions[idx] || [];
+            const hi = highlightIndex[idx] ?? -1;
+
+            return (
+              <div key={row._key} className="grid grid-cols-12 gap-2 items-start relative">
+                <div className="col-span-5">
+                  <input
+                    ref={(el) => {
+                      inputRefs.current[idx] = el ?? null;
+                    }}
+                    type="text"
+                    value={(queries[idx] ?? "") as string}
+                    onFocus={() => setOpenIndex(idx)}
+                    onChange={(e) => {
+                      const v: string = e.target.value ?? "";
+                      setQueries((prev) => prev.map((q, i) => (i === idx ? v : q)));
+
+                      // ruční přepsání → odpojit OFF i lokální makra (ať tam nezůstanou stará data)
+                      updateRow(idx, {
+                        name: v,
+                        off_id: null,
+                        brands: null,
+                        quantity: null,
+                        image_small_url: null,
+                        energy_kcal_100g: null,
+                        proteins_100g: null,
+                        carbs_100g: null,
+                        sugars_100g: null,
+                        fat_100g: null,
+                        saturated_fat_100g: null,
+                        fiber_100g: null,
+                        sodium_100g: null,
+                      });
+
+                      setOpenIndex(idx);
+                    }}
+                    onKeyDown={(e) => onKeyDownList(idx, e)}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        setSuggestions((s) => ({ ...s, [idx]: [] }));
+                        if (openIndex === idx) setOpenIndex(null);
+                      }, 0);
+                    }}
+                    placeholder="Začni psát (např. jahoda, brambora, jogurt...)"
+                    className="w-full p-2 border rounded"
+                    autoComplete="off"
+                  />
+
+                  {openIndex === idx && list.length > 0 && (
+                    <div className="absolute z-20 bg-white border rounded shadow max-h-64 overflow-y-auto w-full mt-1">
+                      {list.map((s, i) => {
+                        const label = (s.name_cs && s.name_cs.trim()) ? s.name_cs! : s.name;
+                        return (
+                          <div
+                            key={`${s.source}-${s.code}-${i}`}
+                            onMouseDown={(ev) => ev.preventDefault()} // drž fokus v inputu
+                            onClick={() => selectSuggestion(idx, s)}
+                            className={`p-2 flex items-center gap-2 cursor-pointer ${
+                              hi === i ? "bg-gray-100" : "hover:bg-gray-50"
+                            }`}
+                          >
+                            {s.image_small_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={s.image_small_url as string}
+                                alt=""
+                                width={32}
+                                height={32}
+                                className="rounded object-cover"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded bg-gray-200" />
+                            )}
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium truncate">
+                                {label}
+                                {s.source === "local" ? " • (lokální)" : ""}
+                              </div>
+                              {s.source === "off" && (
+                                <div className="text-xs text-gray-500 truncate">
+                                  {s.brands ? `${s.brands} • ` : ""}
+                                  {s.quantity || ""}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="col-span-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    value={Number(row.amount ?? 0)}
+                    onChange={(e) =>
+                      updateRow(idx, { amount: Number(e.target.value) || 0 })
+                    }
+                    className="w-full p-2 border rounded text-right"
+                    placeholder="množství"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <select
+                    value={(row.unit ?? "g") as string}
+                    onChange={(e) =>
+                      updateRow(idx, { unit: (e.target.value ?? "g") as string })
+                    }
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="g">g</option>
+                    <option value="ml">ml</option>
+                    <option value="ks">ks</option>
+                  </select>
+                </div>
+
+                <div className="col-span-2">
+                  <input
+                    type="number"
+                    step="0.001"
+                    value={Number(row.calories_per_gram ?? 0)}
+                    onChange={(e) =>
+                      updateRow(idx, {
+                        calories_per_gram: Number(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full p-2 border rounded text-right"
+                    placeholder="kcal/g"
+                  />
+                </div>
+
+                <div className="col-span-1 flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => removeRow(idx)}
+                    className="px-2 py-2 rounded bg-red-50 text-red-700 hover:bg-red-100"
+                    title="Smazat surovinu"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
-  );
-});
+    );
+  }
+);
 
 IngredientAutocomplete.displayName = "IngredientAutocomplete";
 export default IngredientAutocomplete;
