@@ -53,7 +53,7 @@ app.use((req, res, next) => {
 });
 app.use(cors(corsOptions));
 // jistota pro preflight na všech cestách
-app.options("*", cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

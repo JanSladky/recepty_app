@@ -442,9 +442,13 @@ export const createIngredient = async (req: Request, res: Response): Promise<voi
     );
 
     res.status(201).json(newIngredient);
-  } catch {
-    res.status(500).json({ error: "Nepodařilo se přidat surovinu." });
+  } catch (err: any) {
+  if (err?.code === "23505") {
+    res.status(409).json({ error: "Surovina s tímto názvem už existuje." });
+    return; // ✅ ukončíme bez vracení Response
   }
+  res.status(500).json({ error: "Nepodařilo se přidat surovinu." });
+}
 };
 
 export const updateIngredient = async (req: Request, res: Response): Promise<void> => {
@@ -522,10 +526,14 @@ export const updateIngredient = async (req: Request, res: Response): Promise<voi
     );
 
     res.status(200).json({ message: "Surovina byla úspěšně aktualizována." });
-  } catch (err) {
-    console.error("updateIngredient error:", err);
-    res.status(500).json({ error: "Nepodařilo se upravit surovinu." });
+  } catch (err: any) {
+  if (err?.code === "23505") {
+    res.status(409).json({ error: "Surovina s tímto názvem už existuje." });
+    return; // ✅ ukončíme bez vracení Response
   }
+  console.error("updateIngredient error:", err);
+  res.status(500).json({ error: "Nepodařilo se upravit surovinu." });
+}
 };
 
 export const deleteIngredient = async (req: Request, res: Response): Promise<void> => {
