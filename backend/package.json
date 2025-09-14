@@ -8,6 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.build.json",
+    "prestart": "npm run build",
     "start": "node dist/server.js",
     "backfill:off": "ts-node scripts/backfill_off_for_existing_ingredients.ts",
     "sync:off": "ts-node scripts/sync_off_dump.ts",
