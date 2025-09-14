@@ -1,9 +1,8 @@
 // 📁 backend/src/server.ts
-import express from "express";
-import cors from "cors";
+import express, { type Request, type Response, type NextFunction } from "express";
+import cors, { type CorsOptions } from "cors";
 import dotenv from "dotenv";
 
-// ⚠️ .env má přepsat vše, co je v shellu (staré exporty)
 dotenv.config({ override: true });
 
 import recipeRoutes from "./routes/recipes";
@@ -27,23 +26,35 @@ const allowedOrigins = [
 ];
 if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
 
+// jednotná CORS konfigurace
+const corsOptions: CorsOptions = {
+  origin(origin, callback) {
+    if (!origin) return callback(null, true); // např. curl / server-side
+    const ok =
+      allowedOrigins.includes(origin) ||
+      /^https?:\/\/localhost(:\d+)?$/i.test(origin) ||
+      /\.vercel\.app$/i.test(origin);
+    if (ok) return callback(null, true);
+    console.warn("❌ Blokováno CORS:", origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  optionsSuccessStatus: 200,
+  // povolíme hlavičky, které používáš (Authorization, Content-Type)
+  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+};
+
 // 🔧 Middleware
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin) return callback(null, true);
-      const ok =
-        allowedOrigins.includes(origin) ||
-        /^https?:\/\/localhost(:\d+)?$/i.test(origin) ||
-        /\.vercel\.app$/i.test(origin);
-      if (ok) return callback(null, true);
-      console.warn("❌ Blokováno CORS:", origin);
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-    optionsSuccessStatus: 200,
-  })
-);
+app.use((req, res, next) => {
+  // pomáhá CDN/proxy správně cachovat podle Origin
+  res.setHeader("Vary", "Origin");
+  next();
+});
+app.use(cors(corsOptions));
+// jistota pro preflight na všech cestách
+app.options("*", cors(corsOptions));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -66,20 +77,26 @@ app.get("/api/_debug/db", async (_req, res) => {
       "select current_database() as db, inet_server_addr() as host, inet_server_port() as port"
     );
     res.json(r.rows[0]);
-  } catch (e: any) {
-    res.status(500).json({ error: e?.message || String(e) });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: message });
   }
 });
 
-// 🌋 Globální error handler
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error("🔥 Globální serverová chyba:", err);
-  res
-    .status(err?.status || 500)
-    .json({ error: "Serverová chyba", detail: err?.message || "Neznámá chyba" });
+// 🌋 Globální error handler (typově bezpečný)
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const message = err instanceof Error ? err.message : String(err);
+  const status =
+    err && typeof err === "object" && "status" in err ? Number((err as { status?: number }).status) : 500;
+
+  console.error("🔥 Globální serverová chyba:", message);
+  res.status(Number.isFinite(status) && status > 0 ? status : 500).json({
+    error: "Serverová chyba",
+    detail: message || "Neznámá chyba",
+  });
 });
 
 // 🚀 Start
-app.listen(PORT, () => {
-  console.log(`✅ Server běží na http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Server běží na http://0.0.0.0:${PORT}`);
 });
