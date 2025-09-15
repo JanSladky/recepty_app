@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import AdminRoute from "@/components/AdminRoute";
+import Image from "next/image"; // ✅ přidán import
 
 type Role = "SUPERADMIN" | "ADMIN" | "USER";
 
@@ -17,7 +18,9 @@ type User = {
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 /** Type guard pro Axios-like error */
-function isAxiosErrorLike(e: unknown): e is {
+function isAxiosErrorLike(
+  e: unknown
+): e is {
   isAxiosError: boolean;
   message: string;
   response?: { data?: unknown };
@@ -29,6 +32,7 @@ function isAxiosErrorLike(e: unknown): e is {
 function getAxiosErrorMessage(error: unknown): string {
   if (isAxiosErrorLike(error)) {
     const data = (error.response?.data ?? {}) as { error?: string; message?: string };
+    // ⬇️ žádné (error as any).message – typ z type guardu už má message:string
     return data.error || data.message || error.message || "Došlo k chybě při komunikaci se serverem.";
   }
   if (error instanceof Error) return error.message;
@@ -73,11 +77,7 @@ export default function AdminUsersPage() {
     async (id: number, role: Role) => {
       try {
         setSavingId(id);
-        await axios.patch(
-          `${API_URL}/api/admin/users/${id}/role`,
-          { role },
-          { headers: { ...authHeaders(), "Content-Type": "application/json" } }
-        );
+        await axios.patch(`${API_URL}/api/admin/users/${id}/role`, { role }, { headers: { ...authHeaders(), "Content-Type": "application/json" } });
         await fetchUsers();
       } catch (err) {
         alert(getAxiosErrorMessage(err) || "Změna role selhala.");
@@ -124,11 +124,7 @@ export default function AdminUsersPage() {
           <p className="text-gray-500 mt-1">Změna rolí a mazání účtů (jen pro SUPERADMIN).</p>
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-lg border px-4 py-3 text-sm text-red-700 border-red-300 bg-red-50">
-            {error}
-          </div>
-        )}
+        {error && <div className="mb-6 rounded-lg border px-4 py-3 text-sm text-red-700 border-red-300 bg-red-50">{error}</div>}
 
         {/* ======= Desktop TABULKA (md a výš) ======= */}
         <div className="hidden md:block overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
@@ -151,7 +147,7 @@ export default function AdminUsersPage() {
                     <td className="py-3 px-4 align-middle">
                       <div className="flex items-center gap-3">
                         {u.avatar_url ? (
-                          <img src={u.avatar_url} alt={u.name ?? u.email} className="w-8 h-8 rounded-full object-cover border" />
+                          <Image src={u.avatar_url} alt={u.name ?? u.email} width={32} height={32} className="w-8 h-8 rounded-full object-cover border" />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-sm font-bold">
                             {(u.name?.charAt(0) || u.email.charAt(0)).toUpperCase()}
@@ -205,13 +201,13 @@ export default function AdminUsersPage() {
           </div>
         </div>
 
-        {/* ======= Mobile KARTY (do md) — žádné horizontální scrollování ======= */}
+        {/* ======= Mobile KARTY (do md) ======= */}
         <div className="md:hidden space-y-4">
           {users.map((u) => (
             <div key={u.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
               <div className="flex items-center gap-3">
                 {u.avatar_url ? (
-                  <img src={u.avatar_url} alt={u.name ?? u.email} className="w-10 h-10 rounded-full object-cover border" />
+                  <Image src={u.avatar_url} alt={u.name ?? u.email} width={40} height={40} className="w-10 h-10 rounded-full object-cover border" />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-sm font-bold">
                     {(u.name?.charAt(0) || u.email.charAt(0)).toUpperCase()}
@@ -219,7 +215,9 @@ export default function AdminUsersPage() {
                 )}
                 <div className="flex-1">
                   <div className="font-semibold text-gray-800 leading-tight">{u.name ?? "-"}</div>
-                  <div className="mt-1"><RoleBadge role={u.role} /></div>
+                  <div className="mt-1">
+                    <RoleBadge role={u.role} />
+                  </div>
                 </div>
                 <div className="text-xs text-gray-500">ID {u.id}</div>
               </div>
@@ -254,11 +252,7 @@ export default function AdminUsersPage() {
             </div>
           ))}
 
-          {users.length === 0 && (
-            <div className="text-center text-sm text-gray-500 py-8 bg-white border rounded-xl">
-              Žádní uživatelé.
-            </div>
-          )}
+          {users.length === 0 && <div className="text-center text-sm text-gray-500 py-8 bg-white border rounded-xl">Žádní uživatelé.</div>}
         </div>
       </div>
     </AdminRoute>
