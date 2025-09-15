@@ -87,23 +87,18 @@ export default function IngredientAdminPage() {
   });
 
   useEffect(() => {
-    async function fetchAll() {
+    async function fetchCategories() {
       try {
-        const [ingRes, catRes] = await Promise.all([fetch(`${API_URL}/api/ingredients?limit=1000`), fetch(`${API_URL}/api/ingredients/categories`)]);
-        if (!ingRes.ok) throw new Error("Nepodařilo se načíst suroviny");
+        const catRes = await fetch(`${API_URL}/api/ingredients/categories`);
         if (!catRes.ok) throw new Error("Nepodařilo se načíst kategorie");
-        const [ing, cat] = (await Promise.all([ingRes.json(), catRes.json()])) as [Ingredient[], Category[]];
-        setIngredients(ing);
+        const cat = (await catRes.json()) as Category[];
         setCategories(cat);
       } catch (err) {
         console.error(err);
       }
     }
-    fetchAll();
+    fetchCategories();
   }, []);
-
-  if (loading) return <p className="text-center p-10">Načítání oprávnění...</p>;
-  if (!isAdmin) return <p className="text-center p-10 text-red-600 font-semibold">Nemáš oprávnění pro přístup k této stránce.</p>;
 
   /** Chytré upravení řádku – umí autokalkulace kcal/100g <-> kcal/g */
   const handleInputChange = (id: number, field: keyof Ingredient, value: string | number) => {
@@ -257,160 +252,191 @@ export default function IngredientAdminPage() {
       alert("Chyba při komunikaci se serverem.");
     }
   };
+  // vyhledávání s debounce
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      if (!search.trim()) {
+        setIngredients([]);
+        return;
+      }
+      try {
+        const res = await fetch(`${API_URL}/api/ingredients/search?q=${encodeURIComponent(search)}&limit=50&format=full`, {
+          signal: controller.signal,
+        });
+        if (res.ok) {
+          const data = (await res.json()) as Ingredient[];
+          setIngredients(data);
+        }
+      } catch (err) {
+        if ((err as any).name !== "AbortError") console.error(err);
+      }
+    }, 300); // čeká 300 ms po psaní
 
-  const filtered = ingredients.filter((i) => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return true;
-    return (i.name ?? "").toLowerCase().includes(needle) || (i.name_cs ?? "").toLowerCase().includes(needle);
-  });
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [search]);
+  const filtered = ingredients; // server nám vrací už jen odpovídající výsledky
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <main className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-800">Správa surovin</h1>
-          <p className="text-lg text-gray-500 mt-2">Prohlížej a upravuj názvy, překlady i makra.</p>
-        </div>
-
-        {/* Přidání + Hledání */}
-        <div className="bg-white p-6 rounded-2xl shadow-lg mb-8">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Přidat novou surovinu</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4 items-end">
-            <input
-              className="p-3 border rounded-lg md:col-span-2"
-              placeholder="Název"
-              value={newIngredient.name}
-              onChange={(e) => handleNewChange("name", e.target.value)}
-            />
-            <input
-              className="p-3 border rounded-lg"
-              placeholder="kcal/g"
-              type="number"
-              value={newIngredient.calories_per_gram}
-              onChange={(e) => handleNewChange("calories_per_gram", e.target.value)}
-            />
-            <select className="p-3 border rounded-lg" value={newIngredient.category_id} onChange={(e) => handleNewChange("category_id", e.target.value)}>
-              <option value="">Kategorie…</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <input
-              className="p-3 border rounded-lg"
-              placeholder="g/ks"
-              type="number"
-              value={newIngredient.default_grams}
-              onChange={(e) => handleNewChange("default_grams", e.target.value)}
-            />
-            <input
-              className="p-3 border rounded-lg"
-              placeholder="Jednotka (např. g / ml / ks)"
-              value={newIngredient.unit_name}
-              onChange={(e) => handleNewChange("unit_name", e.target.value)}
-            />
-            <button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-4 py-3">
-              ➕ Přidat
-            </button>
+      {loading ? (
+        <p className="text-center p-10">Načítání oprávnění...</p>
+      ) : !isAdmin ? (
+        <p className="text-center p-10 text-red-600 font-semibold">Nemáš oprávnění pro přístup k této stránce.</p>
+      ) : (
+        <main className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl sm:text-5xl font-bold text-gray-800">Správa surovin</h1>
+            <p className="text-lg text-gray-500 mt-2">Prohlížej a upravuj názvy, překlady i makra.</p>
           </div>
 
-          <div className="mt-6 border-t pt-6">
-            <input
-              type="text"
-              placeholder="Hledat (CZ/EN)…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full p-3 border rounded-lg"
-            />
+          {/* Přidání + Hledání */}
+          <div className="bg-white p-6 rounded-2xl shadow-lg mb-8">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Přidat novou surovinu</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4 items-end">
+              <input
+                className="p-3 border rounded-lg md:col-span-2"
+                placeholder="Název"
+                value={newIngredient.name}
+                onChange={(e) => handleNewChange("name", e.target.value)}
+              />
+              <input
+                className="p-3 border rounded-lg"
+                placeholder="kcal/g"
+                type="number"
+                value={newIngredient.calories_per_gram}
+                onChange={(e) => handleNewChange("calories_per_gram", e.target.value)}
+              />
+              <select className="p-3 border rounded-lg" value={newIngredient.category_id} onChange={(e) => handleNewChange("category_id", e.target.value)}>
+                <option value="">Kategorie…</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="p-3 border rounded-lg"
+                placeholder="g/ks"
+                type="number"
+                value={newIngredient.default_grams}
+                onChange={(e) => handleNewChange("default_grams", e.target.value)}
+              />
+              <input
+                className="p-3 border rounded-lg"
+                placeholder="Jednotka (např. g / ml / ks)"
+                value={newIngredient.unit_name}
+                onChange={(e) => handleNewChange("unit_name", e.target.value)}
+              />
+              <button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-4 py-3">
+                ➕ Přidat
+              </button>
+            </div>
+
+            <div className="mt-6 border-t pt-6">
+              <input
+                type="text"
+                placeholder="Hledat (CZ/EN)…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full p-3 border rounded-lg"
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Seznam surovin (edit) */}
-        <div className="space-y-3">
-          {filtered.map((ing) => {
-            const e = edited[ing.id] || {};
-            return (
-              <div key={ing.id} className="bg-white p-4 rounded-xl shadow-sm">
-                <div className="grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-1 text-xs text-gray-500">#{ing.id}</div>
+          {/* Seznam surovin (edit) */}
+          <div className="space-y-3">
+            {filtered.map((ing) => {
+              const e = edited[ing.id] || {};
+              return (
+                <div key={ing.id} className="bg-white p-4 rounded-xl shadow-sm">
+                  <div className="grid grid-cols-12 gap-2 items-center">
+                    <div className="col-span-1 text-xs text-gray-500">#{ing.id}</div>
 
-                  <input
-                    className="col-span-3 p-2 border rounded"
-                    value={e.name ?? ing.name ?? ""}
-                    onChange={(ev) => handleInputChange(ing.id, "name", ev.target.value)}
-                    placeholder="Název (EN)"
-                  />
-                  <input
-                    className="col-span-3 p-2 border rounded"
-                    value={e.name_cs ?? ing.name_cs ?? ""}
-                    onChange={(ev) => handleInputChange(ing.id, "name_cs", ev.target.value)}
-                    placeholder="Název (CS)"
-                  />
+                    <input
+                      className="col-span-3 p-2 border rounded"
+                      value={e.name ?? ing.name ?? ""}
+                      onChange={(ev) => handleInputChange(ing.id, "name", ev.target.value)}
+                      placeholder="Název (EN)"
+                    />
+                    <input
+                      className="col-span-3 p-2 border rounded"
+                      value={e.name_cs ?? ing.name_cs ?? ""}
+                      onChange={(ev) => handleInputChange(ing.id, "name_cs", ev.target.value)}
+                      placeholder="Název (CS)"
+                    />
 
-                  <select
-                    className="col-span-2 p-2 border rounded"
-                    value={e.category_id ?? ing.category_id ?? ""}
-                    onChange={(ev) => handleInputChange(ing.id, "category_id", ev.target.value)}
-                  >
-                    <option value="">Kategorie</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    <select
+                      className="col-span-2 p-2 border rounded"
+                      value={e.category_id ?? ing.category_id ?? ""}
+                      onChange={(ev) => handleInputChange(ing.id, "category_id", ev.target.value)}
+                    >
+                      <option value="">Kategorie</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
 
-                  <input
-                    className="col-span-1 p-2 border rounded"
-                    placeholder="jed."
-                    value={e.unit_name ?? ing.unit_name ?? ""}
-                    onChange={(ev) => handleInputChange(ing.id, "unit_name", ev.target.value)}
-                  />
+                    <input
+                      className="col-span-1 p-2 border rounded"
+                      placeholder="jed."
+                      value={e.unit_name ?? ing.unit_name ?? ""}
+                      onChange={(ev) => handleInputChange(ing.id, "unit_name", ev.target.value)}
+                    />
 
-                  <div className="col-span-2 flex justify-end gap-2">
-                    <button onClick={() => handleSave(ing.id)} className="bg-green-600 hover:bg-green-700 text-white p-2 rounded" title="Uložit">
-                      <IconSave />
-                    </button>
-                    <button onClick={() => handleDelete(ing.id)} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded" title="Smazat">
-                      <IconTrash />
-                    </button>
+                    <div className="col-span-2 flex justify-end gap-2">
+                      <button onClick={() => handleSave(ing.id)} className="bg-green-600 hover:bg-green-700 text-white p-2 rounded" title="Uložit">
+                        <IconSave />
+                      </button>
+                      <button onClick={() => handleDelete(ing.id)} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded" title="Smazat">
+                        <IconTrash />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Makra řádek */}
+                  <div className="mt-2 grid grid-cols-12 gap-2 text-xs">
+                    <NumberCell
+                      label="kcal/100g"
+                      value={e.energy_kcal_100g ?? ing.energy_kcal_100g}
+                      onChange={(v) => handleInputChange(ing.id, "energy_kcal_100g", v)}
+                    />
+                    <NumberCell
+                      label="bílkoviny"
+                      value={e.proteins_100g ?? ing.proteins_100g}
+                      onChange={(v) => handleInputChange(ing.id, "proteins_100g", v)}
+                    />
+                    <NumberCell label="sacharidy" value={e.carbs_100g ?? ing.carbs_100g} onChange={(v) => handleInputChange(ing.id, "carbs_100g", v)} />
+                    <NumberCell label="cukry" value={e.sugars_100g ?? ing.sugars_100g} onChange={(v) => handleInputChange(ing.id, "sugars_100g", v)} />
+                    <NumberCell label="tuky" value={e.fat_100g ?? ing.fat_100g} onChange={(v) => handleInputChange(ing.id, "fat_100g", v)} />
+                    <NumberCell
+                      label="nasycené"
+                      value={e.saturated_fat_100g ?? ing.saturated_fat_100g}
+                      onChange={(v) => handleInputChange(ing.id, "saturated_fat_100g", v)}
+                    />
+                    <NumberCell label="vláknina" value={e.fiber_100g ?? ing.fiber_100g} onChange={(v) => handleInputChange(ing.id, "fiber_100g", v)} />
+                    <NumberCell label="sodík" value={e.sodium_100g ?? ing.sodium_100g} onChange={(v) => handleInputChange(ing.id, "sodium_100g", v)} />
+                    <NumberCell
+                      label="kcal/g"
+                      value={e.calories_per_gram ?? ing.calories_per_gram}
+                      onChange={(v) => handleInputChange(ing.id, "calories_per_gram", v)}
+                    />
+                    <NumberCell label="g/ks" value={e.default_grams ?? ing.default_grams} onChange={(v) => handleInputChange(ing.id, "default_grams", v)} />
+                    <TextCell label="OFF id" value={e.off_id ?? ing.off_id ?? ""} onChange={(v) => handleInputChange(ing.id, "off_id", v)} />
                   </div>
                 </div>
+              );
+            })}
+          </div>
 
-                {/* Makra řádek */}
-                <div className="mt-2 grid grid-cols-12 gap-2 text-xs">
-                  <NumberCell
-                    label="kcal/100g"
-                    value={e.energy_kcal_100g ?? ing.energy_kcal_100g}
-                    onChange={(v) => handleInputChange(ing.id, "energy_kcal_100g", v)}
-                  />
-                  <NumberCell label="bílkoviny" value={e.proteins_100g ?? ing.proteins_100g} onChange={(v) => handleInputChange(ing.id, "proteins_100g", v)} />
-                  <NumberCell label="sacharidy" value={e.carbs_100g ?? ing.carbs_100g} onChange={(v) => handleInputChange(ing.id, "carbs_100g", v)} />
-                  <NumberCell label="cukry" value={e.sugars_100g ?? ing.sugars_100g} onChange={(v) => handleInputChange(ing.id, "sugars_100g", v)} />
-                  <NumberCell label="tuky" value={e.fat_100g ?? ing.fat_100g} onChange={(v) => handleInputChange(ing.id, "fat_100g", v)} />
-                  <NumberCell
-                    label="nasycené"
-                    value={e.saturated_fat_100g ?? ing.saturated_fat_100g}
-                    onChange={(v) => handleInputChange(ing.id, "saturated_fat_100g", v)}
-                  />
-                  <NumberCell label="vláknina" value={e.fiber_100g ?? ing.fiber_100g} onChange={(v) => handleInputChange(ing.id, "fiber_100g", v)} />
-                  <NumberCell label="sodík" value={e.sodium_100g ?? ing.sodium_100g} onChange={(v) => handleInputChange(ing.id, "sodium_100g", v)} />
-                  <NumberCell
-                    label="kcal/g"
-                    value={e.calories_per_gram ?? ing.calories_per_gram}
-                    onChange={(v) => handleInputChange(ing.id, "calories_per_gram", v)}
-                  />
-                  <NumberCell label="g/ks" value={e.default_grams ?? ing.default_grams} onChange={(v) => handleInputChange(ing.id, "default_grams", v)} />
-                  <TextCell label="OFF id" value={e.off_id ?? ing.off_id ?? ""} onChange={(v) => handleInputChange(ing.id, "off_id", v)} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Panel kategorií – případně doplň později */}
-      </main>
+          {/* Panel kategorií – případně doplň později */}
+        </main>
+      )}
     </div>
   );
 }

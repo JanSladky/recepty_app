@@ -556,8 +556,6 @@ export const deleteIngredient = async (req: Request, res: Response): Promise<voi
   }
 };
 
-// --- Hledání v lokálních surovinách (ingredients) pro autocomplete ---
-// GET /api/ingredients/search?q=jah&limit=15
 export async function searchLocalIngredients(req: Request, res: Response) {
   try {
     const qRaw = String(req.query.q ?? "");
@@ -565,34 +563,50 @@ export async function searchLocalIngredients(req: Request, res: Response) {
     const limit = Math.min(Number(req.query.limit ?? 15) || 15, 50);
     if (q.length < 2) return res.json([]);
 
+    const like = `%${q}%`;
     const sql = `
       SELECT
         id,
         name,
         name_cs,
-        COALESCE(calories_per_gram, NULLIF(energy_kcal_100g,0)/100.0) AS calories_per_gram,
+        category_id,
+        unit_name,
         default_grams,
+        -- dopočítej kcal/g, pokud není uložené
+        COALESCE(calories_per_gram, NULLIF(energy_kcal_100g,0)/100.0) AS calories_per_gram,
         off_id,
         energy_kcal_100g, proteins_100g, carbs_100g, sugars_100g,
         fat_100g, saturated_fat_100g, fiber_100g, sodium_100g
       FROM ingredients
-      WHERE lower(name) LIKE lower($1)
-         OR lower(name_cs) LIKE lower($1)
+      WHERE
+        lower(unaccent(COALESCE(name_cs, ''))) LIKE lower(unaccent($1))
+        OR lower(unaccent(COALESCE(name,    ''))) LIKE lower(unaccent($1))
       ORDER BY
         CASE
-          WHEN lower(name_cs) = lower($2) THEN 0
-          WHEN lower(name) = lower($2) THEN 1
-          WHEN lower(name_cs) LIKE lower($3) THEN 2
-          WHEN lower(name) LIKE lower($3) THEN 3
+          WHEN lower(unaccent(COALESCE(name_cs,''))) = lower(unaccent($2)) THEN 0
+          WHEN lower(unaccent(COALESCE(name,'')))    = lower(unaccent($2)) THEN 1
+          WHEN lower(unaccent(COALESCE(name_cs,''))) LIKE lower(unaccent($3)) THEN 2
+          WHEN lower(unaccent(COALESCE(name,'')))    LIKE lower(unaccent($3)) THEN 3
           ELSE 4
         END,
         COALESCE(name_cs, name) ASC
       LIMIT $4
     `;
-    const values = [`%${q}%`, q, `${q}%`, limit];
-
+    const values = [like, q, `${q}%`, limit];
     const { rows } = await db.query(sql, values);
 
+    // Pokud je ?format=full → vrať rovnou kompletní Ingredient[]
+    if (String(req.query.format || "").toLowerCase() === "full") {
+      return res.json(
+        rows.map(r => ({
+          ...r,
+          calories_per_gram: r.calories_per_gram == null ? null : Number(r.calories_per_gram),
+          default_grams:     r.default_grams     == null ? null : Number(r.default_grams),
+        }))
+      );
+    }
+
+    // Jinak vrať „suggestion“ (pro autocomplete)
     const out = rows.map((r: any) => ({
       source: "local" as const,
       id: r.id,
@@ -607,13 +621,13 @@ export async function searchLocalIngredients(req: Request, res: Response) {
       patch: {
         off_id: r.off_id ?? null,
         energy_kcal_100g: r.energy_kcal_100g == null ? null : Number(r.energy_kcal_100g),
-        proteins_100g: r.proteins_100g == null ? null : Number(r.proteins_100g),
-        carbs_100g: r.carbs_100g == null ? null : Number(r.carbs_100g),
-        sugars_100g: r.sugars_100g == null ? null : Number(r.sugars_100g),
-        fat_100g: r.fat_100g == null ? null : Number(r.fat_100g),
+        proteins_100g:    r.proteins_100g    == null ? null : Number(r.proteins_100g),
+        carbs_100g:       r.carbs_100g       == null ? null : Number(r.carbs_100g),
+        sugars_100g:      r.sugars_100g      == null ? null : Number(r.sugars_100g),
+        fat_100g:         r.fat_100g         == null ? null : Number(r.fat_100g),
         saturated_fat_100g: r.saturated_fat_100g == null ? null : Number(r.saturated_fat_100g),
-        fiber_100g: r.fiber_100g == null ? null : Number(r.fiber_100g),
-        sodium_100g: r.sodium_100g == null ? null : Number(r.sodium_100g),
+        fiber_100g:       r.fiber_100g       == null ? null : Number(r.fiber_100g),
+        sodium_100g:      r.sodium_100g      == null ? null : Number(r.sodium_100g),
       },
     }));
 

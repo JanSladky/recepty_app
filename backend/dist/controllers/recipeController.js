@@ -511,6 +511,7 @@ async function searchLocalIngredients(req, res) {
         const limit = Math.min(Number(req.query.limit ?? 15) || 15, 50);
         if (q.length < 2)
             return res.json([]);
+        // Použijeme unaccent, aby fungovalo "cesnek" == "česnek"
         const sql = `
       SELECT
         id,
@@ -522,19 +523,20 @@ async function searchLocalIngredients(req, res) {
         energy_kcal_100g, proteins_100g, carbs_100g, sugars_100g,
         fat_100g, saturated_fat_100g, fiber_100g, sodium_100g
       FROM ingredients
-      WHERE lower(name) LIKE lower($1)
-         OR lower(name_cs) LIKE lower($1)
+      WHERE lower(unaccent(name))    LIKE lower(unaccent($1))
+         OR lower(unaccent(name_cs)) LIKE lower(unaccent($1))
       ORDER BY
         CASE
-          WHEN lower(name_cs) = lower($2) THEN 0
-          WHEN lower(name) = lower($2) THEN 1
-          WHEN lower(name_cs) LIKE lower($3) THEN 2
-          WHEN lower(name) LIKE lower($3) THEN 3
+          WHEN lower(unaccent(name_cs)) = lower(unaccent($2)) THEN 0
+          WHEN lower(unaccent(name))    = lower(unaccent($2)) THEN 1
+          WHEN lower(unaccent(name_cs)) LIKE lower(unaccent($3)) THEN 2
+          WHEN lower(unaccent(name))    LIKE lower(unaccent($3)) THEN 3
           ELSE 4
         END,
         COALESCE(name_cs, name) ASC
       LIMIT $4
     `;
+        // %q% (obsahuje), q (přesná shoda), q% (začíná na)
         const values = [`%${q}%`, q, `${q}%`, limit];
         const { rows } = await db_1.default.query(sql, values);
         const out = rows.map((r) => ({
