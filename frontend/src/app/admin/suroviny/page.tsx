@@ -269,7 +269,9 @@ export default function IngredientAdminPage() {
           setIngredients(data);
         }
       } catch (err) {
-        if ((err as any).name !== "AbortError") console.error(err);
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          console.error(err);
+        }
       }
     }, 300); // čeká 300 ms po psaní
 
