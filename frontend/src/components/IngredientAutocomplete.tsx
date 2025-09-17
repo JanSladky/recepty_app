@@ -29,9 +29,22 @@ export type IngredientRow = {
   saturated_fat_100g?: number | null;
   fiber_100g?: number | null;
   sodium_100g?: number | null;
+
+  // ✨ vybraný preset (index v poli presets), a lokální cache presetů z návrhu
+  __selectedPresetIndex?: number | null;
+  __presets?: ServingPreset[] | null;
 };
 
-/** ===== sjednocený typ návrhu (lokální i OFF) ===== */
+/** Preset porce, jak leží v DB (JSONB) */
+export type ServingPreset = {
+  path: string; // „stroužek“, „palice“, „menší jablko“…
+  g: number;    // kolik gramů odpovídá 1 ks této porce
+  unit?: string; // typicky "ks", ale může být i něco jiného
+};
+
+/** ===== sjednocený typ návrhu (lokální i OFF) =====
+ *  Doplněno o serving_presets z lokální DB.
+ */
 type Suggestion = {
   source: "local" | "off";
   code: string;                    // uniq klíč – u lokálních String(id), u OFF kód/EAN
@@ -43,6 +56,7 @@ type Suggestion = {
   image_small_url?: string | null;
   calories_per_gram?: number | null; // lokální může vracet rovnou kcal/g
   default_grams?: number | null;     // lokální default množství
+  serving_presets?: ServingPreset[] | null; // ✨ nové
 
   patch: {
     off_id: string | null;
@@ -95,7 +109,7 @@ function normalizeLabel(s: string): string {
     .replace(/\s+/g, " ")
     .trim();
 
-  // jemné aliasy – zatím jen česnek (slije "garlic", "garlic raw", "česnek", "česnek stroužek")
+  // jemné aliasy – zatím jen česnek
   if (/(^|\s)garlic(\s|$)/.test(base) || /(^|\s)cesnek(\s|$)/.test(base) || base.includes("strouzek")) {
     return "cesnek";
   }
@@ -104,7 +118,6 @@ function normalizeLabel(s: string): string {
 }
 
 // Sjednocení/odstranění duplicit: seskupí návrhy se stejným normalizovaným labelem.
-// Vybere “vítěze” podle priority: (1) local s makry → (2) local → (3) off s makry → (4) off.
 function mergeSuggestions(a: Suggestion[]): Suggestion[] {
   const groups = new Map<string, Suggestion[]>();
 
@@ -191,6 +204,9 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
         saturated_fat_100g: r.saturated_fat_100g ?? null,
         fiber_100g: r.fiber_100g ?? null,
         sodium_100g: r.sodium_100g ?? null,
+
+        __selectedPresetIndex: null,
+        __presets: null,
       }))
     );
 
@@ -247,12 +263,15 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
           saturated_fat_100g: r.saturated_fat_100g ?? null,
           fiber_100g: r.fiber_100g ?? null,
           sodium_100g: r.sodium_100g ?? null,
+
+          __selectedPresetIndex: null,
+          __presets: null,
         }));
 
         const safeList =
           list.length > 0
             ? list
-            : [{ _key: uid(), name: "", amount: 0, unit: "g", calories_per_gram: 0 }];
+            : [{ _key: uid(), name: "", amount: 0, unit: "g", calories_per_gram: 0, __selectedPresetIndex: null, __presets: null } as IngredientRow];
 
         setRows(safeList);
         setQueries(safeList.map((r) => r.name ?? ""));
@@ -351,6 +370,8 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
         saturated_fat_100g: null,
         fiber_100g: null,
         sodium_100g: null,
+        __selectedPresetIndex: null,
+        __presets: null,
       };
       setRows((prev) => [newRow, ...prev]);
       setQueries((prev) => ["", ...prev]);
@@ -383,6 +404,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
       );
     };
 
+    /** Po kliknutí na návrh ingredience */
     const selectSuggestion = (index: number, s: Suggestion) => {
       const label = (s.name_cs && s.name_cs.trim()) ? s.name_cs! : s.name;
 
@@ -391,10 +413,16 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
           ? s.patch.energy_kcal_100g / 100
           : (s.calories_per_gram ?? 0) || 0;
 
+      const presets = s.serving_presets && s.serving_presets.length ? s.serving_presets : null;
+
+      // pokud existují presety, zkusíme default vybrat první
+      const firstPreset = presets?.[0] ?? null;
+
       updateRow(index, {
         name: label,                                   // uložíme česky
         calories_per_gram: Number(kcalPerGram || 0),
-        default_grams: s.default_grams ?? undefined,
+        default_grams: firstPreset ? Number(firstPreset.g) : (s.default_grams ?? undefined),
+        unit: firstPreset?.unit ?? (s.default_grams ? "ks" : "g"),
 
         off_id: (s.patch?.off_id ?? (s.source === "off" ? s.code : null)) || null,
         brands: (s.brands as string | null) ?? null,
@@ -409,6 +437,9 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
         saturated_fat_100g: s.patch?.saturated_fat_100g ?? null,
         fiber_100g: s.patch?.fiber_100g ?? null,
         sodium_100g: s.patch?.sodium_100g ?? null,
+
+        __presets: presets,
+        __selectedPresetIndex: presets ? 0 : null,
       });
 
       // nastav text v inputu na český label
@@ -454,6 +485,19 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
       }
     };
 
+    /** Když uživatel vybere preset z rozbalovačky v řádku */
+    const applyPreset = (rowIndex: number, presetIndex: number) => {
+      const r = rows[rowIndex];
+      if (!r || !r.__presets || r.__presets.length <= presetIndex) return;
+      const p = r.__presets[presetIndex];
+
+      updateRow(rowIndex, {
+        __selectedPresetIndex: presetIndex,
+        unit: p.unit ?? "ks",
+        default_grams: Number(p.g) || 0,
+      });
+    };
+
     // === render ===
     return (
       <div ref={wrapperRef} className="space-y-3">
@@ -474,6 +518,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
 
             return (
               <div key={row._key} className="grid grid-cols-12 gap-2 items-start relative">
+                {/* Název s autocomplete */}
                 <div className="col-span-5">
                   <input
                     ref={(el) => {
@@ -486,7 +531,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
                       const v: string = e.target.value ?? "";
                       setQueries((prev) => prev.map((q, i) => (i === idx ? v : q)));
 
-                      // ruční přepsání → odpojit OFF i lokální makra (ať tam nezůstanou stará data)
+                      // ruční přepsání → odpojit OFF i lokální makra
                       updateRow(idx, {
                         name: v,
                         off_id: null,
@@ -501,6 +546,8 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
                         saturated_fat_100g: null,
                         fiber_100g: null,
                         sodium_100g: null,
+                        __presets: null,
+                        __selectedPresetIndex: null,
                       });
 
                       setOpenIndex(idx);
@@ -547,12 +594,14 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
                                 {label}
                                 {s.source === "local" ? " • (lokální)" : ""}
                               </div>
-                              {s.source === "off" && (
-                                <div className="text-xs text-gray-500 truncate">
-                                  {s.brands ? `${s.brands} • ` : ""}
-                                  {s.quantity || ""}
-                                </div>
-                              )}
+                              <div className="text-xs text-gray-500 truncate">
+                                {/* ✨ zobraz info, že jsou presety */}
+                                {s.serving_presets && s.serving_presets.length
+                                  ? `Presety: ${s.serving_presets.map(p => p.path).join(", ")}`
+                                  : s.source === "off"
+                                  ? (s.brands ? `${s.brands} • ` : "") + (s.quantity || "")
+                                  : ""}
+                              </div>
                             </div>
                           </div>
                         );
@@ -561,6 +610,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
                   )}
                 </div>
 
+                {/* Množství */}
                 <div className="col-span-2">
                   <input
                     type="number"
@@ -575,6 +625,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
                   />
                 </div>
 
+                {/* Jednotka */}
                 <div className="col-span-2">
                   <select
                     value={(row.unit ?? "g") as string}
@@ -589,6 +640,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
                   </select>
                 </div>
 
+                {/* kcal/g */}
                 <div className="col-span-2">
                   <input
                     type="number"
@@ -604,6 +656,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
                   />
                 </div>
 
+                {/* Smazat řádek */}
                 <div className="col-span-1 flex items-center">
                   <button
                     type="button"
@@ -614,6 +667,30 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
                     ✕
                   </button>
                 </div>
+
+                {/* ✨ Presety porcí (pokud jsou) */}
+                {row.__presets && row.__presets.length > 0 && (
+                  <div className="col-span-12 -mt-1">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-gray-500">Porce:</span>
+                      <select
+                        value={row.__selectedPresetIndex ?? 0}
+                        onChange={(e) => applyPreset(idx, Number(e.target.value))}
+                        className="p-2 border rounded"
+                      >
+                        {row.__presets.map((p, i) => (
+                          <option key={`${p.path}-${i}`} value={i}>
+                            {p.path} ({p.g} g / {p.unit ?? "ks"})
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-gray-400">
+                        → nastaví jednotku na <b>{row.__presets[row.__selectedPresetIndex ?? 0]?.unit ?? "ks"}</b> a g/ks na{" "}
+                        <b>{row.__presets[row.__selectedPresetIndex ?? 0]?.g ?? "-"}</b>
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

@@ -6,6 +6,8 @@ import db from "../utils/db";
  *        TYPY
  * ========================= */
 
+export type ServingPreset = { label: string; grams: number; unit?: string; inflect?: { one?: string; few?: string; many?: string } };
+
 export type Ingredient = {
   id: number;
   name: string;
@@ -26,6 +28,18 @@ export type Ingredient = {
   sodium_100g?: number | null;
   off_id?: string | null;
   off_last_synced?: string | null;
+  name_genitive?: string | null;
+  trans_fat_100g?: number | null;
+  mono_fat_100g?: number | null;
+  poly_fat_100g?: number | null;
+  cholesterol_mg_100g?: number | null;
+  salt_100g?: number | null;
+  calcium_mg_100g?: number | null;
+  water_100g?: number | null;
+  phe_mg_100g?: number | null;
+
+  // ✅ předvolby porcí
+  serving_presets?: ServingPreset[] | null;
 };
 
 export type IngredientInput = {
@@ -35,6 +49,7 @@ export type IngredientInput = {
   calories_per_gram: number;
   display?: string;
   default_grams?: number | null; // může přijít null z DB
+  selectedServingGrams?: number | null; // ✅ NOVĚ – priorita před default_grams
 
   // identifikátor z OFF (může i nemusí být)
   off_id?: string | null;
@@ -48,10 +63,14 @@ export type IngredientInput = {
   saturated_fat_100g?: number | null;
   fiber_100g?: number | null;
   sodium_100g?: number | null;
+  name_genitive?: string | null;
 
   brands?: string | null;
   quantity?: string | null;
   image_small_url?: string | null;
+
+  // FE je nepotřebuje při ukládání receptu, ale typově se může hodit
+  serving_presets?: ServingPreset[] | null;
 };
 
 /* =========================
@@ -65,10 +84,13 @@ export async function getAllIngredientsFromDB(): Promise<Ingredient[]> {
          i.id, i.name, i.calories_per_gram, i.category_id,
          c.name AS category_name,
          i.default_grams, i.unit_name,
-         i.off_id,
+         i.off_id, i.off_last_synced,
+         i.name_genitive,
          i.energy_kcal_100g, i.proteins_100g, i.carbs_100g, i.sugars_100g,
          i.fat_100g, i.saturated_fat_100g, i.fiber_100g, i.sodium_100g,
-         i.off_last_synced
+         i.trans_fat_100g, i.mono_fat_100g, i.poly_fat_100g, i.cholesterol_mg_100g,
+         i.salt_100g, i.calcium_mg_100g, i.water_100g, i.phe_mg_100g,
+         i.serving_presets
        FROM ingredients i
        LEFT JOIN ingredient_categories c ON i.category_id = c.id
        ORDER BY i.name ASC`
@@ -81,10 +103,13 @@ export async function getAllIngredientsFromDB(): Promise<Ingredient[]> {
            i.id, i.name, i.calories_per_gram, i.category_id,
            NULL::text AS category_name,
            i.default_grams, i.unit_name,
-           i.off_id,
+           i.off_id, i.off_last_synced,
+           i.name_genitive,
            i.energy_kcal_100g, i.proteins_100g, i.carbs_100g, i.sugars_100g,
            i.fat_100g, i.saturated_fat_100g, i.fiber_100g, i.sodium_100g,
-           i.off_last_synced
+           i.trans_fat_100g, i.mono_fat_100g, i.poly_fat_100g, i.cholesterol_mg_100g,
+           i.salt_100g, i.calcium_mg_100g, i.water_100g, i.phe_mg_100g,
+           i.serving_presets
          FROM ingredients i
          ORDER BY i.name ASC`
       );
@@ -93,7 +118,6 @@ export async function getAllIngredientsFromDB(): Promise<Ingredient[]> {
     throw e;
   }
 }
-
 function rowToIngredient(r: any): Ingredient {
   return {
     id: Number(r.id),
@@ -104,6 +128,10 @@ function rowToIngredient(r: any): Ingredient {
     default_grams: r.default_grams == null ? null : Number(r.default_grams),
     unit_name: r.unit_name ?? null,
     off_id: r.off_id ?? null,
+    off_last_synced: r.off_last_synced ?? null,
+    name_genitive: r.name_genitive ?? null,
+
+    // makra/minerály
     energy_kcal_100g: r.energy_kcal_100g == null ? null : Number(r.energy_kcal_100g),
     proteins_100g: r.proteins_100g == null ? null : Number(r.proteins_100g),
     carbs_100g: r.carbs_100g == null ? null : Number(r.carbs_100g),
@@ -112,7 +140,24 @@ function rowToIngredient(r: any): Ingredient {
     saturated_fat_100g: r.saturated_fat_100g == null ? null : Number(r.saturated_fat_100g),
     fiber_100g: r.fiber_100g == null ? null : Number(r.fiber_100g),
     sodium_100g: r.sodium_100g == null ? null : Number(r.sodium_100g),
-    off_last_synced: r.off_last_synced ?? null,
+
+    trans_fat_100g: r.trans_fat_100g == null ? null : Number(r.trans_fat_100g),
+    mono_fat_100g: r.mono_fat_100g == null ? null : Number(r.mono_fat_100g),
+    poly_fat_100g: r.poly_fat_100g == null ? null : Number(r.poly_fat_100g),
+    cholesterol_mg_100g: r.cholesterol_mg_100g == null ? null : Number(r.cholesterol_mg_100g),
+    salt_100g: r.salt_100g == null ? null : Number(r.salt_100g),
+    calcium_mg_100g: r.calcium_mg_100g == null ? null : Number(r.calcium_mg_100g),
+    water_100g: r.water_100g == null ? null : Number(r.water_100g),
+    phe_mg_100g: r.phe_mg_100g == null ? null : Number(r.phe_mg_100g),
+
+    serving_presets: Array.isArray(r.serving_presets)
+      ? (r.serving_presets as any[]).map((p) => ({
+          label: String(p.path ?? p.label ?? ""),
+          grams: Number(p.g ?? p.grams ?? 0) || 0,
+          unit: p.unit ?? "ks",
+          inflect: p.inflect ? { one: p.inflect.one ?? undefined, few: p.inflect.few ?? undefined, many: p.inflect.many ?? undefined } : undefined,
+        }))
+      : [],
   };
 }
 
@@ -121,13 +166,15 @@ export async function createIngredientInDB(
   calories_per_gram: number,
   category_id: number,
   default_grams?: number,
-  unit_name?: string
+  unit_name?: string,
+  serving_presets?: ServingPreset[],
+  name_genitive?: string | null
 ): Promise<Ingredient> {
   const res = await db.query(
-    `INSERT INTO ingredients (name, calories_per_gram, category_id, default_grams, unit_name)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, name, calories_per_gram, category_id, default_grams, unit_name`,
-    [name, calories_per_gram, category_id, default_grams ?? null, unit_name ?? null]
+    `INSERT INTO ingredients (name, calories_per_gram, category_id, default_grams, unit_name, serving_presets, name_genitive)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, name, calories_per_gram, category_id, default_grams, unit_name, serving_presets, name_genitive`,
+    [name, calories_per_gram, category_id, default_grams ?? null, unit_name ?? null, JSON.stringify(serving_presets ?? []), name_genitive ?? null]
   );
 
   let category_name = "";
@@ -147,9 +194,18 @@ export async function createIngredientInDB(
     category_name,
     default_grams: row.default_grams == null ? null : Number(row.default_grams),
     unit_name: row.unit_name ?? null,
+    serving_presets: Array.isArray(row.serving_presets)
+      ? (row.serving_presets as any[]).map((p: any) => ({
+          label: String(p.path ?? p.label ?? ""),
+          grams: Number(p.g ?? p.grams ?? 0) || 0,
+          unit: p.unit ?? "ks",
+        }))
+      : [],
   };
 }
 
+// Pozn.: updateIngredientInDB se v controlleru nevolá (update je řešen tam),
+// ale ponechávám původní signaturu kvůli kompatibilitě jinde:
 export async function updateIngredientInDB(
   id: number,
   name: string,
@@ -208,14 +264,31 @@ export async function deleteIngredientCategory(id: number): Promise<void> {
  *     POMOCNÉ VÝPOČTY
  * ========================= */
 
+function gramsForIngredient(ing: { amount: number; unit: string; default_grams?: number | null; selectedServingGrams?: number | null }): number {
+  const amount = Number(ing.amount ?? 0);
+  const unit = String(ing.unit ?? "g").toLowerCase();
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+
+  if (unit === "g" || unit === "ml") return amount;
+
+  if (unit === "ks") {
+    const perPiece =
+      (ing.selectedServingGrams ?? null) != null && Number(ing.selectedServingGrams) > 0
+        ? Number(ing.selectedServingGrams)
+        : (ing.default_grams ?? null) != null && Number(ing.default_grams) > 0
+        ? Number(ing.default_grams)
+        : 0;
+    return perPiece > 0 ? amount * perPiece : 0;
+  }
+
+  // fallback – neznámé jednotky zachovej jako „množství v g“
+  return amount;
+}
+
 function calculateTotalCalories(ingredients: (IngredientInput & { default_grams?: number | null })[]): number {
   return ingredients.reduce((sum: number, ing) => {
-    let weightInGrams = 0;
-    if (ing.unit === "g" || ing.unit === "ml") weightInGrams = ing.amount;
-    else if (ing.unit === "ks") weightInGrams = (ing.default_grams ?? 0) * ing.amount;
-    else weightInGrams = ing.amount;
-
-    const kcal = weightInGrams * (ing.calories_per_gram || 0);
+    const grams = gramsForIngredient(ing);
+    const kcal = grams * (ing.calories_per_gram || 0);
     return Math.round(sum + kcal);
   }, 0);
 }
@@ -223,6 +296,7 @@ function calculateTotalCalories(ingredients: (IngredientInput & { default_grams?
 function calculateNutritionTotals(
   ingredients: (IngredientInput & {
     default_grams?: number | null;
+    selectedServingGrams?: number | null;
     energy_kcal_100g?: number | null;
     proteins_100g?: number | null;
     carbs_100g?: number | null;
@@ -235,14 +309,9 @@ function calculateNutritionTotals(
 ) {
   return ingredients.reduce(
     (acc, ing) => {
-      let grams = 0;
-      if (ing.unit === "g" || ing.unit === "ml") grams = ing.amount;
-      else if (ing.unit === "ks") grams = (ing.default_grams ?? 0) * ing.amount;
-      else grams = ing.amount;
-
+      const grams = gramsForIngredient(ing);
       const factor = grams / 100;
 
-      // energie – preferuj OFF (kcal/100g), jinak fallback z calories_per_gram
       const kcalFromOff = (ing.energy_kcal_100g ?? 0) * factor;
       const kcalFallback = (ing.calories_per_gram || 0) * grams;
 
@@ -312,33 +381,35 @@ export async function getRecipeByIdFromDB(id: number) {
   const recipe = recipeRes.rows[0];
   if (!recipe) return null;
 
-  // ✨ ÚPRAVA: ber makra z OFF, a když OFF není, vezmi je z ingredients.*
   const tryAdvanced = async () => {
     const q = `
-      SELECT
-        ri.amount,
-        ri.unit,
-        ri.display,
-        i.name,
-        i.default_grams,
+    SELECT
+      ri.amount,
+      ri.unit,
+      ri.display,
+      i.name,
+      i.name_genitive,
+      i.serving_presets,
+      i.default_grams,
+      ri.selected_serving_grams,                          -- ⬅️ PŘIDÁNO
 
-        -- kcal/g: preferuj i.calories_per_gram, jinak OFF/100
-        COALESCE(i.calories_per_gram, op.energy_kcal_100g/100.0) AS calories_per_gram,
+      -- kcal/g: preferuj i.calories_per_gram, jinak OFF/100
+      COALESCE(i.calories_per_gram, op.energy_kcal_100g/100.0) AS calories_per_gram,
 
-        -- MAKRA: preferuj OFF, fallback na ingredients.*
-        COALESCE(op.energy_kcal_100g,   i.energy_kcal_100g)   AS energy_kcal_100g,
-        COALESCE(op.proteins_100g,      i.proteins_100g)      AS proteins_100g,
-        COALESCE(op.carbs_100g,         i.carbs_100g)         AS carbs_100g,
-        COALESCE(op.sugars_100g,        i.sugars_100g)        AS sugars_100g,
-        COALESCE(op.fat_100g,           i.fat_100g)           AS fat_100g,
-        COALESCE(op.saturated_fat_100g, i.saturated_fat_100g) AS saturated_fat_100g,
-        COALESCE(op.fiber_100g,         i.fiber_100g)         AS fiber_100g,
-        COALESCE(op.sodium_100g,        i.sodium_100g)        AS sodium_100g
-      FROM recipe_ingredients ri
-      LEFT JOIN ingredients  i  ON ri.ingredient_id = i.id
-      LEFT JOIN off_products op ON op.code = i.off_id
-      WHERE ri.recipe_id = $1
-    `;
+      -- MAKRA: preferuj OFF, fallback na ingredients.*
+      COALESCE(op.energy_kcal_100g,   i.energy_kcal_100g)   AS energy_kcal_100g,
+      COALESCE(op.proteins_100g,      i.proteins_100g)      AS proteins_100g,
+      COALESCE(op.carbs_100g,         i.carbs_100g)         AS carbs_100g,
+      COALESCE(op.sugars_100g,        i.sugars_100g)        AS sugars_100g,
+      COALESCE(op.fat_100g,           i.fat_100g)           AS fat_100g,
+      COALESCE(op.saturated_fat_100g, i.saturated_fat_100g) AS saturated_fat_100g,
+      COALESCE(op.fiber_100g,         i.fiber_100g)         AS fiber_100g,
+      COALESCE(op.sodium_100g,        i.sodium_100g)        AS sodium_100g
+    FROM recipe_ingredients ri
+    LEFT JOIN ingredients  i  ON ri.ingredient_id = i.id
+    LEFT JOIN off_products op ON op.code = i.off_id
+    WHERE ri.recipe_id = $1
+  `;
     const { rows } = await db.query(q, [id]);
     return rows.map((row: any) => ({
       name: !row.name || row.name.trim() === "" ? "Neznámá surovina" : row.name,
@@ -348,30 +419,45 @@ export async function getRecipeByIdFromDB(id: number) {
       display: row.display && String(row.display).trim() !== "" ? String(row.display) : undefined,
       default_grams: row.default_grams == null ? undefined : Number(row.default_grams),
 
+      // ⬅️ PŘIDÁNO
+      selectedServingGrams: row.selected_serving_grams == null ? null : Number(row.selected_serving_grams),
+      name_genitive: row.name_genitive ?? null,
+      servingPresets: Array.isArray(row.serving_presets)
+        ? row.serving_presets.map((p: any) => ({
+            label: String(p.path ?? p.label ?? ""),
+            grams: Number(p.g ?? p.grams ?? 0) || 0,
+            unit: p.unit ? String(p.unit) : "ks",
+            // pokud máš v JSONu i skloňování, pošli dál
+            inflect: p.inflect ?? undefined,
+          }))
+        : [],
       energy_kcal_100g: row.energy_kcal_100g == null ? null : Number(row.energy_kcal_100g),
-      proteins_100g:    row.proteins_100g    == null ? null : Number(row.proteins_100g),
-      carbs_100g:       row.carbs_100g       == null ? null : Number(row.carbs_100g),
-      sugars_100g:      row.sugars_100g      == null ? null : Number(row.sugars_100g),
-      fat_100g:         row.fat_100g         == null ? null : Number(row.fat_100g),
+      proteins_100g: row.proteins_100g == null ? null : Number(row.proteins_100g),
+      carbs_100g: row.carbs_100g == null ? null : Number(row.carbs_100g),
+      sugars_100g: row.sugars_100g == null ? null : Number(row.sugars_100g),
+      fat_100g: row.fat_100g == null ? null : Number(row.fat_100g),
       saturated_fat_100g: row.saturated_fat_100g == null ? null : Number(row.saturated_fat_100g),
-      fiber_100g:       row.fiber_100g       == null ? null : Number(row.fiber_100g),
-      sodium_100g:      row.sodium_100g      == null ? null : Number(row.sodium_100g),
+      fiber_100g: row.fiber_100g == null ? null : Number(row.fiber_100g),
+      sodium_100g: row.sodium_100g == null ? null : Number(row.sodium_100g),
     })) as IngredientInput[];
   };
 
   const tryBasic = async () => {
     const q = `
-      SELECT
-        ri.amount,
-        ri.unit,
-        ri.display,
-        i.name,
-        i.default_grams,
-        i.calories_per_gram
-      FROM recipe_ingredients ri
-      LEFT JOIN ingredients i ON ri.ingredient_id = i.id
-      WHERE ri.recipe_id = $1
-    `;
+    SELECT
+      ri.amount,
+      ri.unit,
+      ri.display,
+      i.name,
+      i.name_genitive,
+      i.serving_presets,
+      i.default_grams,
+      ri.selected_serving_grams,                         
+      i.calories_per_gram
+    FROM recipe_ingredients ri
+    LEFT JOIN ingredients i ON ri.ingredient_id = i.id
+    WHERE ri.recipe_id = $1
+  `;
     const { rows } = await db.query(q, [id]);
     return rows.map((row: any) => ({
       name: !row.name || row.name.trim() === "" ? "Neznámá surovina" : row.name,
@@ -380,6 +466,18 @@ export async function getRecipeByIdFromDB(id: number) {
       calories_per_gram: row.calories_per_gram == null ? 0 : Number(row.calories_per_gram),
       display: row.display && String(row.display).trim() !== "" ? String(row.display) : undefined,
       default_grams: row.default_grams == null ? undefined : Number(row.default_grams),
+
+      // ⬅️ PŘIDÁNO
+      selectedServingGrams: row.selected_serving_grams == null ? null : Number(row.selected_serving_grams),
+      name_genitive: row.name_genitive ?? null,
+      servingPresets: Array.isArray(row.serving_presets)
+        ? row.serving_presets.map((p: any) => ({
+            label: String(p.path ?? p.label ?? ""),
+            grams: Number(p.g ?? p.grams ?? 0) || 0,
+            unit: p.unit ? String(p.unit) : "ks",
+            inflect: p.inflect ?? undefined,
+          }))
+        : [],
       energy_kcal_100g: null,
       proteins_100g: null,
       carbs_100g: null,
@@ -474,10 +572,7 @@ async function insertRelations(client: PoolClient, recipeId: number, mealTypes: 
 
       // pokud calories_per_gram není a máme energy_kcal_100g, dopočítej
       if ((!ing.calories_per_gram || ing.calories_per_gram === 0) && ing.energy_kcal_100g != null) {
-        await client.query(
-          `UPDATE ingredients SET calories_per_gram = $1 WHERE id = $2`,
-          [Number(ing.energy_kcal_100g) / 100, ingredientId]
-        );
+        await client.query(`UPDATE ingredients SET calories_per_gram = $1 WHERE id = $2`, [Number(ing.energy_kcal_100g) / 100, ingredientId]);
       }
     } else {
       // 3) pokud přichází off_id a není v DB, doplň ho
@@ -485,8 +580,7 @@ async function insertRelations(client: PoolClient, recipeId: number, mealTypes: 
         await client.query(`UPDATE ingredients SET off_id = $1 WHERE id = $2`, [ing.off_id, ingredientId]);
       }
 
-      // 3b) ✨ pokud jde o „vlastní“ surovinu (nebo chceme aktualizovat lokální makra),
-      //     propíšeme makra do tabulky ingredients (jen když dorazí nějaká hodnota)
+      // 3b) aktualizace lokálních maker (když dorazí)
       await client.query(
         `UPDATE ingredients SET
            energy_kcal_100g   = COALESCE($2, energy_kcal_100g),
@@ -511,7 +605,7 @@ async function insertRelations(client: PoolClient, recipeId: number, mealTypes: 
         ]
       );
 
-      // 3c) když nemáš calories_per_gram a teď už máme energy_kcal_100g, dopočítej
+      // 3c) dopočet kcal/g z energy_kcal_100g, pokud chyběl
       if ((!ing.calories_per_gram || ing.calories_per_gram === 0) && ing.energy_kcal_100g != null) {
         await client.query(
           `UPDATE ingredients
@@ -537,8 +631,8 @@ async function insertRelations(client: PoolClient, recipeId: number, mealTypes: 
            fat_100g           = COALESCE(EXCLUDED.fat_100g,           off_products.fat_100g),
            saturated_fat_100g = COALESCE(EXCLUDED.saturated_fat_100g, off_products.saturated_fat_100g),
            fiber_100g         = COALESCE(EXCLUDED.fiber_100g,         off_products.fiber_100g),
-           sodium_100g        = COALESCE(EXCLUDED.sodium_100g,        off_products.sodium_100g)`
-      , [
+           sodium_100g        = COALESCE(EXCLUDED.sodium_100g,        off_products.sodium_100g)`,
+        [
           ing.off_id,
           ing.energy_kcal_100g ?? null,
           ing.proteins_100g ?? null,
@@ -560,10 +654,22 @@ async function insertRelations(client: PoolClient, recipeId: number, mealTypes: 
       else if (Math.abs(ing.amount - 0.25) < 0.0001) displayText = `čtvrtina ${ing.name}`;
     }
 
+    // 6) ulož ingredienci do recipe_ingredients vč. selected_serving_grams ✅
+    // spočti g/ks s prioritou selectedServingGrams -> default_grams (jen pro 'ks')
+    const perPiece =
+      ing.unit === "ks"
+        ? ing.selectedServingGrams != null && Number(ing.selectedServingGrams) > 0
+          ? Number(ing.selectedServingGrams)
+          : ing.default_grams != null && Number(ing.default_grams) > 0
+          ? Number(ing.default_grams)
+          : null
+        : null;
+
     await client.query(
-      `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, amount, unit, display)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [recipeId, ingredientId, ing.amount, ing.unit, displayText]
+      `INSERT INTO recipe_ingredients
+     (recipe_id, ingredient_id, amount, unit, display, selected_serving_grams)
+   VALUES ($1, $2, $3, $4, $5, $6)`,
+      [recipeId, ingredientId, ing.amount, ing.unit, displayText, perPiece]
     );
   }
 
@@ -716,11 +822,18 @@ export async function removeFavoriteInDB(userId: number, recipeId: number): Prom
 export async function getIngredientsForRecipes(recipeIds: number[]): Promise<IngredientInput[]> {
   if (recipeIds.length === 0) return [];
   const query = `
-    SELECT i.name, ri.amount, ri.unit, i.calories_per_gram, i.default_grams
+    SELECT i.name, ri.amount, ri.unit, i.calories_per_gram, i.default_grams, ri.selected_serving_grams
       FROM recipe_ingredients ri
       JOIN ingredients i ON ri.ingredient_id = i.id
      WHERE ri.recipe_id = ANY($1::int[])
   `;
   const res = await db.query(query, [recipeIds]);
-  return res.rows as IngredientInput[];
+  return res.rows.map((r: any) => ({
+    name: String(r.name),
+    amount: Number(r.amount) || 0,
+    unit: String(r.unit),
+    calories_per_gram: r.calories_per_gram == null ? 0 : Number(r.calories_per_gram),
+    default_grams: r.default_grams == null ? null : Number(r.default_grams),
+    selectedServingGrams: r.selected_serving_grams == null ? null : Number(r.selected_serving_grams),
+  })) as IngredientInput[];
 }

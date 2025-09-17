@@ -53,6 +53,33 @@ function parseJSON<T>(value: unknown, fallback: T): T {
   return (value as T) ?? fallback;
 }
 
+/** ✅ Parser předvoleb porcí: [{label:string, grams:number}, ...] */
+function parseServingPresets(input: unknown): {
+  label: string;
+  grams: number;
+  unit?: string;
+  inflect?: { one?: string; few?: string; many?: string };
+}[] {
+  const raw =
+    typeof input === "string"
+      ? (() => { try { return JSON.parse(input); } catch { return []; } })()
+      : input;
+
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((x: any) => ({
+      label: String(x?.label ?? x?.path ?? "").trim(),
+      grams: Number(x?.grams ?? x?.g ?? NaN),
+      unit:  x?.unit ? String(x.unit) : "ks",
+      inflect: x?.inflect ? {
+        one:  x.inflect.one  ?? undefined,
+        few:  x.inflect.few  ?? undefined,
+        many: x.inflect.many ?? undefined,
+      } : undefined,
+    }))
+    .filter((x) => x.label && Number.isFinite(x.grams) && x.grams > 0);
+}
+
 /** ====== PŮVODNÍ JSON parser (ponechán jako fallback) ====== */
 function processIngredients(raw: unknown): ModelIngredientInput[] {
   let arr: unknown;
@@ -106,18 +133,30 @@ function processIngredients(raw: unknown): ModelIngredientInput[] {
     if (i.sodium_100g !== undefined && i.sodium_100g !== "")
       base.sodium_100g = Number(i.sodium_100g);
 
+    // volitelné – pokud JSON obsahoval vybraný preset
+    if (i.selectedServingGrams !== undefined && i.selectedServingGrams !== null && i.selectedServingGrams !== "") {
+      base.selectedServingGrams = Number(i.selectedServingGrams);
+    }
+
     return base as ModelIngredientInput;
   });
 }
 
 /** ====== NOVÝ parser pro rozbalené FormData: ingredients[0][...] ====== */
+/** lokální typ pro sběr z FormData – rozšiřuje model o optional selectedServingGrams,
+ * aby TS nehlásil chybu na Partial<ModelIngredientInput>.
+ */
+type CollectedIng = Partial<ModelIngredientInput> & {
+  selectedServingGrams?: number | null;
+};
+
 function collectIngredientsFromBody(body: any): ModelIngredientInput[] {
-  // Pokud dorazil starý JSON způsob, použij ho
+  // Fallback – když někdo pošle JSON celé pole v "ingredients"
   if (body.ingredients && (typeof body.ingredients === "string" || Array.isArray(body.ingredients))) {
     return processIngredients(body.ingredients);
   }
 
-  const byIndex: Record<string, Partial<ModelIngredientInput>> = {};
+  const byIndex: Record<string, CollectedIng> = {};
 
   for (const rawKey of Object.keys(body)) {
     const m = rawKey.match(/^ingredients\[(\d+)\]\[(.+)\]$/);
@@ -127,12 +166,23 @@ function collectIngredientsFromBody(body: any): ModelIngredientInput[] {
 
     const v = body[rawKey];
 
-    if ([
-      "amount", "calories_per_gram", "default_grams",
-      "energy_kcal_100g", "proteins_100g", "carbs_100g", "sugars_100g",
-      "fat_100g", "saturated_fat_100g", "fiber_100g", "sodium_100g"
-    ].includes(field)) {
-      (byIndex[idx] as any)[field] = (v === "" || v == null) ? null : Number(v);
+    if (
+      [
+        "amount",
+        "calories_per_gram",
+        "default_grams",
+        "selectedServingGrams",
+        "energy_kcal_100g",
+        "proteins_100g",
+        "carbs_100g",
+        "sugars_100g",
+        "fat_100g",
+        "saturated_fat_100g",
+        "fiber_100g",
+        "sodium_100g",
+      ].includes(field)
+    ) {
+      (byIndex[idx] as any)[field] = v === "" || v == null ? null : Number(v);
       continue;
     }
 
@@ -148,19 +198,17 @@ function collectIngredientsFromBody(body: any): ModelIngredientInput[] {
     unit: String(r.unit ?? "g"),
     calories_per_gram: Number(r.calories_per_gram ?? 0),
     display: r.display == null || r.display === "" ? undefined : String(r.display),
-    default_grams:
-      r.default_grams === null || r.default_grams === undefined ? null : Number(r.default_grams),
-
+    default_grams: r.default_grams === null || r.default_grams === undefined ? null : Number(r.default_grams),
+    selectedServingGrams: r.selectedServingGrams == null ? null : Number(r.selectedServingGrams),
     off_id: r.off_id == null || r.off_id === "" ? null : String(r.off_id),
-
     energy_kcal_100g: r.energy_kcal_100g == null ? null : Number(r.energy_kcal_100g),
-    proteins_100g:    r.proteins_100g    == null ? null : Number(r.proteins_100g),
-    carbs_100g:       r.carbs_100g       == null ? null : Number(r.carbs_100g),
-    sugars_100g:      r.sugars_100g      == null ? null : Number(r.sugars_100g),
-    fat_100g:         r.fat_100g         == null ? null : Number(r.fat_100g),
+    proteins_100g: r.proteins_100g == null ? null : Number(r.proteins_100g),
+    carbs_100g: r.carbs_100g == null ? null : Number(r.carbs_100g),
+    sugars_100g: r.sugars_100g == null ? null : Number(r.sugars_100g),
+    fat_100g: r.fat_100g == null ? null : Number(r.fat_100g),
     saturated_fat_100g: r.saturated_fat_100g == null ? null : Number(r.saturated_fat_100g),
-    fiber_100g:       r.fiber_100g       == null ? null : Number(r.fiber_100g),
-    sodium_100g:      r.sodium_100g      == null ? null : Number(r.sodium_100g),
+    fiber_100g: r.fiber_100g == null ? null : Number(r.fiber_100g),
+    sodium_100g: r.sodium_100g == null ? null : Number(r.sodium_100g),
   }));
 
   return out;
@@ -234,8 +282,13 @@ export const addRecipe = async (req: Request, res: Response): Promise<void> => {
     const imageUrl = getUploadedImageUrl(req) ?? "";
 
     const recipeId = await createFullRecipe(
-      title, notes ?? "", imageUrl,
-      parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps
+      title,
+      notes ?? "",
+      imageUrl,
+      parsedMealTypes,
+      parsedIngredients,
+      parsedCategories,
+      parsedSteps
     );
 
     res.status(201).json({ message: "Recept uložen.", id: recipeId });
@@ -247,7 +300,10 @@ export const addRecipe = async (req: Request, res: Response): Promise<void> => {
 
 export const updateRecipe = async (req: Request, res: Response): Promise<void> => {
   const id = Number(req.params.id);
-  if (Number.isNaN(id)) { res.status(400).json({ error: "Neplatné ID receptu." }); return; }
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID receptu." });
+    return;
+  }
 
   try {
     if (!ensureAdmin(req, res)) return;
@@ -266,7 +322,16 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
     const uploadedUrl = getUploadedImageUrl(req);
     const finalImageUrl = uploadedUrl ?? (existingImageUrl || null);
 
-    await updateRecipeInDB(id, title, notes ?? "", finalImageUrl, parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps);
+    await updateRecipeInDB(
+      id,
+      title,
+      notes ?? "",
+      finalImageUrl,
+      parsedMealTypes,
+      parsedIngredients,
+      parsedCategories,
+      parsedSteps
+    );
     res.status(200).json({ message: "Recept úspěšně upraven." });
   } catch (error) {
     console.error("updateRecipe error:", error);
@@ -276,7 +341,10 @@ export const updateRecipe = async (req: Request, res: Response): Promise<void> =
 
 export const deleteRecipe = async (req: Request, res: Response): Promise<void> => {
   const id = Number(req.params.id);
-  if (Number.isNaN(id)) { res.status(400).json({ error: "Neplatné ID." }); return; }
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID." });
+    return;
+  }
   try {
     if (!ensureAdmin(req, res)) return;
     await deleteRecipeFromDB(id);
@@ -306,8 +374,13 @@ export const submitRecipe = async (req: Request, res: Response): Promise<void> =
     const imageUrl = getUploadedImageUrl(req) ?? "";
 
     const recipeId = await createFullRecipe(
-      title, notes ?? "", imageUrl,
-      parsedMealTypes, parsedIngredients, parsedCategories, parsedSteps
+      title,
+      notes ?? "",
+      imageUrl,
+      parsedMealTypes,
+      parsedIngredients,
+      parsedCategories,
+      parsedSteps
     );
 
     await db.query(
@@ -347,7 +420,10 @@ export const getPendingRecipes = async (_req: Request, res: Response): Promise<v
 export const approveRecipe = async (req: Request, res: Response): Promise<void> => {
   if (!ensureAdmin(req, res)) return;
   const id = Number(req.params.id);
-  if (Number.isNaN(id)) { res.status(400).json({ error: "Neplatné ID receptu." }); return; }
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID receptu." });
+    return;
+  }
   try {
     const approverId = req.user!.id;
     const result = await db.query(
@@ -359,7 +435,10 @@ export const approveRecipe = async (req: Request, res: Response): Promise<void> 
         WHERE id = $2`,
       [approverId, id]
     );
-    if (result.rowCount === 0) { res.status(404).json({ error: "Recept nenalezen." }); return; }
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: "Recept nenalezen." });
+      return;
+    }
     res.status(200).json({ message: "Recept byl schválen." });
   } catch {
     res.status(500).json({ error: "Nepodařilo se schválit recept." });
@@ -370,7 +449,10 @@ export const rejectRecipe = async (req: Request, res: Response): Promise<void> =
   if (!ensureAdmin(req, res)) return;
   const id = Number(req.params.id);
   const { reason } = req.body as { reason?: string };
-  if (Number.isNaN(id)) { res.status(400).json({ error: "Neplatné ID receptu." }); return; }
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID receptu." });
+    return;
+  }
   try {
     const result = await db.query(
       `UPDATE recipes
@@ -381,7 +463,10 @@ export const rejectRecipe = async (req: Request, res: Response): Promise<void> =
         WHERE id = $1`,
       [id, reason ?? null]
     );
-    if (result.rowCount === 0) { res.status(404).json({ error: "Recept nenalezen." }); return; }
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: "Recept nenalezen." });
+      return;
+    }
     res.status(200).json({ message: "Recept byl zamítnut." });
   } catch {
     res.status(500).json({ error: "Nepodařilo se zamítnout recept." });
@@ -391,7 +476,6 @@ export const rejectRecipe = async (req: Request, res: Response): Promise<void> =
 /** ---------- SUROVINY ---------- **/
 export const getAllIngredients = async (req: Request, res: Response): Promise<void> => {
   try {
-    // volitelné stránkování (default limit 500)
     const limit = Math.min(Number(req.query.limit ?? 500) || 500, 2000);
     const offset = Math.max(Number(req.query.offset ?? 0) || 0, 0);
 
@@ -401,13 +485,15 @@ export const getAllIngredients = async (req: Request, res: Response): Promise<vo
         id,
         name,
         name_cs,
+        name_genitive,
         category_id,
         unit_name,
         default_grams,
         calories_per_gram,
         off_id,
         energy_kcal_100g, proteins_100g, carbs_100g, sugars_100g,
-        fat_100g, saturated_fat_100g, fiber_100g, sodium_100g
+        fat_100g, saturated_fat_100g, fiber_100g, sodium_100g,
+        serving_presets
       FROM ingredients
       ORDER BY id ASC
       LIMIT $1 OFFSET $2
@@ -422,123 +508,139 @@ export const getAllIngredients = async (req: Request, res: Response): Promise<vo
   }
 };
 
-export const createIngredient = async (req: Request, res: Response): Promise<void> => {
+export async function createIngredient(req: Request, res: Response) {
   try {
-    if (!ensureAdmin(req, res)) return;
+    const b = req.body ?? {};
+    const servingPresets = Array.isArray(b.serving_presets) ? b.serving_presets : [];
 
-    const { name, category_id, calories_per_gram, default_grams, unit_name } = req.body as any;
-
-    if (!name || category_id === undefined || calories_per_gram === undefined) {
-      res.status(400).json({ error: "Chybí povinné údaje." });
-      return;
-    }
-
-    const newIngredient = await createIngredientInDB(
-      name.trim(),
-      Number(calories_per_gram),
-      Number(category_id),
-      default_grams === undefined || default_grams === null || default_grams === "" ? undefined : Number(default_grams),
-      unit_name || undefined
-    );
-
-    res.status(201).json(newIngredient);
-  } catch (err: any) {
-  if (err?.code === "23505") {
-    res.status(409).json({ error: "Surovina s tímto názvem už existuje." });
-    return; // ✅ ukončíme bez vracení Response
-  }
-  res.status(500).json({ error: "Nepodařilo se přidat surovinu." });
-}
-};
-
-export const updateIngredient = async (req: Request, res: Response): Promise<void> => {
-  const id = Number(req.params.id);
-  if (Number.isNaN(id)) { res.status(400).json({ error: "Neplatné ID suroviny." }); return; }
-
-  try {
-    if (!ensureAdmin(req, res)) return;
-
-    // povolíme širší payload:
-    const {
-      name,
-      name_cs,
-      category_id,
-      calories_per_gram,
-      default_grams,
-      unit_name,
-      off_id,
-      energy_kcal_100g, proteins_100g, carbs_100g, sugars_100g,
-      fat_100g, saturated_fat_100g, fiber_100g, sodium_100g,
-    } = req.body as any;
-
-    if (name === undefined || category_id === undefined) {
-      res.status(400).json({ error: "Chybí povinné údaje (name / category_id)." });
-      return;
-    }
-
-    const toNum = (v: unknown) =>
-      v === "" || v === null || v === undefined ? null : Number(v);
-
-    // pokud není zadán calories_per_gram, ale je k dispozici energy_kcal_100g, dopočítej
-    const kcalPerGram =
-      calories_per_gram === "" || calories_per_gram == null
-        ? (toNum(energy_kcal_100g) != null ? Number(energy_kcal_100g) / 100 : null)
-        : Number(calories_per_gram);
-
-    await db.query(
+    const { rows } = await db.query(
       `
-      UPDATE ingredients
-         SET name                = $2,
-             name_cs             = $3,
-             category_id         = $4,
-             calories_per_gram   = $5,
-             default_grams       = $6,
-             unit_name           = $7,
-             off_id              = $8,
-             energy_kcal_100g    = $9,
-             proteins_100g       = $10,
-             carbs_100g          = $11,
-             sugars_100g         = $12,
-             fat_100g            = $13,
-             saturated_fat_100g  = $14,
-             fiber_100g          = $15,
-             sodium_100g         = $16
-       WHERE id = $1
+      INSERT INTO public.ingredients (
+        name, name_cs, name_genitive, unit_name, category_id, default_grams,
+        calories_per_gram,
+        energy_kcal_100g, proteins_100g, carbs_100g, sugars_100g, fat_100g, saturated_fat_100g,
+        fiber_100g, sodium_100g,
+        trans_fat_100g, mono_fat_100g, poly_fat_100g, cholesterol_mg_100g,
+        salt_100g, calcium_mg_100g, water_100g, phe_mg_100g,
+        serving_presets
+      ) VALUES (
+        $1,$2,$3,$4,$5,$6,
+        $7,
+        $8,$9,$10,$11,$12,$13,
+        $14,$15,
+        $16,$17,$18,$19,
+        $20,$21,$22,$23,
+        $24::jsonb
+      ) RETURNING *;
       `,
       [
-        id,
-        String(name).trim(),
-        name_cs === "" ? null : (name_cs ?? null),
-        Number(category_id),
-        kcalPerGram,
-        toNum(default_grams),
-        unit_name === "" || unit_name === undefined ? null : unit_name,
-        off_id === "" ? null : (off_id ?? null),
-        toNum(energy_kcal_100g),
-        toNum(proteins_100g),
-        toNum(carbs_100g),
-        toNum(sugars_100g),
-        toNum(fat_100g),
-        toNum(saturated_fat_100g),
-        toNum(fiber_100g),
-        toNum(sodium_100g),
+        b.name ?? null, b.name_cs ?? null, b.name_genitive ?? null, b.unit_name ?? null,
+        b.category_id ?? null, b.default_grams ?? null,
+        b.calories_per_gram ?? null,
+        b.energy_kcal_100g ?? null, b.proteins_100g ?? null, b.carbs_100g ?? null, b.sugars_100g ?? null, b.fat_100g ?? null, b.saturated_fat_100g ?? null,
+        b.fiber_100g ?? null, b.sodium_100g ?? null,
+        b.trans_fat_100g ?? null, b.mono_fat_100g ?? null, b.poly_fat_100g ?? null, b.cholesterol_mg_100g ?? null,
+        b.salt_100g ?? null, b.calcium_mg_100g ?? null, b.water_100g ?? null, b.phe_mg_100g ?? null,
+        JSON.stringify(servingPresets),
       ]
     );
 
-    res.status(200).json({ message: "Surovina byla úspěšně aktualizována." });
-  } catch (err: any) {
-  if (err?.code === "23505") {
-    res.status(409).json({ error: "Surovina s tímto názvem už existuje." });
-    return; // ✅ ukončíme bez vracení Response
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Create failed" });
   }
-  console.error("updateIngredient error:", err);
-  res.status(500).json({ error: "Nepodařilo se upravit surovinu." });
 }
-};
+
+export async function updateIngredient(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    const b = req.body ?? {};
+
+    // JSON pole ošetřit na jsonb
+    const servingPresets = Array.isArray(b.serving_presets) ? b.serving_presets : [];
+
+    const { rows } = await db.query(
+      `
+      UPDATE public.ingredients SET
+        name=$1,
+        name_cs=$2,
+        name_genitive=$3,
+        unit_name=$4,
+        category_id=$5,
+        default_grams=$6,
+        calories_per_gram=$7,
+
+        energy_kcal_100g=$8,
+        proteins_100g=$9,
+        carbs_100g=$10,
+        sugars_100g=$11,
+        fat_100g=$12,
+        saturated_fat_100g=$13,
+        fiber_100g=$14,
+        sodium_100g=$15,
+
+        trans_fat_100g=$16,
+        mono_fat_100g=$17,
+        poly_fat_100g=$18,
+        cholesterol_mg_100g=$19,
+
+        salt_100g=$20,
+        calcium_mg_100g=$21,
+        water_100g=$22,
+        phe_mg_100g=$23,
+
+        serving_presets=$24::jsonb
+      WHERE id=$25
+      RETURNING *;
+      `,
+      [
+        b.name ?? null,
+        b.name_cs ?? null,
+        b.name_genitive ?? null,
+        b.unit_name ?? null,
+        b.category_id ?? null,
+        b.default_grams ?? null,
+        b.calories_per_gram ?? null,
+
+        b.energy_kcal_100g ?? null,
+        b.proteins_100g ?? null,
+        b.carbs_100g ?? null,
+        b.sugars_100g ?? null,
+        b.fat_100g ?? null,
+        b.saturated_fat_100g ?? null,
+        b.fiber_100g ?? null,
+        b.sodium_100g ?? null,
+
+        b.trans_fat_100g ?? null,
+        b.mono_fat_100g ?? null,
+        b.poly_fat_100g ?? null,
+        b.cholesterol_mg_100g ?? null,
+
+        b.salt_100g ?? null,
+        b.calcium_mg_100g ?? null,
+        b.water_100g ?? null,
+        b.phe_mg_100g ?? null,
+
+        JSON.stringify(servingPresets),
+        id,
+      ]
+    );
+
+    if (!rows[0]) return res.status(404).json({ error: "Not found" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Update failed" });
+  }
+}
 
 export const deleteIngredient = async (req: Request, res: Response): Promise<void> => {
   const id = Number(req.params.id);
-  if (Number.isNaN(id)) { res.status(400).json({ error: "Neplatné ID." }); return; }
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID." });
+    return;
+  }
 
   try {
     if (!ensureAdmin(req, res)) return;
@@ -556,84 +658,44 @@ export const deleteIngredient = async (req: Request, res: Response): Promise<voi
   }
 };
 
+
 export async function searchLocalIngredients(req: Request, res: Response) {
   try {
-    const qRaw = String(req.query.q ?? "");
-    const q = qRaw.trim();
-    const limit = Math.min(Number(req.query.limit ?? 15) || 15, 50);
-    if (q.length < 2) return res.json([]);
+    const q = String(req.query.q ?? "").toLowerCase();
+    const limit = Math.min(Number(req.query.limit ?? 50), 200);
+    const format = String(req.query.format ?? "compact");
 
-    const like = `%${q}%`;
-    const sql = `
-      SELECT
-        id,
-        name,
-        name_cs,
-        category_id,
-        unit_name,
-        default_grams,
-        -- dopočítej kcal/g, pokud není uložené
-        COALESCE(calories_per_gram, NULLIF(energy_kcal_100g,0)/100.0) AS calories_per_gram,
-        off_id,
-        energy_kcal_100g, proteins_100g, carbs_100g, sugars_100g,
-        fat_100g, saturated_fat_100g, fiber_100g, sodium_100g
-      FROM ingredients
-      WHERE
-        lower(unaccent(COALESCE(name_cs, ''))) LIKE lower(unaccent($1))
-        OR lower(unaccent(COALESCE(name,    ''))) LIKE lower(unaccent($1))
-      ORDER BY
-        CASE
-          WHEN lower(unaccent(COALESCE(name_cs,''))) = lower(unaccent($2)) THEN 0
-          WHEN lower(unaccent(COALESCE(name,'')))    = lower(unaccent($2)) THEN 1
-          WHEN lower(unaccent(COALESCE(name_cs,''))) LIKE lower(unaccent($3)) THEN 2
-          WHEN lower(unaccent(COALESCE(name,'')))    LIKE lower(unaccent($3)) THEN 3
-          ELSE 4
-        END,
-        COALESCE(name_cs, name) ASC
-      LIMIT $4
+    const colsCompact = `
+      id, name, name_cs, category_id, default_grams, unit_name,
+      energy_kcal_100g, proteins_100g, carbs_100g, sugars_100g, fat_100g
     `;
-    const values = [like, q, `${q}%`, limit];
-    const { rows } = await db.query(sql, values);
 
-    // Pokud je ?format=full → vrať rovnou kompletní Ingredient[]
-    if (String(req.query.format || "").toLowerCase() === "full") {
-      return res.json(
-        rows.map(r => ({
-          ...r,
-          calories_per_gram: r.calories_per_gram == null ? null : Number(r.calories_per_gram),
-          default_grams:     r.default_grams     == null ? null : Number(r.default_grams),
-        }))
-      );
-    }
+    const colsFull = `
+      id, name, name_cs, name_genitive, category_id, default_grams, unit_name,
+      calories_per_gram,
+      energy_kcal_100g, proteins_100g, carbs_100g, sugars_100g, fat_100g, saturated_fat_100g,
+      fiber_100g, sodium_100g,
+      trans_fat_100g, mono_fat_100g, poly_fat_100g, cholesterol_mg_100g,
+      salt_100g, calcium_mg_100g, water_100g, phe_mg_100g,
+      serving_presets
+    `;
 
-    // Jinak vrať „suggestion“ (pro autocomplete)
-    const out = rows.map((r: any) => ({
-      source: "local" as const,
-      id: r.id,
-      name: r.name as string,
-      name_cs: r.name_cs as string | null,
-      calories_per_gram: r.calories_per_gram == null ? null : Number(r.calories_per_gram),
-      default_grams: r.default_grams == null ? null : Number(r.default_grams),
-      brands: null,
-      quantity: null,
-      image_small_url: null,
-      code: String(r.id),
-      patch: {
-        off_id: r.off_id ?? null,
-        energy_kcal_100g: r.energy_kcal_100g == null ? null : Number(r.energy_kcal_100g),
-        proteins_100g:    r.proteins_100g    == null ? null : Number(r.proteins_100g),
-        carbs_100g:       r.carbs_100g       == null ? null : Number(r.carbs_100g),
-        sugars_100g:      r.sugars_100g      == null ? null : Number(r.sugars_100g),
-        fat_100g:         r.fat_100g         == null ? null : Number(r.fat_100g),
-        saturated_fat_100g: r.saturated_fat_100g == null ? null : Number(r.saturated_fat_100g),
-        fiber_100g:       r.fiber_100g       == null ? null : Number(r.fiber_100g),
-        sodium_100g:      r.sodium_100g      == null ? null : Number(r.sodium_100g),
-      },
-    }));
+    const cols = format === "full" ? colsFull : colsCompact;
 
-    res.json(out);
+    const { rows } = await db.query(
+      `
+      SELECT ${cols}
+      FROM public.ingredients
+      WHERE lower(coalesce(name_cs, name)) LIKE $1
+      ORDER BY name_cs NULLS LAST, name
+      LIMIT $2
+      `,
+      [`%${q}%`, limit]
+    );
+
+    res.json(rows);
   } catch (err) {
-    console.error("searchLocalIngredients error:", err);
+    console.error(err);
     res.status(500).json({ error: "Search failed" });
   }
 }
@@ -667,7 +729,10 @@ export const createCategory = async (req: Request, res: Response): Promise<void>
 
 export const updateCategory = async (req: Request, res: Response): Promise<void> => {
   const id = Number(req.params.id);
-  if (Number.isNaN(id)) { res.status(400).json({ error: "Neplatné ID." }); return; }
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID." });
+    return;
+  }
   try {
     if (!ensureAdmin(req, res)) return;
 
@@ -686,7 +751,10 @@ export const updateCategory = async (req: Request, res: Response): Promise<void>
 
 export const deleteCategory = async (req: Request, res: Response): Promise<void> => {
   const id = Number(req.params.id);
-  if (Number.isNaN(id)) { res.status(400).json({ error: "Neplatné ID." }); return; }
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Neplatné ID." });
+    return;
+  }
   try {
     if (!ensureAdmin(req, res)) return;
 
