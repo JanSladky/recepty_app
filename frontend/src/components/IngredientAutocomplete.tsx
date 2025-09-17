@@ -35,10 +35,10 @@ export type IngredientRow = {
   __presets?: ServingPreset[] | null;
 };
 
-/** Preset porce, jak leží v DB (JSONB) */
+/** Preset porce, jak leží v UI */
 export type ServingPreset = {
-  path: string; // „stroužek“, „palice“, „menší jablko“…
-  g: number;    // kolik gramů odpovídá 1 ks této porce
+  path: string;  // „stroužek“, „palice“, „menší jablko“…
+  g: number;     // kolik gramů odpovídá 1 ks této porce
   unit?: string; // typicky "ks", ale může být i něco jiného
 };
 
@@ -56,7 +56,7 @@ type Suggestion = {
   image_small_url?: string | null;
   calories_per_gram?: number | null; // lokální může vracet rovnou kcal/g
   default_grams?: number | null;     // lokální default množství
-  serving_presets?: ServingPreset[] | null; // ✨ nové
+  serving_presets?: ServingPreset[] | null;
 
   patch: {
     off_id: string | null;
@@ -81,6 +81,28 @@ type Props = {
   onChange?: (rows: IngredientRow[]) => void;
 };
 
+/** ===== typy pro lokální /search výsledek (format=full) ===== */
+type DbPresetLike = { path?: string; label?: string; g?: number; grams?: number; unit?: string | null } | null;
+
+type LocalIngredientSearchRow = {
+  id: number | string;
+  name?: string | null;
+  name_cs?: string | null;
+  calories_per_gram?: number | null;
+  default_grams?: number | null;
+  serving_presets?: DbPresetLike[] | null;
+
+  off_id?: string | null;
+  energy_kcal_100g?: number | null;
+  proteins_100g?: number | null;
+  carbs_100g?: number | null;
+  sugars_100g?: number | null;
+  fat_100g?: number | null;
+  saturated_fat_100g?: number | null;
+  fiber_100g?: number | null;
+  sodium_100g?: number | null;
+};
+
 // --- utils ---
 function uid() {
   const g = globalThis as unknown as { crypto?: { randomUUID?: () => string } };
@@ -102,14 +124,13 @@ function useDebounced<T>(value: T, delay = 180) {
 // odstraní diakritiku, interpunkci, slova typu "raw" apod. a znormalizuje pro deduplikaci
 function normalizeLabel(s: string): string {
   const base = (s || "")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")     // bez diakritiky
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[,.;:()]+/g, " ")
-    .replace(/\s+(raw|fresh|uncooked|shelf\s*stable)\b/g, " ") // obecná “šum” slova
+    .replace(/\s+(raw|fresh|uncooked|shelf\s*stable)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
-  // jemné aliasy – zatím jen česnek
   if (/(^|\s)garlic(\s|$)/.test(base) || /(^|\s)cesnek(\s|$)/.test(base) || base.includes("strouzek")) {
     return "cesnek";
   }
@@ -217,14 +238,10 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
     const [suggestions, setSuggestions] = useState<Record<number, Suggestion[]>>({});
     const [highlightIndex, setHighlightIndex] = useState<Record<number, number>>({});
 
-    // jen jeden otevřený dropdown
     const [openIndex, setOpenIndex] = useState<number | null>(null);
     const wrapperRef = useRef<HTMLDivElement | null>(null);
-
-    // per-row input refy kvůli focusu
     const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
-    // klik mimo – zavři
     useEffect(() => {
       function onDocMouseDown(e: MouseEvent) {
         if (!wrapperRef.current) return;
@@ -276,12 +293,10 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
         setRows(safeList);
         setQueries(safeList.map((r) => r.name ?? ""));
 
-        // focus na první řádek
         setTimeout(() => inputRefs.current[0]?.focus(), 0);
       },
     }));
 
-    // propagace do parentu
     useEffect(() => {
       onChange?.(rows);
     }, [rows, onChange]);
@@ -290,12 +305,55 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
     const debouncedQueries = useDebounced(queries, 180);
     const ctrls = useRef<Record<number, AbortController>>({});
 
+    // ✨ helper: normalizace DB presetů do tvaru {path,g,unit}
+    function normalizeDbPresets(arr: LocalIngredientSearchRow["serving_presets"]): ServingPreset[] | null {
+      if (!Array.isArray(arr)) return null;
+      const out = arr
+        .map((p) => ({
+          path: String(p?.path ?? p?.label ?? "").trim(),
+          g: Number(p?.g ?? p?.grams ?? 0) || 0,
+          unit: (p?.unit ?? "ks") || "ks",
+        }))
+        .filter((p) => p.path && p.g > 0);
+      return out.length ? out : null;
+    }
+
     async function fetchLocalDB(q: string, limit: number, signal: AbortSignal): Promise<Suggestion[]> {
+      // ✨ přidej format=full, aby přišly presety i makra
       const url = `${API_URL}/api/ingredients/search?` +
-        new URLSearchParams({ q, limit: String(limit) }).toString();
+        new URLSearchParams({ q, limit: String(limit), format: "full" }).toString();
       const res = await fetch(url, { signal });
       if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-      return (await res.json()) as Suggestion[];
+      const rows: LocalIngredientSearchRow[] = await res.json();
+
+      // ✨ převod na Suggestion[]
+      return rows.map((r) => {
+        const presets = normalizeDbPresets(r.serving_presets);
+        return {
+          source: "local",
+          code: String(r.id),
+          id: Number(r.id),
+          name: String(r.name ?? ""),
+          name_cs: r.name_cs ?? null,
+          brands: null,
+          quantity: null,
+          image_small_url: null,
+          calories_per_gram: r.calories_per_gram == null ? null : Number(r.calories_per_gram),
+          default_grams: r.default_grams == null ? null : Number(r.default_grams),
+          serving_presets: presets,
+          patch: {
+            off_id: r.off_id ?? null,
+            energy_kcal_100g: r.energy_kcal_100g == null ? null : Number(r.energy_kcal_100g),
+            proteins_100g: r.proteins_100g == null ? null : Number(r.proteins_100g),
+            carbs_100g: r.carbs_100g == null ? null : Number(r.carbs_100g),
+            sugars_100g: r.sugars_100g == null ? null : Number(r.sugars_100g),
+            fat_100g: r.fat_100g == null ? null : Number(r.fat_100g),
+            saturated_fat_100g: r.saturated_fat_100g == null ? null : Number(r.saturated_fat_100g),
+            fiber_100g: r.fiber_100g == null ? null : Number(r.fiber_100g),
+            sodium_100g: r.sodium_100g == null ? null : Number(r.sodium_100g),
+          },
+        } as Suggestion;
+      });
     }
 
     async function fetchOFF(q: string, limit: number, signal: AbortSignal): Promise<Suggestion[]> {
@@ -414,12 +472,10 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
           : (s.calories_per_gram ?? 0) || 0;
 
       const presets = s.serving_presets && s.serving_presets.length ? s.serving_presets : null;
-
-      // pokud existují presety, zkusíme default vybrat první
       const firstPreset = presets?.[0] ?? null;
 
       updateRow(index, {
-        name: label,                                   // uložíme česky
+        name: label,
         calories_per_gram: Number(kcalPerGram || 0),
         default_grams: firstPreset ? Number(firstPreset.g) : (s.default_grams ?? undefined),
         unit: firstPreset?.unit ?? (s.default_grams ? "ks" : "g"),
@@ -442,16 +498,13 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
         __selectedPresetIndex: presets ? 0 : null,
       });
 
-      // nastav text v inputu na český label
       setQueries((prev) => prev.map((q, i) => (i === index ? label : q)));
 
-      // zavři dropdown + zruš probíhající request
       ctrls.current[index]?.abort?.();
       setSuggestions((prev) => ({ ...prev, [index]: [] }));
       setHighlightIndex((h) => ({ ...h, [index]: -1 }));
       setOpenIndex(null);
 
-      // vrať caret do inputu
       setTimeout(() => {
         const el = inputRefs.current[index];
         if (el) {
@@ -571,7 +624,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
                         return (
                           <div
                             key={`${s.source}-${s.code}-${i}`}
-                            onMouseDown={(ev) => ev.preventDefault()} // drž fokus v inputu
+                            onMouseDown={(ev) => ev.preventDefault()}
                             onClick={() => selectSuggestion(idx, s)}
                             className={`p-2 flex items-center gap-2 cursor-pointer ${
                               hi === i ? "bg-gray-100" : "hover:bg-gray-50"
@@ -595,7 +648,6 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(
                                 {s.source === "local" ? " • (lokální)" : ""}
                               </div>
                               <div className="text-xs text-gray-500 truncate">
-                                {/* ✨ zobraz info, že jsou presety */}
                                 {s.serving_presets && s.serving_presets.length
                                   ? `Presety: ${s.serving_presets.map(p => p.path).join(", ")}`
                                   : s.source === "off"

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import useAdmin from "@/hooks/useAdmin";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5050";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5050";
 
 const UNIT_OPTIONS = ["g", "ml", "ks"] as const;
 type UnitOption = typeof UNIT_OPTIONS[number];
@@ -90,6 +90,34 @@ export type Ingredient = {
 
 export type Category = { id: number; name: string };
 
+type RawPreset = {
+  path?: unknown;
+  g?: unknown;
+  label?: unknown;
+  grams?: unknown;
+  unit?: unknown;
+  inflect?: { one?: unknown; few?: unknown; many?: unknown } | null;
+};
+
+function normalizePreset(p: unknown): ServingPreset {
+  const obj = (p ?? {}) as RawPreset;
+  const inf = obj.inflect ?? null;
+
+  return {
+    label: String((obj.path ?? obj.label ?? "") as string),
+    grams: Number((obj.g ?? obj.grams ?? 0) as number) || 0,
+    unit: typeof obj.unit === "string" ? obj.unit : "ks",
+    inflect:
+      inf && typeof inf === "object"
+        ? {
+            one: typeof inf.one === "string" ? inf.one : "",
+            few: typeof inf.few === "string" ? inf.few : "",
+            many: typeof inf.many === "string" ? inf.many : "",
+          }
+        : undefined,
+  };
+}
+
 /* ---------------- Helpers ---------------- */
 const toNullOrNumber = (v: unknown): number | null => {
   if (v === "" || v == null) return null;
@@ -103,6 +131,85 @@ const isMissingOrNonPositive = (v: unknown) => {
   return !Number.isFinite(n) || n <= 0;
 };
 
+
+const normalizeIngredient = (raw: unknown): Ingredient => {
+  type RawIngredient = {
+    id?: unknown;
+    name?: unknown;
+    name_cs?: unknown;
+    name_genitive?: unknown;
+    category_id?: unknown;
+    unit_name?: unknown;
+    default_grams?: unknown;
+    calories_per_gram?: unknown;
+    off_id?: unknown;
+
+    energy_kcal_100g?: unknown;
+    proteins_100g?: unknown;
+    carbs_100g?: unknown;
+    sugars_100g?: unknown;
+    fat_100g?: unknown;
+    saturated_fat_100g?: unknown;
+    fiber_100g?: unknown;
+    sodium_100g?: unknown;
+
+    trans_fat_100g?: unknown;
+    mono_fat_100g?: unknown;
+    poly_fat_100g?: unknown;
+    cholesterol_mg_100g?: unknown;
+    salt_100g?: unknown;
+    calcium_mg_100g?: unknown;
+    water_100g?: unknown;
+    phe_mg_100g?: unknown;
+
+    serving_presets?: unknown;   // DB shape
+    servingPresets?: unknown;    // případně už camelCase
+  };
+
+  const r = (raw ?? {}) as RawIngredient;
+
+  const rawPresetsArray: unknown[] =
+    Array.isArray(r.serving_presets)
+      ? r.serving_presets as unknown[]
+      : Array.isArray(r.servingPresets)
+      ? r.servingPresets as unknown[]
+      : [];
+
+  const presets: ServingPreset[] = rawPresetsArray.map(normalizePreset);
+
+  return {
+    id: Number(r.id),
+    name: String(r.name ?? ""),
+    name_cs: r.name_cs == null ? null : String(r.name_cs),
+    name_genitive: r.name_genitive == null ? null : String(r.name_genitive),
+    category_id: r.category_id == null ? null : Number(r.category_id),
+    unit_name: r.unit_name == null ? null : String(r.unit_name),
+    default_grams: r.default_grams == null ? null : Number(r.default_grams),
+    calories_per_gram: r.calories_per_gram == null ? null : Number(r.calories_per_gram),
+    off_id: r.off_id == null ? null : String(r.off_id),
+
+    energy_kcal_100g: r.energy_kcal_100g == null ? null : Number(r.energy_kcal_100g),
+    proteins_100g: r.proteins_100g == null ? null : Number(r.proteins_100g),
+    carbs_100g: r.carbs_100g == null ? null : Number(r.carbs_100g),
+    sugars_100g: r.sugars_100g == null ? null : Number(r.sugars_100g),
+    fat_100g: r.fat_100g == null ? null : Number(r.fat_100g),
+    saturated_fat_100g: r.saturated_fat_100g == null ? null : Number(r.saturated_fat_100g),
+    fiber_100g: r.fiber_100g == null ? null : Number(r.fiber_100g),
+    sodium_100g: r.sodium_100g == null ? null : Number(r.sodium_100g),
+
+    trans_fat_100g: r.trans_fat_100g == null ? null : Number(r.trans_fat_100g),
+    mono_fat_100g: r.mono_fat_100g == null ? null : Number(r.mono_fat_100g),
+    poly_fat_100g: r.poly_fat_100g == null ? null : Number(r.poly_fat_100g),
+    cholesterol_mg_100g: r.cholesterol_mg_100g == null ? null : Number(r.cholesterol_mg_100g),
+    salt_100g: r.salt_100g == null ? null : Number(r.salt_100g),
+    calcium_mg_100g: r.calcium_mg_100g == null ? null : Number(r.calcium_mg_100g),
+    water_100g: r.water_100g == null ? null : Number(r.water_100g),
+    phe_mg_100g: r.phe_mg_100g == null ? null : Number(r.phe_mg_100g),
+
+    servingPresets: presets,
+  };
+};
+
 export default function IngredientAdminPage() {
   const { isAdmin, loading } = useAdmin();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -110,20 +217,84 @@ export default function IngredientAdminPage() {
   const [search, setSearch] = useState("");
   const [edited, setEdited] = useState<Record<number, Partial<Ingredient>>>({});
 
-  const [newIngredient, setNewIngredient] = useState({
+  // --- NOVĚ: kompletní formulář pro novou surovinu ---
+  type NewIngredientForm = {
+    name: string;
+    name_cs: string;
+    name_genitive: string;
+    category_id: string;
+    unit_name: string;
+    off_id: string;
+
+    // povinné naší logikou
+    default_grams: string;
+
+    // kcal/g (odvozené z energy_kcal_100g/100, ale necháme i ručně zadat)
+    calories_per_gram: string;
+
+    // výživové hodnoty na 100 g
+    energy_kcal_100g: string;
+    proteins_100g: string;
+    carbs_100g: string;
+    sugars_100g: string;
+    fat_100g: string;
+    saturated_fat_100g: string;
+    fiber_100g: string;
+    sodium_100g: string;
+    trans_fat_100g: string;
+    mono_fat_100g: string;
+    poly_fat_100g: string;
+    cholesterol_mg_100g: string;
+    salt_100g: string;
+    calcium_mg_100g: string;
+    water_100g: string;
+    phe_mg_100g: string;
+  };
+
+  const initialNew: NewIngredientForm = {
     name: "",
-    calories_per_gram: "",
+    name_cs: "",
+    name_genitive: "",
     category_id: "",
-    default_grams: "", // *** povinné pole u nového záznamu ***
     unit_name: "",
-  });
+    off_id: "",
+
+    default_grams: "",
+    calories_per_gram: "",
+
+    energy_kcal_100g: "",
+    proteins_100g: "",
+    carbs_100g: "",
+    sugars_100g: "",
+    fat_100g: "",
+    saturated_fat_100g: "",
+    fiber_100g: "",
+    sodium_100g: "",
+    trans_fat_100g: "",
+    mono_fat_100g: "",
+    poly_fat_100g: "",
+    cholesterol_mg_100g: "",
+    salt_100g: "",
+    calcium_mg_100g: "",
+    water_100g: "",
+    phe_mg_100g: "",
+  };
+
+  const [newIngredient, setNewIngredient] = useState<NewIngredientForm>(initialNew);
+
+  // --- NOVĚ: presety porcí pro novou surovinu ---
+  const [newPresets, setNewPresets] = useState<ServingPreset[]>([]);
 
   /* ---- Načti kategorie ---- */
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch(`${API_URL}/api/ingredients/categories`);
-        if (!res.ok) throw new Error("Nepodařilo se načíst kategorie");
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          console.error("GET /api/ingredients/categories FAIL", res.status, txt);
+          throw new Error("Nepodařilo se načíst kategorie");
+        }
         setCategories((await res.json()) as Category[]);
       } catch (e) {
         console.error(e);
@@ -179,6 +350,18 @@ export default function IngredientAdminPage() {
       row.servingPresets = base.filter((_, i) => i !== index);
       return { ...prev, [id]: row };
     });
+  };
+  // --- NOVÉ: práce s presety u NOVÉ suroviny (bez id) ---
+  const addNewPreset = () => {
+    setNewPresets((prev) => [...prev, { label: "", grams: 0, unit: "ks", inflect: { one: "", few: "", many: "" } }]);
+  };
+
+  const updateNewPreset = (index: number, patch: Partial<ServingPreset>) => {
+    setNewPresets((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch, grams: Number(patch.grams ?? p.grams) } : p)));
+  };
+
+  const removeNewPreset = (index: number) => {
+    setNewPresets((prev) => prev.filter((_, i) => i !== index));
   };
 
   /* ---- Uložit řádek ---- */
@@ -300,34 +483,75 @@ export default function IngredientAdminPage() {
   const handleNewChange = (field: keyof typeof newIngredient, value: string) => setNewIngredient((p) => ({ ...p, [field]: value }));
 
   const handleCreate = async () => {
-    const { name, calories_per_gram, category_id, default_grams, unit_name } = newIngredient;
-    if (!name || !category_id) return alert("Vyplň název a kategorii.");
-    if (isMissingOrNonPositive(default_grams)) return alert("Vyplň prosím 'g/ks' u nové suroviny (povinné, > 0).");
+    const n = newIngredient;
+    if (!n.name || !n.category_id) return alert("Vyplň název a kategorii.");
+    if (isMissingOrNonPositive(n.default_grams)) return alert("Vyplň prosím 'g/ks' u nové suroviny (povinné, > 0).");
+
+    // Připrav payload se všemi poli + presety
+    const payload = {
+      name: n.name,
+      name_cs: n.name_cs || null,
+      name_genitive: n.name_genitive || null,
+      off_id: n.off_id || null,
+      unit_name: n.unit_name || null,
+
+      category_id: Number(n.category_id) || null,
+      default_grams: toNullOrNumber(n.default_grams),
+      calories_per_gram: toNullOrNumber(n.calories_per_gram),
+
+      energy_kcal_100g: toNullOrNumber(n.energy_kcal_100g),
+      proteins_100g: toNullOrNumber(n.proteins_100g),
+      carbs_100g: toNullOrNumber(n.carbs_100g),
+      sugars_100g: toNullOrNumber(n.sugars_100g),
+      fat_100g: toNullOrNumber(n.fat_100g),
+      saturated_fat_100g: toNullOrNumber(n.saturated_fat_100g),
+      fiber_100g: toNullOrNumber(n.fiber_100g),
+      sodium_100g: toNullOrNumber(n.sodium_100g),
+
+      trans_fat_100g: toNullOrNumber(n.trans_fat_100g),
+      mono_fat_100g: toNullOrNumber(n.mono_fat_100g),
+      poly_fat_100g: toNullOrNumber(n.poly_fat_100g),
+      cholesterol_mg_100g: toNullOrNumber(n.cholesterol_mg_100g),
+      salt_100g: toNullOrNumber(n.salt_100g),
+      calcium_mg_100g: toNullOrNumber(n.calcium_mg_100g),
+      water_100g: toNullOrNumber(n.water_100g),
+      phe_mg_100g: toNullOrNumber(n.phe_mg_100g),
+
+      serving_presets: newPresets.map((p) => ({
+        label: String(p.label ?? ""),
+        grams: Number(p.grams ?? 0),
+        unit: p.unit ?? "ks",
+        inflect: p.inflect && (p.inflect.one || p.inflect.few || p.inflect.many) ? { one: p.inflect.one, few: p.inflect.few, many: p.inflect.many } : undefined,
+      })),
+    };
+
+    if (payload.category_id == null) return alert("Kategorie je povinná.");
 
     try {
       const token = localStorage.getItem("token") ?? "";
       const res = await fetch(`${API_URL}/api/ingredients`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          name,
-          category_id: Number(category_id),
-          calories_per_gram: calories_per_gram ? Number(calories_per_gram) : null,
-          default_grams: default_grams ? Number(default_grams) : null,
-          unit_name: unit_name || null,
-          serving_presets: [],
-        }),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) return alert("Vytvoření selhalo.");
-      const created = (await res.json()) as Ingredient;
+
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        alert(`Vytvoření selhalo: ${err.error || `HTTP ${res.status}`}`);
+        return;
+      }
+
+      const createdRaw = await res.json();
+      const created = normalizeIngredient(createdRaw);
+
       setIngredients((prev) => [...prev, created]);
-      setNewIngredient({ name: "", calories_per_gram: "", category_id: "", default_grams: "", unit_name: "" });
+      setNewIngredient(initialNew);
+      setNewPresets([]);
     } catch (e) {
       console.error(e);
       alert("Chyba při komunikaci se serverem.");
     }
   };
-
   /* ---- Hledání s debounce ---- */
   useEffect(() => {
     const controller = new AbortController();
@@ -338,7 +562,11 @@ export default function IngredientAdminPage() {
       }
       try {
         const res = await fetch(`${API_URL}/api/ingredients/search?q=${encodeURIComponent(search)}&limit=50&format=full`, { signal: controller.signal });
-        if (res.ok) setIngredients((await res.json()) as Ingredient[]);
+        if (res.ok) {
+          const data = await res.json();
+          const normalized = Array.isArray(data) ? data.map(normalizeIngredient) : [];
+          setIngredients(normalized);
+        }
       } catch (e) {
         if (!(e instanceof DOMException && e.name === "AbortError")) console.error(e);
       }
@@ -366,20 +594,28 @@ export default function IngredientAdminPage() {
           {/* Přidání + Hledání */}
           <div className="bg-white p-6 rounded-2xl shadow-lg mb-8">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Přidat novou surovinu</h2>
+
+            {/* --- Základní údaje --- */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-4 items-end">
               <input
                 className="p-3 border rounded-lg md:col-span-2"
-                placeholder="Název"
+                placeholder="Název (EN)"
                 value={newIngredient.name}
                 onChange={(e) => handleNewChange("name", e.target.value)}
               />
               <input
-                className="p-3 border rounded-lg"
-                placeholder="kcal/g"
-                type="number"
-                value={newIngredient.calories_per_gram}
-                onChange={(e) => handleNewChange("calories_per_gram", e.target.value)}
+                className="p-3 border rounded-lg md:col-span-2"
+                placeholder="Název (CS)"
+                value={newIngredient.name_cs}
+                onChange={(e) => handleNewChange("name_cs", e.target.value)}
               />
+              <input
+                className="p-3 border rounded-lg md:col-span-2"
+                placeholder="Genitiv (koho/čeho) – např. česneku"
+                value={newIngredient.name_genitive}
+                onChange={(e) => handleNewChange("name_genitive", e.target.value)}
+              />
+
               <select className="p-3 border rounded-lg" value={newIngredient.category_id} onChange={(e) => handleNewChange("category_id", e.target.value)}>
                 <option value="">Kategorie…</option>
                 {categories.map((c) => (
@@ -388,14 +624,13 @@ export default function IngredientAdminPage() {
                   </option>
                 ))}
               </select>
-              <input
-                className={`p-3 border rounded-lg ${isMissingOrNonPositive(newIngredient.default_grams) ? "border-red-500" : ""}`}
-                placeholder="g/ks (POVINNÉ)"
-                type="number"
-                value={newIngredient.default_grams}
-                onChange={(e) => handleNewChange("default_grams", e.target.value)}
-              />
-              <select className="p-3 border rounded-lg" value={newIngredient.unit_name} onChange={(e) => handleNewChange("unit_name", e.target.value)}>
+
+              <select
+                className="p-3 border rounded-lg"
+                value={newIngredient.unit_name}
+                onChange={(e) => handleNewChange("unit_name", e.target.value)}
+                title="Jednotka suroviny"
+              >
                 <option value="">Jednotka…</option>
                 {UNIT_OPTIONS.map((u: UnitOption) => (
                   <option key={u} value={u}>
@@ -403,11 +638,136 @@ export default function IngredientAdminPage() {
                   </option>
                 ))}
               </select>
-              <button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-4 py-3">
+
+              <input
+                className={`p-3 border rounded-lg ${isMissingOrNonPositive(newIngredient.default_grams) ? "border-red-500" : ""}`}
+                placeholder="g/ks (POVINNÉ)"
+                type="number"
+                value={newIngredient.default_grams}
+                onChange={(e) => handleNewChange("default_grams", e.target.value)}
+              />
+
+              <input
+                className="p-3 border rounded-lg"
+                placeholder="kcal/g"
+                type="number"
+                value={newIngredient.calories_per_gram}
+                onChange={(e) => handleNewChange("calories_per_gram", e.target.value)}
+                title="Volitelné, dopočítá se z kcal/100g"
+              />
+
+              <input
+                className="p-3 border rounded-lg"
+                placeholder="OFF ID (volitelné)"
+                value={newIngredient.off_id}
+                onChange={(e) => handleNewChange("off_id", e.target.value)}
+              />
+
+              <button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-4 py-3 md:col-span-2">
                 ➕ Přidat
               </button>
             </div>
 
+            {/* --- Výživa na 100 g --- */}
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-8 gap-4">
+              <NumberCell label="kcal/100g" value={newIngredient.energy_kcal_100g} onChange={(v) => handleNewChange("energy_kcal_100g", v)} />
+              <NumberCell label="bílkoviny (g)" value={newIngredient.proteins_100g} onChange={(v) => handleNewChange("proteins_100g", v)} />
+              <NumberCell label="sacharidy (g)" value={newIngredient.carbs_100g} onChange={(v) => handleNewChange("carbs_100g", v)} />
+              <NumberCell label="cukry (g)" value={newIngredient.sugars_100g} onChange={(v) => handleNewChange("sugars_100g", v)} />
+              <NumberCell label="tuky (g)" value={newIngredient.fat_100g} onChange={(v) => handleNewChange("fat_100g", v)} />
+              <NumberCell label="nasycené (g)" value={newIngredient.saturated_fat_100g} onChange={(v) => handleNewChange("saturated_fat_100g", v)} />
+              <NumberCell label="vláknina (g)" value={newIngredient.fiber_100g} onChange={(v) => handleNewChange("fiber_100g", v)} />
+              <NumberCell label="sodík (g)" value={newIngredient.sodium_100g} onChange={(v) => handleNewChange("sodium_100g", v)} />
+
+              <NumberCell label="trans (g)" value={newIngredient.trans_fat_100g} onChange={(v) => handleNewChange("trans_fat_100g", v)} />
+              <NumberCell label="mono (g)" value={newIngredient.mono_fat_100g} onChange={(v) => handleNewChange("mono_fat_100g", v)} />
+              <NumberCell label="poly (g)" value={newIngredient.poly_fat_100g} onChange={(v) => handleNewChange("poly_fat_100g", v)} />
+              <NumberCell label="cholesterol (mg)" value={newIngredient.cholesterol_mg_100g} onChange={(v) => handleNewChange("cholesterol_mg_100g", v)} />
+              <NumberCell label="sůl (g)" value={newIngredient.salt_100g} onChange={(v) => handleNewChange("salt_100g", v)} />
+              <NumberCell label="vápník (mg)" value={newIngredient.calcium_mg_100g} onChange={(v) => handleNewChange("calcium_mg_100g", v)} />
+              <NumberCell label="voda (g)" value={newIngredient.water_100g} onChange={(v) => handleNewChange("water_100g", v)} />
+              <NumberCell label="PHE (mg)" value={newIngredient.phe_mg_100g} onChange={(v) => handleNewChange("phe_mg_100g", v)} />
+            </div>
+
+            {/* --- Předvolby porcí pro NOVOU surovinu --- */}
+            <div className="mt-6 rounded-lg border p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="font-semibold">Předvolby porcí (nová surovina)</div>
+                <button type="button" onClick={addNewPreset} className="text-sm px-3 py-1.5 rounded bg-green-600 text-white hover:bg-green-700">
+                  + přidat
+                </button>
+              </div>
+
+              {newPresets.length === 0 && (
+                <div className="text-sm text-gray-500">Zatím žádné položky. Přidej např. „stroužek (3 g)“, „plátek (20 g)“, „porce (50 g)“.</div>
+              )}
+
+              <div className="space-y-2">
+                {newPresets.map((p, i) => (
+                  <div key={i} className="space-y-2 p-2 rounded border">
+                    <div className="grid grid-cols-12 gap-2">
+                      <input
+                        className="col-span-6 p-2 border rounded"
+                        placeholder="název (stroužek / plátek / porce …)"
+                        value={p.label}
+                        onChange={(e) => updateNewPreset(i, { label: e.target.value })}
+                      />
+                      <div className="col-span-4 flex">
+                        <input
+                          type="number"
+                          step="0.1"
+                          className="w-full p-2 border rounded-l text-right"
+                          placeholder="gramů"
+                          value={Number.isFinite(p.grams) ? p.grams : 0}
+                          onChange={(e) => updateNewPreset(i, { grams: Number(e.target.value) })}
+                        />
+                        <span className="inline-flex items-center px-3 rounded-r border border-l-0 bg-gray-50 text-gray-600">g</span>
+                      </div>
+                      <select
+                        className="col-span-2 p-2 border rounded"
+                        value={p.unit ?? "ks"}
+                        onChange={(e) => updateNewPreset(i, { unit: e.target.value })}
+                        title="Jednotka porce (výchozí ks)"
+                      >
+                        <option value="ks">ks</option>
+                        <option value="g">g</option>
+                        <option value="ml">ml</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-12 gap-2">
+                      <input
+                        className="col-span-4 p-2 border rounded"
+                        placeholder="1× (one) např. stroužek"
+                        value={p.inflect?.one ?? ""}
+                        onChange={(e) => updateNewPreset(i, { inflect: { ...(p.inflect ?? {}), one: e.target.value } })}
+                      />
+                      <input
+                        className="col-span-4 p-2 border rounded"
+                        placeholder="2–4× (few) např. stroužky"
+                        value={p.inflect?.few ?? ""}
+                        onChange={(e) => updateNewPreset(i, { inflect: { ...(p.inflect ?? {}), few: e.target.value } })}
+                      />
+                      <div className="col-span-3">
+                        <input
+                          className="w-full p-2 border rounded"
+                          placeholder="5+× (many) např. stroužků"
+                          value={p.inflect?.many ?? ""}
+                          onChange={(e) => updateNewPreset(i, { inflect: { ...(p.inflect ?? {}), many: e.target.value } })}
+                        />
+                      </div>
+                      <div className="col-span-1 flex justify-end">
+                        <button type="button" onClick={() => removeNewPreset(i)} className="px-3 py-2 rounded border text-red-600 hover:bg-red-50">
+                          Odebrat
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* --- Hledání --- */}
             <div className="mt-6 border-t pt-6">
               <input
                 type="text"

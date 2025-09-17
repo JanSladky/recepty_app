@@ -6,18 +6,37 @@ import { useParams, useRouter } from "next/navigation";
 import RecipeForm from "@/components/RecipeForm";
 import type { IngredientRow } from "@/components/IngredientAutocomplete";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5050";
 
-// Shape, jak přichází ingredience z backendu (detail receptu)
+/* ---------- Typy z backendu (volnější) ---------- */
+type ServingPreset = {
+  label: string;
+  grams: number;
+  unit?: string;
+  inflect?: { one?: string; few?: string; many?: string };
+};
+
 type BackendIng = {
+  id?: number | string | null;
+  ingredient_id?: number | string | null;
+
   name: string;
-  amount: number;
+  amount: number | string;
   unit: string;
   calories_per_gram: number | string;
-  display?: string | null;
-  default_grams?: number | null;
 
-  // ⬇⬇⬇ DOPLNĚNO
+  display?: string | null;
+  default_grams?: number | string | null;
+
+  // může přijít i tohle z detailu receptu
+  selectedServingGrams?: number | string | null;
+
+  // presety mohou přijít v obou tvarech
+  serving_presets?: ServingPreset[] | null;
+  servingPresets?: ServingPreset[] | null;
+
+  // doplňky
+  name_genitive?: string | null;
   off_id?: string | null;
 
   // OFF makra – mohou být null
@@ -30,6 +49,51 @@ type BackendIng = {
   fiber_100g?: number | null;
   sodium_100g?: number | null;
 };
+
+type BackendRecipe = {
+  title: string;
+  notes?: string | null;
+  image_url?: string | null;
+  ingredients?: BackendIng[];
+  categories?: string[];
+  meal_types?: string[];
+  steps?: string[];
+  calories?: number;
+};
+
+/* ---------- Helpers ---------- */
+const num = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const getIngredientId = (ing: BackendIng): number | undefined => {
+  const raw = ing.ingredient_id ?? ing.id ?? null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+// dofetch doplňků pro ingredienci (presety, default_grams, name_genitive)
+async function fetchIngredientExtras(id: number) {
+  try {
+    const res = await fetch(`${API_URL}/api/ingredients/${id}?format=full`);
+    if (!res.ok) return null;
+    const j = await res.json();
+
+    const presets: ServingPreset[] =
+      (Array.isArray(j.serving_presets) ? j.serving_presets : []) ||
+      (Array.isArray(j.servingPresets) ? j.servingPresets : []) ||
+      [];
+
+    return {
+      servingPresets: presets,
+      default_grams: j.default_grams ?? null,
+      name_genitive: j.name_genitive ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export default function EditPage() {
   const params = useParams();
@@ -65,30 +129,88 @@ export default function EditPage() {
           throw new Error(txt || "Chyba při načítání receptu.");
         }
 
-        const data = await res.json();
+        const data: BackendRecipe = await res.json();
 
-        const mappedIngredients: IngredientRow[] = (data.ingredients || []).map((i: BackendIng) => ({
-          name: i.name,
-          amount: Number(i.amount || 0),
-          unit: i.unit || "g",
-          calories_per_gram: Number(i.calories_per_gram || 0),
-          default_grams:
-            i.default_grams === undefined || i.default_grams === null ? undefined : Number(i.default_grams),
-          display: i.display ?? undefined,
+        // Hydratace ingrediencí: doplň presety/default_grams/name_genitive pokud chybí
+        const mappedIngredients: IngredientRow[] = await Promise.all(
+          (data.ingredients || []).map(async (i: BackendIng) => {
+            const iid = getIngredientId(i);
 
-          // ⬇⬇⬇ DOPLNĚNO – držíme OFF vazbu i při editaci
-          off_id: i.off_id ?? undefined,
+            const hasPresets =
+              (Array.isArray(i.servingPresets) && i.servingPresets.length > 0) ||
+              (Array.isArray(i.serving_presets) && i.serving_presets.length > 0);
 
-          // OFF makra (na 100 g)
-          energy_kcal_100g: i.energy_kcal_100g ?? null,
-          proteins_100g: i.proteins_100g ?? null,
-          carbs_100g: i.carbs_100g ?? null,
-          sugars_100g: i.sugars_100g ?? null,
-          fat_100g: i.fat_100g ?? null,
-          saturated_fat_100g: i.saturated_fat_100g ?? null,
-          fiber_100g: i.fiber_100g ?? null,
-          sodium_100g: i.sodium_100g ?? null,
-        }));
+            let servingPresets: ServingPreset[] | undefined = undefined;
+            let default_grams: number | undefined = undefined;
+            let name_genitive: string | undefined = undefined;
+
+            if (hasPresets) {
+              servingPresets = (i.servingPresets ?? i.serving_presets ?? undefined) || undefined;
+              default_grams = i.default_grams == null ? undefined : num(i.default_grams) || undefined;
+              name_genitive = i.name_genitive ?? undefined;
+            } else if (iid) {
+              const extra = await fetchIngredientExtras(iid);
+              if (extra) {
+                servingPresets = extra.servingPresets ?? undefined;
+                // pokud přišlo z receptu číslo, má přednost
+                default_grams =
+                  i.default_grams == null
+                    ? extra.default_grams == null
+                      ? undefined
+                      : num(extra.default_grams) || undefined
+                    : num(i.default_grams) || undefined;
+                name_genitive = i.name_genitive ?? extra.name_genitive ?? undefined;
+              }
+            } else {
+              // bez ID – ber aspoň to, co přišlo
+              servingPresets = (i.servingPresets ?? i.serving_presets ?? undefined) || undefined;
+              default_grams = i.default_grams == null ? undefined : num(i.default_grams) || undefined;
+              name_genitive = i.name_genitive ?? undefined;
+            }
+
+            // vybraná porce pro 'ks', pokud byla uložená
+            const selectedServingGrams =
+              i.selectedServingGrams == null ? undefined : num(i.selectedServingGrams) || undefined;
+
+            const row: IngredientRow & {
+              servingPresets?: ServingPreset[];
+              selectedServingGrams?: number;
+              name_genitive?: string | null;
+              off_id?: string;
+            } = {
+              name: i.name,
+              amount: num(i.amount),
+              unit: i.unit || "g",
+              calories_per_gram: num(i.calories_per_gram),
+
+              display: i.display ?? undefined,
+              default_grams,
+              // předáme i vybraný preset, pokud existuje
+              selectedServingGrams,
+
+              // sjednoceně camelCase, IngredientAutocomplete/RecipeForm si to umí vzít
+              servingPresets,
+
+              // doplňky pro labely
+              name_genitive: name_genitive ?? null,
+
+              // držíme OFF vazbu i při editaci
+              off_id: i.off_id ?? undefined,
+
+              // OFF makra (na 100 g) – jen přepošleme dál
+              energy_kcal_100g: i.energy_kcal_100g ?? null,
+              proteins_100g: i.proteins_100g ?? null,
+              carbs_100g: i.carbs_100g ?? null,
+              sugars_100g: i.sugars_100g ?? null,
+              fat_100g: i.fat_100g ?? null,
+              saturated_fat_100g: i.saturated_fat_100g ?? null,
+              fiber_100g: i.fiber_100g ?? null,
+              sodium_100g: i.sodium_100g ?? null,
+            };
+
+            return row;
+          })
+        );
 
         setInitialData({
           title: data.title,

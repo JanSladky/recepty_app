@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import CategorySelector from "@/components/CategorySelector";
 import MealTypeSelector from "@/components/MealTypeSelector";
 import IngredientAutocomplete, {
@@ -80,10 +80,8 @@ export type IngredientInputForForm = {
 /*    GRAMY & KALORIE HELPER  */
 /* ========================== */
 
-// kategorie (pokud je ve formuláři vybíráš)
 export type Category = { id: number; name: string };
 
-// hodnoty celého formuláře receptu
 export type RecipeFormValues = {
   title: string;
   notes: string;
@@ -131,8 +129,9 @@ type IngredientRowLike = IngredientRow & {
   grams_per_piece?: number | null;
   g_per_piece?: number | null;
 
-  servingPresets?: ServingPreset[] | null | undefined; // standardní
-  __presets?: PresetLike[] | null | undefined; // alternativní
+  // standardní i snake presety (ale nebudeme měnit __presets, to má vlastní typ uvnitř komponenty)
+  servingPresets?: ServingPreset[] | null | undefined;
+  serving_presets?: ServingPreset[] | null | undefined;
 
   selectedPresetIndex?: number | null;
   __selectedPresetIndex?: number | null;
@@ -149,14 +148,20 @@ type IngredientRowLike = IngredientRow & {
   saturated_fat_100g?: number | null;
   fiber_100g?: number | null;
   sodium_100g?: number | null;
+
+  // ✨ doplněno kvůli TS chybě
+  name_genitive?: string | null;
 };
+
+// ✨ Pomocný typ pro bezpečné čtení interního pole z autocomplete
+type PrivatePresetCarrier = { __presets?: PresetLike[] | null };
 
 // normalizace pro porovnání labelů presetů
 const normalize = (s: string) =>
   String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
 /** Vrátí g/ks s prioritou:
- *  1) vybraný preset (různá pole včetně __presets + __selectedPresetIndex)
+ *  1) vybraný preset (různá pole včetně __selectedPresetIndex)
  *  2) vybraný label / fallback „stroužek/clove“
  *  3) až potom default_grams
  */
@@ -177,10 +182,10 @@ function getPresetGramsForRow(ing: IngredientRow | IngredientRowLike): number | 
     if (Number.isFinite(n) && n > 0) return n;
   }
 
-  // 2) seznam presetů – standardní i "__" pole
+  // 2) seznam presetů – standardní i snake
   const presets: PresetLike[] =
     (Array.isArray(x?.servingPresets) ? (x?.servingPresets as PresetLike[]) : []) ??
-    (Array.isArray(x?.__presets) ? (x?.__presets as PresetLike[]) : []) ??
+    (Array.isArray(x?.serving_presets) ? (x?.serving_presets as PresetLike[]) : []) ??
     [];
 
   if (presets.length) {
@@ -274,11 +279,29 @@ export default function RecipeForm({
     setImagePreview(initialImageUrl || null);
   }, [initialImageUrl]);
 
+  /* --------- Normalizace inicializačních ingrediencí (jen snake→camel) ---------- */
+  const normalizedInitialIngredients: IngredientRowLike[] = useMemo(() => {
+    return (initialIngredients || []).map((ing) => {
+      const x = ing as IngredientRowLike;
+
+      // sjednotit presety: snake → camel (nešaháme na __presets, to si spravuje komponenta)
+      const servingPresets =
+        (Array.isArray(x.servingPresets) ? x.servingPresets : undefined) ??
+        (Array.isArray(x.serving_presets) ? x.serving_presets : undefined) ??
+        undefined;
+
+      return {
+        ...x,
+        servingPresets,
+      };
+    });
+  }, [initialIngredients]);
+
   /* --------- Přepočet kcal z reálných gramů (včetně presetů) ---------- */
   const [calories, setCalories] = useState<number>(initialCalories ?? 0);
 
   useEffect(() => {
-    setCalories(calcTotalCalories(initialIngredients ?? []));
+    setCalories(calcTotalCalories(normalizedInitialIngredients));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -294,7 +317,7 @@ export default function RecipeForm({
     e.preventDefault();
     setSubmitting(true);
 
-    const rows = ingredientRef.current?.getIngredients() || [];
+    const rows = (ingredientRef.current?.getIngredients() || []) as IngredientRowLike[];
     if (rows.length === 0) {
       alert("Musíš zadat alespoň jednu surovinu.");
       setSubmitting(false);
@@ -302,7 +325,7 @@ export default function RecipeForm({
     }
 
     // čisté ingredience pro POST/PUT
-    const ingredients: IngredientRow[] = rows.map((ing) => ({
+    const ingredients: IngredientRowLike[] = rows.map((ing) => ({
       ...ing,
       calories_per_gram: Number(ing.calories_per_gram || 0),
       amount: Number(ing.amount || 0),
@@ -325,8 +348,10 @@ export default function RecipeForm({
 
       // vybraný preset (má přednost před default_grams)
       const perPiece = getPresetGramsForRow(ing);
-      if (Number(perPiece) > 0) {
-        formData.append(`ingredients[${i}][selectedServingGrams]`, String(perPiece));
+      const directSelected = Number(ing.selectedServingGrams ?? 0);
+      const toSend = Number.isFinite(directSelected) && directSelected > 0 ? directSelected : perPiece;
+      if (Number(toSend) > 0) {
+        formData.append(`ingredients[${i}][selectedServingGrams]`, String(toSend));
       }
 
       if (ing.default_grams != null) {
@@ -337,29 +362,46 @@ export default function RecipeForm({
       }
 
       // OFF ID + makra (na 100 g) — volitelné
-      const maybe = ing as Partial<IngredientRowLike>;
-      if (maybe.off_id) {
-        formData.append(`ingredients[${i}][off_id]`, String(maybe.off_id));
+      if (ing.off_id) {
+        formData.append(`ingredients[${i}][off_id]`, String(ing.off_id));
       }
 
-      formData.append(`ingredients[${i}][energy_kcal_100g]`,   maybe.energy_kcal_100g   == null ? "" : String(maybe.energy_kcal_100g));
-      formData.append(`ingredients[${i}][proteins_100g]`,      maybe.proteins_100g      == null ? "" : String(maybe.proteins_100g));
-      formData.append(`ingredients[${i}][carbs_100g]`,         maybe.carbs_100g         == null ? "" : String(maybe.carbs_100g));
-      formData.append(`ingredients[${i}][sugars_100g]`,        maybe.sugars_100g        == null ? "" : String(maybe.sugars_100g));
-      formData.append(`ingredients[${i}][fat_100g]`,           maybe.fat_100g           == null ? "" : String(maybe.fat_100g));
-      formData.append(`ingredients[${i}][saturated_fat_100g]`, maybe.saturated_fat_100g == null ? "" : String(maybe.saturated_fat_100g));
-      formData.append(`ingredients[${i}][fiber_100g]`,         maybe.fiber_100g         == null ? "" : String(maybe.fiber_100g));
-      formData.append(`ingredients[${i}][sodium_100g]`,        maybe.sodium_100g        == null ? "" : String(maybe.sodium_100g));
+      formData.append(`ingredients[${i}][energy_kcal_100g]`,   ing.energy_kcal_100g   == null ? "" : String(ing.energy_kcal_100g));
+      formData.append(`ingredients[${i}][proteins_100g]`,      ing.proteins_100g      == null ? "" : String(ing.proteins_100g));
+      formData.append(`ingredients[${i}][carbs_100g]`,         ing.carbs_100g         == null ? "" : String(ing.carbs_100g));
+      formData.append(`ingredients[${i}][sugars_100g]`,        ing.sugars_100g        == null ? "" : String(ing.sugars_100g));
+      formData.append(`ingredients[${i}][fat_100g]`,           ing.fat_100g           == null ? "" : String(ing.fat_100g));
+      formData.append(`ingredients[${i}][saturated_fat_100g]`, ing.saturated_fat_100g == null ? "" : String(ing.saturated_fat_100g));
+      formData.append(`ingredients[${i}][fiber_100g]`,         ing.fiber_100g         == null ? "" : String(ing.fiber_100g));
+      formData.append(`ingredients[${i}][sodium_100g]`,        ing.sodium_100g        == null ? "" : String(ing.sodium_100g));
 
-      // (volitelné) Pošli i presety v jednotném tvaru – hodí se pro klientský detail/modál
-      const presetsRaw = Array.isArray(maybe.__presets) ? maybe.__presets : null;
-      if (presetsRaw) {
-        const normalized = presetsRaw.map((p) => ({
-          label: String(("label" in p ? p.label : "path" in p ? p.path : "") ?? ""),
-          grams: Number(("grams" in p ? p.grams : "g" in p ? p.g : 0)) || 0,
-          unit: ("unit" in p && p.unit) ? p.unit : "ks",
+      // Pošli i presety:
+      // 1) primárně z camel `servingPresets`
+      if (Array.isArray(ing.servingPresets) && ing.servingPresets.length) {
+        const normalized = ing.servingPresets.map((p) => ({
+          label: String(p.label ?? ""),
+          grams: Number(p.grams || 0),
+          unit: p.unit ?? "ks",
+          inflect: p.inflect,
         }));
         formData.append(`ingredients[${i}][servingPresets]`, JSON.stringify(normalized));
+      } else {
+        // 2) fallback – pokud by někde šly jen __presets (jiný tvar)
+        const alt = (ing as PrivatePresetCarrier).__presets as PresetLike[] | undefined;
+        if (Array.isArray(alt) && alt.length) {
+          const normalized = alt.map((p) => ({
+            label: String(("label" in p ? p.label : "path" in p ? p.path : "") ?? ""),
+            grams: Number(("grams" in p ? p.grams : "g" in p ? p.g : 0)) || 0,
+            unit: ("unit" in p && p.unit) ? p.unit : "ks",
+            inflect: (p as { inflect?: { one?: string; few?: string; many?: string } }).inflect,
+          }));
+          formData.append(`ingredients[${i}][servingPresets]`, JSON.stringify(normalized));
+        }
+      }
+
+      // skloňování — jen pokud máme (je volitelné)
+      if (ing.name_genitive != null) {
+        formData.append(`ingredients[${i}][name_genitive]`, String(ing.name_genitive));
       }
     });
 
@@ -482,7 +524,7 @@ export default function RecipeForm({
         <div className="mt-4">
           <IngredientAutocomplete
             ref={ingredientRef}
-            initialIngredients={initialIngredients}
+            initialIngredients={normalizedInitialIngredients as IngredientRow[]}
             onChange={(rows: IngredientRow[]) => setCalories(calcTotalCalories(rows))}
           />
         </div>

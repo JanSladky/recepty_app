@@ -53,7 +53,7 @@ function parseJSON<T>(value: unknown, fallback: T): T {
   return (value as T) ?? fallback;
 }
 
-/** ✅ Parser předvoleb porcí: [{label:string, grams:number}, ...] */
+/** ✅ Parser předvoleb porcí: [{label:string, grams:number, unit?:string, inflect?:{...}}] */
 function parseServingPresets(input: unknown): {
   label: string;
   grams: number;
@@ -62,7 +62,13 @@ function parseServingPresets(input: unknown): {
 }[] {
   const raw =
     typeof input === "string"
-      ? (() => { try { return JSON.parse(input); } catch { return []; } })()
+      ? (() => {
+          try {
+            return JSON.parse(input);
+          } catch {
+            return [];
+          }
+        })()
       : input;
 
   if (!Array.isArray(raw)) return [];
@@ -70,12 +76,14 @@ function parseServingPresets(input: unknown): {
     .map((x: any) => ({
       label: String(x?.label ?? x?.path ?? "").trim(),
       grams: Number(x?.grams ?? x?.g ?? NaN),
-      unit:  x?.unit ? String(x.unit) : "ks",
-      inflect: x?.inflect ? {
-        one:  x.inflect.one  ?? undefined,
-        few:  x.inflect.few  ?? undefined,
-        many: x.inflect.many ?? undefined,
-      } : undefined,
+      unit: x?.unit ? String(x.unit) : "ks",
+      inflect: x?.inflect
+        ? {
+            one: x.inflect.one ?? undefined,
+            few: x.inflect.few ?? undefined,
+            many: x.inflect.many ?? undefined,
+          }
+        : undefined,
     }))
     .filter((x) => x.label && Number.isFinite(x.grams) && x.grams > 0);
 }
@@ -96,9 +104,11 @@ function processIngredients(raw: unknown): ModelIngredientInput[] {
 
   return (arr as any[]).map((i) => {
     const ingredient_id =
-      i.ingredient_id !== undefined ? Number(i.ingredient_id)
-      : i.id !== undefined ? Number(i.id)
-      : 0;
+      i.ingredient_id !== undefined
+        ? Number(i.ingredient_id)
+        : i.id !== undefined
+        ? Number(i.id)
+        : 0;
 
     const base: any = {
       ingredient_id,
@@ -134,7 +144,11 @@ function processIngredients(raw: unknown): ModelIngredientInput[] {
       base.sodium_100g = Number(i.sodium_100g);
 
     // volitelné – pokud JSON obsahoval vybraný preset
-    if (i.selectedServingGrams !== undefined && i.selectedServingGrams !== null && i.selectedServingGrams !== "") {
+    if (
+      i.selectedServingGrams !== undefined &&
+      i.selectedServingGrams !== null &&
+      i.selectedServingGrams !== ""
+    ) {
       base.selectedServingGrams = Number(i.selectedServingGrams);
     }
 
@@ -143,9 +157,6 @@ function processIngredients(raw: unknown): ModelIngredientInput[] {
 }
 
 /** ====== NOVÝ parser pro rozbalené FormData: ingredients[0][...] ====== */
-/** lokální typ pro sběr z FormData – rozšiřuje model o optional selectedServingGrams,
- * aby TS nehlásil chybu na Partial<ModelIngredientInput>.
- */
 type CollectedIng = Partial<ModelIngredientInput> & {
   selectedServingGrams?: number | null;
 };
@@ -198,7 +209,8 @@ function collectIngredientsFromBody(body: any): ModelIngredientInput[] {
     unit: String(r.unit ?? "g"),
     calories_per_gram: Number(r.calories_per_gram ?? 0),
     display: r.display == null || r.display === "" ? undefined : String(r.display),
-    default_grams: r.default_grams === null || r.default_grams === undefined ? null : Number(r.default_grams),
+    default_grams:
+      r.default_grams === null || r.default_grams === undefined ? null : Number(r.default_grams),
     selectedServingGrams: r.selectedServingGrams == null ? null : Number(r.selectedServingGrams),
     off_id: r.off_id == null || r.off_id === "" ? null : String(r.off_id),
     energy_kcal_100g: r.energy_kcal_100g == null ? null : Number(r.energy_kcal_100g),
@@ -493,7 +505,7 @@ export const getAllIngredients = async (req: Request, res: Response): Promise<vo
         off_id,
         energy_kcal_100g, proteins_100g, carbs_100g, sugars_100g,
         fat_100g, saturated_fat_100g, fiber_100g, sodium_100g,
-        serving_presets
+        COALESCE(serving_presets,'[]'::jsonb) AS serving_presets   -- ✅ nikdy null
       FROM ingredients
       ORDER BY id ASC
       LIMIT $1 OFFSET $2
@@ -511,7 +523,10 @@ export const getAllIngredients = async (req: Request, res: Response): Promise<vo
 export async function createIngredient(req: Request, res: Response) {
   try {
     const b = req.body ?? {};
-    const servingPresets = Array.isArray(b.serving_presets) ? b.serving_presets : [];
+
+    // ✅ přijmi snake i camel + string/array
+    const rawPresets = (b as any).serving_presets ?? (b as any).servingPresets ?? [];
+    const servingPresets = parseServingPresets(rawPresets);
 
     const { rows } = await db.query(
       `
@@ -534,13 +549,29 @@ export async function createIngredient(req: Request, res: Response) {
       ) RETURNING *;
       `,
       [
-        b.name ?? null, b.name_cs ?? null, b.name_genitive ?? null, b.unit_name ?? null,
-        b.category_id ?? null, b.default_grams ?? null,
+        b.name ?? null,
+        b.name_cs ?? null,
+        b.name_genitive ?? null,
+        b.unit_name ?? null,
+        b.category_id ?? null,
+        b.default_grams ?? null,
         b.calories_per_gram ?? null,
-        b.energy_kcal_100g ?? null, b.proteins_100g ?? null, b.carbs_100g ?? null, b.sugars_100g ?? null, b.fat_100g ?? null, b.saturated_fat_100g ?? null,
-        b.fiber_100g ?? null, b.sodium_100g ?? null,
-        b.trans_fat_100g ?? null, b.mono_fat_100g ?? null, b.poly_fat_100g ?? null, b.cholesterol_mg_100g ?? null,
-        b.salt_100g ?? null, b.calcium_mg_100g ?? null, b.water_100g ?? null, b.phe_mg_100g ?? null,
+        b.energy_kcal_100g ?? null,
+        b.proteins_100g ?? null,
+        b.carbs_100g ?? null,
+        b.sugars_100g ?? null,
+        b.fat_100g ?? null,
+        b.saturated_fat_100g ?? null,
+        b.fiber_100g ?? null,
+        b.sodium_100g ?? null,
+        b.trans_fat_100g ?? null,
+        b.mono_fat_100g ?? null,
+        b.poly_fat_100g ?? null,
+        b.cholesterol_mg_100g ?? null,
+        b.salt_100g ?? null,
+        b.calcium_mg_100g ?? null,
+        b.water_100g ?? null,
+        b.phe_mg_100g ?? null,
         JSON.stringify(servingPresets),
       ]
     );
@@ -557,8 +588,9 @@ export async function updateIngredient(req: Request, res: Response) {
     const id = Number(req.params.id);
     const b = req.body ?? {};
 
-    // JSON pole ošetřit na jsonb
-    const servingPresets = Array.isArray(b.serving_presets) ? b.serving_presets : [];
+    // ✅ přijmi snake i camel + string/array
+    const rawPresets = (b as any).serving_presets ?? (b as any).servingPresets ?? [];
+    const servingPresets = parseServingPresets(rawPresets);
 
     const { rows } = await db.query(
       `
@@ -658,7 +690,6 @@ export const deleteIngredient = async (req: Request, res: Response): Promise<voi
   }
 };
 
-
 export async function searchLocalIngredients(req: Request, res: Response) {
   try {
     const q = String(req.query.q ?? "").toLowerCase();
@@ -677,7 +708,7 @@ export async function searchLocalIngredients(req: Request, res: Response) {
       fiber_100g, sodium_100g,
       trans_fat_100g, mono_fat_100g, poly_fat_100g, cholesterol_mg_100g,
       salt_100g, calcium_mg_100g, water_100g, phe_mg_100g,
-      serving_presets
+      COALESCE(serving_presets,'[]'::jsonb) AS serving_presets
     `;
 
     const cols = format === "full" ? colsFull : colsCompact;
@@ -693,7 +724,62 @@ export async function searchLocalIngredients(req: Request, res: Response) {
       [`%${q}%`, limit]
     );
 
-    res.json(rows);
+    // 🔧 Normalizace výstupu – FE modal očekává camelCase `servingPresets` a nikdy null
+    const normalized = rows.map((r: any) => {
+      const base: any = {
+        id: r.id,
+        name: r.name,
+        name_cs: r.name_cs ?? null,
+        name_genitive: r.name_genitive ?? null,
+        category_id: r.category_id ?? null,
+        default_grams: r.default_grams ?? null,
+        unit_name: r.unit_name ?? null,
+        calories_per_gram: r.calories_per_gram ?? null,
+        energy_kcal_100g: r.energy_kcal_100g ?? null,
+        proteins_100g: r.proteins_100g ?? null,
+        carbs_100g: r.carbs_100g ?? null,
+        sugars_100g: r.sugars_100g ?? null,
+        fat_100g: r.fat_100g ?? null,
+        saturated_fat_100g: r.saturated_fat_100g ?? null,
+        fiber_100g: r.fiber_100g ?? null,
+        sodium_100g: r.sodium_100g ?? null,
+        trans_fat_100g: r.trans_fat_100g ?? null,
+        mono_fat_100g: r.mono_fat_100g ?? null,
+        poly_fat_100g: r.poly_fat_100g ?? null,
+        cholesterol_mg_100g: r.cholesterol_mg_100g ?? null,
+        salt_100g: r.salt_100g ?? null,
+        calcium_mg_100g: r.calcium_mg_100g ?? null,
+        water_100g: r.water_100g ?? null,
+        phe_mg_100g: r.phe_mg_100g ?? null,
+      };
+
+      // vždy zajisti pole presetů (i pro compact)
+      const serving_presets: any[] =
+        format === "full"
+          ? Array.isArray(r.serving_presets)
+            ? r.serving_presets
+            : []
+          : [];
+
+      // přidej snake i camel verzi, aby FE mělo vždy co číst
+      (base as any).serving_presets = serving_presets;
+      (base as any).servingPresets = serving_presets.map((p: any) => ({
+        label: String(p?.label ?? p?.path ?? ""),
+        grams: Number(p?.grams ?? p?.g ?? 0) || 0,
+        unit: p?.unit ?? "ks",
+        inflect: p?.inflect
+          ? {
+              one: p.inflect.one ?? undefined,
+              few: p.inflect.few ?? undefined,
+              many: p.inflect.many ?? undefined,
+            }
+          : undefined,
+      }));
+
+      return base;
+    });
+
+    res.json(normalized);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Search failed" });

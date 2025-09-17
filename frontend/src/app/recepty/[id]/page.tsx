@@ -45,7 +45,7 @@ const IconHeart = ({ isFavorite }: { isFavorite: boolean }) => (
   </svg>
 );
 
-/* ---------- Typy od backendu (sjednocené s kontrolerem/modely) ---------- */
+/* ---------- Typy od backendu ---------- */
 export type ServingPreset = {
   label: string;
   grams: number;
@@ -54,15 +54,17 @@ export type ServingPreset = {
 };
 
 export type IngredientInput = {
+  id?: number; // může přijít
+  ingredient_id?: number; // může přijít
   name: string;
   amount: number;
   unit: string;
   calories_per_gram: number;
   display?: string;
-  default_grams?: number | null;          // může být undefined → níže vždy doplníme na null
+  default_grams?: number | null;
   selectedServingGrams?: number | null;
 
-  // OFF volitelná makra (na 100 g)
+  // makra na 100 g
   energy_kcal_100g?: number | null;
   proteins_100g?: number | null;
   carbs_100g?: number | null;
@@ -73,9 +75,12 @@ export type IngredientInput = {
   sodium_100g?: number | null;
 
   name_genitive?: string | null;
-  servingPresets?: ServingPreset[];
 
-  // Rozšíření pro další pole, která modal umí zobrazit:
+  // může přijít jako camel i snake:
+  servingPresets?: ServingPreset[];
+  serving_presets?: ServingPreset[];
+
+  // rozšířené položky (na 100 g)
   trans_fat_100g?: number | null;
   mono_fat_100g?: number | null;
   poly_fat_100g?: number | null;
@@ -102,20 +107,28 @@ export type Recipe = {
   title: string;
   notes?: string | null;
   image_url?: string | null;
-  steps?: string[]; // volitelné, když se k nim přistupuje s ?
+  steps?: string[];
   status?: "APPROVED" | "PENDING" | "REJECTED";
   created_by?: number | null;
-
   categories?: string[];
   meal_types?: string[];
-
   ingredients?: IngredientInput[];
-
   calories?: number;
   nutrition_totals?: NutritionTotals;
 };
 
-/* ---------- Helpers ---------- */
+// NOVĚ – pokrývá id, ingredient_id, ingredientId i vnořený tvar ingredient.id
+const getIngredientId = (ing: Partial<IngredientInput> & { ingredient?: { id?: number } }): number | undefined => {
+  const raw =
+    ing.ingredient_id ??
+    (ing as { ingredientId?: number }).ingredientId ?? // pro jistotu kompatibilita
+    ing.id ??
+    ing.ingredient?.id ??
+    null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+};
+
 const nz = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 const normalize = (s: string) =>
@@ -147,6 +160,38 @@ function computeGrams(amount: number, unit: string, selectedServingGrams?: numbe
     return per > 0 ? a * per : 0;
   }
   return 0;
+}
+
+/* ---- Dostažení doplňků (serving_presets / default_grams / name_genitive) pro ingredienci ---- */
+type IngredientExtras = {
+  servingPresets: ServingPreset[];
+  default_grams: number | null;
+  name_genitive: string | null;
+};
+type IngredientExtrasAPI = {
+  serving_presets?: ServingPreset[] | null;
+  servingPresets?: ServingPreset[] | null;
+  default_grams?: number | null;
+  name_genitive?: string | null;
+};
+
+async function fetchIngredientExtras(id: number): Promise<IngredientExtras | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/ingredients/${id}?format=full`);
+    if (!res.ok) return null;
+    const j: IngredientExtrasAPI = await res.json();
+
+    // sjednotíme presety do camelCase
+    const presets = (Array.isArray(j.serving_presets) ? j.serving_presets : null) ?? (Array.isArray(j.servingPresets) ? j.servingPresets : null) ?? [];
+
+    return {
+      servingPresets: presets,
+      default_grams: j.default_grams ?? null,
+      name_genitive: j.name_genitive ?? null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export default function DetailPage() {
@@ -190,7 +235,34 @@ export default function DetailPage() {
         const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
         const res = await fetch(`${API_URL}/api/recipes/${id}`, { headers });
         if (!res.ok) throw new Error(`Recept se nepodařilo načíst (HTTP ${res.status})`);
+
         const data: Recipe = await res.json();
+
+        // 🔧 HYDRATACE: doplň chybějící presety a související pole pro každou ingredienci
+        if (Array.isArray(data.ingredients) && data.ingredients.length) {
+          const hydrated = await Promise.all(
+            data.ingredients.map(async (ing: IngredientInput) => {
+              const hasPresets =
+                (Array.isArray(ing.servingPresets) && ing.servingPresets.length > 0) || (Array.isArray(ing.serving_presets) && ing.serving_presets.length > 0);
+
+              const iid = getIngredientId(ing);
+              if (hasPresets || !iid) return ing;
+
+              const extra = await fetchIngredientExtras(iid);
+              if (!extra) return ing;
+
+              return {
+                ...ing,
+                servingPresets: extra.servingPresets, // camelCase pro UI
+                default_grams: ing.default_grams ?? extra.default_grams ?? null,
+                name_genitive: ing.name_genitive ?? extra.name_genitive ?? null,
+              };
+            })
+          );
+
+          data.ingredients = hydrated as IngredientInput[];
+        }
+
         setRecipe(data);
         if (email) fetchFavorites(email, data.id);
       } catch (e) {
@@ -308,7 +380,7 @@ export default function DetailPage() {
           <Image src={imageUrl} alt={recipe.title} fill sizes="100vw" className="object-cover" unoptimized />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/20 flex flex-col justify-end p-6 md:p-8">
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl md:text-5xl font-bold text-white drop-shadow-lg">{recipe.title}</h1>
+              <h1 className="text-3xl md:text-5xl font-bold text-white">{recipe.title}</h1>
               {isPending && <span className="text-xs md:text-sm bg-yellow-400 text-gray-900 font-bold px-2 py-1 rounded">Čeká na schválení</span>}
               {recipe.status === "REJECTED" && <span className="text-xs md:text-sm bg-red-500 text-white font-bold px-2 py-1 rounded">Zamítnuto</span>}
             </div>
@@ -419,13 +491,16 @@ export default function DetailPage() {
                   // 3) badge kcal
                   const kcal = Math.round(nz(ing.calories_per_gram) * grams);
 
-                  // 4) zkus najít vybraný preset (podle gramáže)
-                  const servingPresets: ServingPreset[] = Array.isArray(ing.servingPresets) ? ing.servingPresets : [];
-                  const chosenPreset = selected && servingPresets.length
-                    ? servingPresets.find((p) => Math.round(p.grams) === Math.round(selected))
-                    : undefined;
+                  // 4) presety – camel i snake
+                  const servingPresets: ServingPreset[] = Array.isArray(ing.servingPresets)
+                    ? ing.servingPresets
+                    : Array.isArray(ing.serving_presets)
+                    ? ing.serving_presets
+                    : [];
 
-                  // 5) finální text přes helper (umí genitiv i skloňování presetu)
+                  const chosenPreset = selected && servingPresets.length ? servingPresets.find((p) => Math.round(p.grams) === Math.round(selected)) : undefined;
+
+                  // 5) text přes helper
                   const label = formatIngredientLabel({
                     amount,
                     unit,
@@ -448,12 +523,16 @@ export default function DetailPage() {
                           });
 
                           const modalPayload: IngredientForModal = {
+                            id: getIngredientId(ing), // ✅ důležité pro dofetch v modalu
                             name: ing.name,
                             amount,
                             unit,
-                            default_grams: ing.default_grams ?? null, // ← zajisti number|null
-                            selectedServingGrams: typeof ing.selectedServingGrams === "number" ? ing.selectedServingGrams : selectedGuess ?? null,
-                            servingPresets: servingPresets,
+
+                            default_grams: ing.default_grams != null ? Number(ing.default_grams) : null,
+                            selectedServingGrams:
+                              typeof ing.selectedServingGrams === "number" ? ing.selectedServingGrams : selectedGuess != null ? selectedGuess : null,
+
+                            servingPresets,
                             name_genitive: ing.name_genitive ?? null,
 
                             energy_kcal_100g: ing.energy_kcal_100g ?? null,
@@ -474,7 +553,11 @@ export default function DetailPage() {
                             water_100g: ing.water_100g ?? null,
                             phe_mg_100g: ing.phe_mg_100g ?? null,
                           };
-
+                          console.log("[ING → MODAL payload]", {
+                            from: ing,
+                            id: getIngredientId(ing),
+                            name: ing.name,
+                          });
                           setModalIng(modalPayload);
                           setModalOpen(true);
                         }}
@@ -493,7 +576,14 @@ export default function DetailPage() {
         </div>
       </main>
 
-      {modalOpen && modalIng && <IngredientNutritionModal key={modalIng.name} open onClose={() => setModalOpen(false)} ingredient={modalIng} />}
+      {modalOpen && modalIng && (
+        <IngredientNutritionModal
+          key={modalIng.id ?? modalIng.name} // ✅ preferuj id, ať se modal správně remountne
+          open
+          onClose={() => setModalOpen(false)}
+          ingredient={modalIng}
+        />
+      )}
     </div>
   );
 }

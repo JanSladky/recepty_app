@@ -383,35 +383,39 @@ export async function getRecipeByIdFromDB(id: number) {
 
   const tryAdvanced = async () => {
     const q = `
-    SELECT
-      ri.amount,
-      ri.unit,
-      ri.display,
-      i.name,
-      i.name_genitive,
-      i.serving_presets,
-      i.default_grams,
-      ri.selected_serving_grams,                          -- ⬅️ PŘIDÁNO
+  SELECT
+    ri.ingredient_id,                                -- ✅ přidáno
+    ri.amount,
+    ri.unit,
+    ri.display,
 
-      -- kcal/g: preferuj i.calories_per_gram, jinak OFF/100
-      COALESCE(i.calories_per_gram, op.energy_kcal_100g/100.0) AS calories_per_gram,
+    i.name,
+    i.name_genitive,
+    COALESCE(i.serving_presets, '[]'::jsonb) AS serving_presets,  -- ✅ vždy pole
+    i.default_grams,
 
-      -- MAKRA: preferuj OFF, fallback na ingredients.*
-      COALESCE(op.energy_kcal_100g,   i.energy_kcal_100g)   AS energy_kcal_100g,
-      COALESCE(op.proteins_100g,      i.proteins_100g)      AS proteins_100g,
-      COALESCE(op.carbs_100g,         i.carbs_100g)         AS carbs_100g,
-      COALESCE(op.sugars_100g,        i.sugars_100g)        AS sugars_100g,
-      COALESCE(op.fat_100g,           i.fat_100g)           AS fat_100g,
-      COALESCE(op.saturated_fat_100g, i.saturated_fat_100g) AS saturated_fat_100g,
-      COALESCE(op.fiber_100g,         i.fiber_100g)         AS fiber_100g,
-      COALESCE(op.sodium_100g,        i.sodium_100g)        AS sodium_100g
-    FROM recipe_ingredients ri
-    LEFT JOIN ingredients  i  ON ri.ingredient_id = i.id
-    LEFT JOIN off_products op ON op.code = i.off_id
-    WHERE ri.recipe_id = $1
-  `;
+    ri.selected_serving_grams,
+
+    -- kcal/g: preferuj i.calories_per_gram, jinak OFF/100
+    COALESCE(i.calories_per_gram, op.energy_kcal_100g/100.0) AS calories_per_gram,
+
+    -- MAKRA: preferuj OFF, fallback na ingredients.*
+    COALESCE(op.energy_kcal_100g,   i.energy_kcal_100g)   AS energy_kcal_100g,
+    COALESCE(op.proteins_100g,      i.proteins_100g)      AS proteins_100g,
+    COALESCE(op.carbs_100g,         i.carbs_100g)         AS carbs_100g,
+    COALESCE(op.sugars_100g,        i.sugars_100g)        AS sugars_100g,
+    COALESCE(op.fat_100g,           i.fat_100g)           AS fat_100g,
+    COALESCE(op.saturated_fat_100g, i.saturated_fat_100g) AS saturated_fat_100g,
+    COALESCE(op.fiber_100g,         i.fiber_100g)         AS fiber_100g,
+    COALESCE(op.sodium_100g,        i.sodium_100g)        AS sodium_100g
+  FROM recipe_ingredients ri
+  LEFT JOIN ingredients  i  ON ri.ingredient_id = i.id
+  LEFT JOIN off_products op ON op.code = i.off_id
+  WHERE ri.recipe_id = $1
+`;
     const { rows } = await db.query(q, [id]);
     return rows.map((row: any) => ({
+      ingredient_id: row.ingredient_id ?? undefined,
       name: !row.name || row.name.trim() === "" ? "Neznámá surovina" : row.name,
       amount: Number(row.amount) || 0,
       unit: row.unit as string,
