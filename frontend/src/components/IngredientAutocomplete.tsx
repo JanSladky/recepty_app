@@ -478,6 +478,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
 
       __presets: presets,
       __selectedPresetIndex: presets ? 0 : null,
+      selectedPresetLabel: firstPreset ? firstPreset.path ?? null : null,
     });
 
     setQueries((prev) => prev.map((q, i) => (i === index ? label : q)));
@@ -521,20 +522,23 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
   };
 
   /** Když uživatel vybere preset z rozbalovačky v řádku */
+
   const applyPreset = (rowIndex: number, presetIndex: number) => {
     const r = rows[rowIndex];
     if (!r || !r.__presets || r.__presets.length <= presetIndex) return;
-    const p = r.__presets[presetIndex];
+
+    // Preset může mít vždy 'path', ale pro jistotu toleruj i 'label'
+    type FlexPreset = ServingPreset & { label?: string | null };
+    const p = r.__presets[presetIndex] as FlexPreset;
 
     updateRow(rowIndex, {
       __selectedPresetIndex: presetIndex,
-      // ulož i label vybraného presetu – využije se pro správné skloňování/label
-      selectedPresetLabel: (p as any).path ?? (p as any).label ?? "",
+      // uložíme text vybraného presetu (pro skloňování v labelu)
+      selectedPresetLabel: p.path ?? p.label ?? "",
       unit: p.unit ?? "ks",
       default_grams: Number(p.g) || 0,
     });
   };
-
   // === render ===
   return (
     <div ref={wrapperRef} className="space-y-3">
