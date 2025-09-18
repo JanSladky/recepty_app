@@ -14,6 +14,7 @@ export type IngredientRow = {
   default_grams?: number;
   display?: string;
   selectedPresetLabel?: string | null;
+  selectedServingGrams?: number | null;
 
   // OFF identifikátor + metadata
   off_id?: string | null;
@@ -104,6 +105,12 @@ type LocalIngredientSearchRow = {
   sodium_100g?: number | null;
 };
 
+type RawPreset = { label?: string; grams?: number; unit?: string | null } | { path?: string; g?: number; unit?: string | null };
+
+type InitialWithPresets = IngredientRow & {
+  servingPresets?: RawPreset[] | null;
+  serving_presets?: RawPreset[] | null;
+};
 // --- utils ---
 function uid() {
   const g = (globalThis as unknown) as { crypto?: { randomUUID?: () => string } };
@@ -192,39 +199,73 @@ class LRU {
 }
 const lru = new LRU(200);
 
+/** ✨ Pomocník: normalizuj presety do UI tvaru {path,g,unit} */
+function toUiPresetList(src?: Array<{ label?: string; grams?: number; path?: string; g?: number; unit?: string | null }> | null): ServingPreset[] | null {
+  if (!Array.isArray(src)) return null;
+  const out = src
+    .map((p) => ({
+      path: String(p?.path ?? p?.label ?? "").trim(),
+      g: Number(p?.g ?? p?.grams ?? 0) || 0,
+      unit: (p?.unit ?? "ks") || "ks",
+    }))
+    .filter((p) => p.path && p.g > 0);
+  return out.length ? out : null;
+}
+
 // --- komponenta ---
 const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>(({ initialIngredients = [], onChange }, ref) => {
   const normalizedInitial = initialIngredients && initialIngredients.length ? initialIngredients : [{ name: "", amount: 0, unit: "g", calories_per_gram: 0 }];
 
   const [rows, setRows] = useState<IngredientRow[]>(
-    normalizedInitial.map((r) => ({
-      _key: r._key ?? uid(),
-      name: (r.name ?? "") as string,
-      amount: Number(r.amount ?? 0),
-      unit: (r.unit ?? "g") as string,
-      calories_per_gram: Number(r.calories_per_gram ?? 0),
-      default_grams: r.default_grams === undefined ? undefined : Number(r.default_grams),
-      display: r.display ?? undefined,
+    normalizedInitial.map((r) => {
+      const from = r as InitialWithPresets;
+      const presetsUI = toUiPresetList(from.servingPresets ?? from.serving_presets ?? null);
 
-      off_id: r.off_id ?? null,
-      brands: (r.brands as string | null) ?? null,
-      quantity: (r.quantity as string | null) ?? null,
-      image_small_url: r.image_small_url ?? null,
+      let selIdx: number | null = null;
+      if (presetsUI && presetsUI.length) {
+        if (r.selectedPresetLabel) {
+          const want = String(r.selectedPresetLabel).trim().toLowerCase();
+          selIdx = presetsUI.findIndex((p) => p.path.trim().toLowerCase() === want);
+        }
+        if ((selIdx == null || selIdx < 0) && r.selectedServingGrams) {
+          const g = Number(r.selectedServingGrams);
+          if (g > 0) {
+            selIdx = presetsUI.findIndex((p) => Math.round(Number(p.g)) === Math.round(g));
+          }
+        }
+        if (!(selIdx != null && selIdx >= 0)) selIdx = null;
+      }
 
-      energy_kcal_100g: r.energy_kcal_100g ?? null,
-      proteins_100g: r.proteins_100g ?? null,
-      carbs_100g: r.carbs_100g ?? null,
-      sugars_100g: r.sugars_100g ?? null,
-      fat_100g: r.fat_100g ?? null,
-      saturated_fat_100g: r.saturated_fat_100g ?? null,
-      fiber_100g: r.fiber_100g ?? null,
-      sodium_100g: r.sodium_100g ?? null,
+      return {
+        _key: r._key ?? uid(),
+        name: (r.name ?? "") as string,
+        amount: Number(r.amount ?? 0),
+        unit: (r.unit ?? "g") as string,
+        calories_per_gram: Number(r.calories_per_gram ?? 0),
+        default_grams: r.default_grams === undefined ? undefined : Number(r.default_grams),
+        display: r.display ?? undefined,
+        selectedPresetLabel: r.selectedPresetLabel ?? null,
+        selectedServingGrams: r.selectedServingGrams == null ? null : Number(r.selectedServingGrams),
 
-      __selectedPresetIndex: null,
-      __presets: null,
-    }))
+        off_id: r.off_id ?? null,
+        brands: (r.brands as string | null) ?? null,
+        quantity: (r.quantity as string | null) ?? null,
+        image_small_url: r.image_small_url ?? null,
+
+        energy_kcal_100g: r.energy_kcal_100g ?? null,
+        proteins_100g: r.proteins_100g ?? null,
+        carbs_100g: r.carbs_100g ?? null,
+        sugars_100g: r.sugars_100g ?? null,
+        fat_100g: r.fat_100g ?? null,
+        saturated_fat_100g: r.saturated_fat_100g ?? null,
+        fiber_100g: r.fiber_100g ?? null,
+        sodium_100g: r.sodium_100g ?? null,
+
+        __selectedPresetIndex: selIdx,
+        __presets: presetsUI,
+      };
+    })
   );
-
   const [queries, setQueries] = useState<string[]>(normalizedInitial.map((r) => (r.name ?? "") as string));
 
   const [suggestions, setSuggestions] = useState<Record<number, Suggestion[]>>({});
@@ -250,41 +291,73 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
   useImperativeHandle(ref, () => ({
     getIngredients: () => rows,
     setInitialIngredients: (v: IngredientRow[]) => {
-      const list = (v ?? []).map((r) => ({
-        _key: r._key ?? uid(),
-        name: (r.name ?? "") as string,
-        amount: Number(r.amount ?? 0),
-        unit: (r.unit ?? "g") as string,
-        calories_per_gram: Number(r.calories_per_gram ?? 0),
-        default_grams: r.default_grams === undefined ? undefined : Number(r.default_grams),
-        display: r.display ?? undefined,
+      const list = (v ?? []).map((r) => {
+        // ⬇️ žádné any – přetypujeme na InitialWithPresets
+        const from = r as InitialWithPresets;
+        const presetsUI = toUiPresetList(from.servingPresets ?? from.serving_presets ?? null);
 
-        off_id: r.off_id ?? null,
-        brands: (r.brands as string | null) ?? null,
-        quantity: (r.quantity as string | null) ?? null,
-        image_small_url: r.image_small_url ?? null,
+        let selIdx: number | null = null;
+        if (presetsUI && presetsUI.length) {
+          if (r.selectedPresetLabel) {
+            const want = String(r.selectedPresetLabel).trim().toLowerCase();
+            selIdx = presetsUI.findIndex((p) => p.path.trim().toLowerCase() === want);
+          }
+          if ((selIdx == null || selIdx < 0) && r.selectedServingGrams) {
+            const g = Number(r.selectedServingGrams);
+            if (g > 0) {
+              selIdx = presetsUI.findIndex((p) => Math.round(Number(p.g)) === Math.round(g));
+            }
+          }
+          if (!(selIdx != null && selIdx >= 0)) selIdx = null;
+        }
 
-        energy_kcal_100g: r.energy_kcal_100g ?? null,
-        proteins_100g: r.proteins_100g ?? null,
-        carbs_100g: r.carbs_100g ?? null,
-        sugars_100g: r.sugars_100g ?? null,
-        fat_100g: r.fat_100g ?? null,
-        saturated_fat_100g: r.saturated_fat_100g ?? null,
-        fiber_100g: r.fiber_100g ?? null,
-        sodium_100g: r.sodium_100g ?? null,
+        return {
+          _key: r._key ?? uid(),
+          name: (r.name ?? "") as string,
+          amount: Number(r.amount ?? 0),
+          unit: (r.unit ?? "g") as string,
+          calories_per_gram: Number(r.calories_per_gram ?? 0),
+          default_grams: r.default_grams === undefined ? undefined : Number(r.default_grams),
+          display: r.display ?? undefined,
+          selectedPresetLabel: r.selectedPresetLabel ?? null,
+          selectedServingGrams: r.selectedServingGrams == null ? null : Number(r.selectedServingGrams),
 
-        __selectedPresetIndex: null,
-        __presets: null,
-      }));
+          off_id: r.off_id ?? null,
+          brands: (r.brands as string | null) ?? null,
+          quantity: (r.quantity as string | null) ?? null,
+          image_small_url: r.image_small_url ?? null,
+
+          energy_kcal_100g: r.energy_kcal_100g ?? null,
+          proteins_100g: r.proteins_100g ?? null,
+          carbs_100g: r.carbs_100g ?? null,
+          sugars_100g: r.sugars_100g ?? null,
+          fat_100g: r.fat_100g ?? null,
+          saturated_fat_100g: r.saturated_fat_100g ?? null,
+          fiber_100g: r.fiber_100g ?? null,
+          sodium_100g: r.sodium_100g ?? null,
+
+          __selectedPresetIndex: selIdx,
+          __presets: presetsUI,
+        } as IngredientRow;
+      });
 
       const safeList =
         list.length > 0
           ? list
-          : [{ _key: uid(), name: "", amount: 0, unit: "g", calories_per_gram: 0, __selectedPresetIndex: null, __presets: null } as IngredientRow];
+          : [
+              {
+                _key: uid(),
+                name: "",
+                amount: 0,
+                unit: "g",
+                calories_per_gram: 0,
+                __selectedPresetIndex: null,
+                __presets: null,
+              } as IngredientRow,
+            ];
 
       setRows(safeList);
       setQueries(safeList.map((r) => r.name ?? ""));
-
       setTimeout(() => inputRefs.current[0]?.focus(), 0);
     },
   }));
@@ -462,6 +535,9 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
       default_grams: firstPreset ? Number(firstPreset.g) : s.default_grams ?? undefined,
       unit: firstPreset?.unit ?? (s.default_grams ? "ks" : "g"),
 
+      selectedServingGrams: firstPreset ? Number(firstPreset.g) : null,
+      selectedPresetLabel: firstPreset ? firstPreset.path ?? null : null,
+
       off_id: (s.patch?.off_id ?? (s.source === "off" ? s.code : null)) || null,
       brands: (s.brands as string | null) ?? null,
       quantity: (s.quantity as string | null) ?? null,
@@ -478,7 +554,6 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
 
       __presets: presets,
       __selectedPresetIndex: presets ? 0 : null,
-      selectedPresetLabel: firstPreset ? firstPreset.path ?? null : null,
     });
 
     setQueries((prev) => prev.map((q, i) => (i === index ? label : q)));
@@ -522,23 +597,27 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
   };
 
   /** Když uživatel vybere preset z rozbalovačky v řádku */
-
   const applyPreset = (rowIndex: number, presetIndex: number) => {
     const r = rows[rowIndex];
     if (!r || !r.__presets || r.__presets.length <= presetIndex) return;
 
-    // Preset může mít vždy 'path', ale pro jistotu toleruj i 'label'
-    type FlexPreset = ServingPreset & { label?: string | null };
-    const p = r.__presets[presetIndex] as FlexPreset;
+    const raw = r.__presets[presetIndex] as ServingPreset | { label?: string; grams?: number; unit?: string | null };
+
+    const label = (raw as ServingPreset).path ?? (raw as { label?: string }).label ?? "";
+
+    const grams = (raw as ServingPreset).g ?? (raw as { grams?: number }).grams ?? 0;
+
+    const unit = (raw as ServingPreset).unit ?? (raw as { unit?: string }).unit ?? "ks";
 
     updateRow(rowIndex, {
       __selectedPresetIndex: presetIndex,
-      // uložíme text vybraného presetu (pro skloňování v labelu)
-      selectedPresetLabel: p.path ?? p.label ?? "",
-      unit: p.unit ?? "ks",
-      default_grams: Number(p.g) || 0,
+      selectedPresetLabel: label,
+      selectedServingGrams: grams, // ✨ klíčové pro přenos do formuláře
+      unit,
+      default_grams: grams,
     });
   };
+
   // === render ===
   return (
     <div ref={wrapperRef} className="space-y-3">
@@ -568,7 +647,7 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
                     const v: string = e.target.value ?? "";
                     setQueries((prev) => prev.map((q, i) => (i === idx ? v : q)));
 
-                    // ruční přepsání → odpojit OFF i lokální makra
+                    // ruční přepsání → odpojit makra i preset i výběr
                     updateRow(idx, {
                       name: v,
                       off_id: null,
@@ -585,6 +664,8 @@ const IngredientAutocomplete = forwardRef<IngredientAutocompleteHandle, Props>((
                       sodium_100g: null,
                       __presets: null,
                       __selectedPresetIndex: null,
+                      selectedPresetLabel: null,
+                      selectedServingGrams: null, // ✨ přidal jsem – ať nezůstane starý výběr
                     });
 
                     setOpenIndex(idx);

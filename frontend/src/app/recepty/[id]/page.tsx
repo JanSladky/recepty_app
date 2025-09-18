@@ -63,7 +63,7 @@ export type IngredientInput = {
   display?: string;
   default_grams?: number | null;
   selectedServingGrams?: number | null;
-
+  selected_serving_grams?: number | null;
   // makra na 100 g
   energy_kcal_100g?: number | null;
   proteins_100g?: number | null;
@@ -140,7 +140,11 @@ const normalize = (s: string) =>
 
 /** Minimální tvar pro odhad porce */
 type IngredientForGuess = Pick<IngredientInput, "display" | "name" | "selectedServingGrams">;
-
+function readSelectedServingGrams(ing: IngredientInput): number | null {
+  if (typeof ing.selectedServingGrams === "number") return ing.selectedServingGrams;
+  if (typeof ing.selected_serving_grams === "number") return ing.selected_serving_grams;
+  return null;
+}
 /** Fallback: když v JSONu není selectedServingGrams, zkus uhodnout 3 g/ks z textu. */
 function guessSelectedServingGrams(ing: IngredientForGuess): number | null {
   if (typeof ing.selectedServingGrams === "number" && ing.selectedServingGrams > 0) return ing.selectedServingGrams;
@@ -481,9 +485,8 @@ export default function DetailPage() {
 
                   // 1) hodnota z API (pokud existuje) → jinak chytrý odhad
                   const selected =
-                    typeof ing.selectedServingGrams === "number"
-                      ? ing.selectedServingGrams
-                      : guessSelectedServingGrams({ name: ing.name, display: ing.display, selectedServingGrams: ing.selectedServingGrams });
+                    readSelectedServingGrams(ing) ??
+                    guessSelectedServingGrams({ name: ing.name, display: ing.display, selectedServingGrams: ing.selectedServingGrams });
 
                   // 2) gramáž (pro 'ks' použij vybranou/odhadovanou porci nebo default_grams)
                   const grams = unit === "ks" ? computeGrams(amount, unit, selected, ing.default_grams ?? null) : amount;
@@ -529,6 +532,7 @@ export default function DetailPage() {
                             unit,
 
                             default_grams: ing.default_grams != null ? Number(ing.default_grams) : null,
+
                             selectedServingGrams:
                               typeof ing.selectedServingGrams === "number" ? ing.selectedServingGrams : selectedGuess != null ? selectedGuess : null,
 

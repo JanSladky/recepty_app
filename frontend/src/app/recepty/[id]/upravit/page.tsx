@@ -30,6 +30,7 @@ type BackendIng = {
 
   // může přijít i tohle z detailu receptu
   selectedServingGrams?: number | string | null;
+  selected_serving_grams?: number | string | null;
 
   // presety mohou přijít v obou tvarech
   serving_presets?: ServingPreset[] | null;
@@ -81,9 +82,7 @@ async function fetchIngredientExtras(id: number) {
     const j = await res.json();
 
     const presets: ServingPreset[] =
-      (Array.isArray(j.serving_presets) ? j.serving_presets : []) ||
-      (Array.isArray(j.servingPresets) ? j.servingPresets : []) ||
-      [];
+      (Array.isArray(j.serving_presets) ? j.serving_presets : []) || (Array.isArray(j.servingPresets) ? j.servingPresets : []) || [];
 
     return {
       servingPresets: presets,
@@ -137,8 +136,7 @@ export default function EditPage() {
             const iid = getIngredientId(i);
 
             const hasPresets =
-              (Array.isArray(i.servingPresets) && i.servingPresets.length > 0) ||
-              (Array.isArray(i.serving_presets) && i.serving_presets.length > 0);
+              (Array.isArray(i.servingPresets) && i.servingPresets.length > 0) || (Array.isArray(i.serving_presets) && i.serving_presets.length > 0);
 
             let servingPresets: ServingPreset[] | undefined = undefined;
             let default_grams: number | undefined = undefined;
@@ -169,8 +167,10 @@ export default function EditPage() {
             }
 
             // vybraná porce pro 'ks', pokud byla uložená
-            const selectedServingGrams =
-              i.selectedServingGrams == null ? undefined : num(i.selectedServingGrams) || undefined;
+            const selectedServingGramsRaw =
+              i.selectedServingGrams != null ? i.selectedServingGrams : i.selected_serving_grams != null ? i.selected_serving_grams : null;
+
+            const selectedServingGrams = selectedServingGramsRaw == null ? undefined : num(selectedServingGramsRaw) || undefined;
 
             const row: IngredientRow & {
               servingPresets?: ServingPreset[];
